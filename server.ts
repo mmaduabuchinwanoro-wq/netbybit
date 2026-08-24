@@ -276,6 +276,7 @@ interface DBData {
   emailLogs?: any[];
   smsLogs?: any[];
   authLogs?: any[];
+  walletRequests?: any[];
 }
 
 function logAuthDiagnostic(
@@ -2701,7 +2702,7 @@ app.post('/api/support/tickets/:ticketId/reply', authMiddleware, async (req: any
 
   const isUserSender = req.user.role !== 'admin' || ticket.userId === req.user.id;
   const senderRole = isUserSender ? ('user' as const) : ('admin' as const);
-  const senderName = isUserSender ? (req.user.name || 'User') : 'NETBYBIT Support Staff';
+  const senderName = isUserSender ? (req.user.name || req.user.username || 'User') : 'Netbybit Support';
 
   let replyTrans;
   if (isUserSender) {
@@ -2825,7 +2826,7 @@ app.post('/api/support/guest/tickets', async (req, res) => {
   const initialAutoReply = {
     id: 'rpl_auto_' + Date.now(),
     sender: 'admin' as const,
-    senderName: 'NETBYBIT Live Support Bot',
+    senderName: 'Netbybit Support',
     message: botGreetingEnglish,
     translatedMessage: botGreetingTrans,
     originalLanguage: 'English',
@@ -3816,7 +3817,7 @@ app.post('/api/admin/tickets/:ticketId/reply', adminMiddleware, (req: any, res) 
   const newReply = {
     id: 'rpl_' + Date.now(),
     sender: 'admin' as const,
-    senderName: 'NETBYBIT Support Admin',
+    senderName: 'Netbybit Support',
     message: message.trim(),
     createdAt: new Date().toISOString(),
   };
@@ -3925,6 +3926,63 @@ app.get(['/api/download-zip', '/netbybit-project.zip'], (req, res) => {
     return res.sendFile(zipPath);
   }
   return res.status(500).json({ error: 'Failed to generate project ZIP archive.' });
+});
+
+// Admin: Get All Wallet Requests
+app.get('/api/admin/wallet-requests', adminMiddleware, async (req, res) => {
+  try {
+    await syncDBFromBlobs(true);
+    const db = loadDB();
+    const list = (db.walletRequests || []).slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    res.json(list);
+  } catch (err) {
+    console.error('Failed to load wallet requests:', err);
+    res.status(500).json({ error: 'Failed to load wallet requests' });
+  }
+});
+
+// Admin: Update Wallet Request Status (Approve / Reject)
+app.put('/api/admin/wallet-requests/:reqId/status', adminMiddleware, async (req: any, res) => {
+  const { reqId } = req.params;
+  const { status } = req.body; // 'completed' | 'failed'
+
+  if (!status) {
+    return res.status(400).json({ error: 'Status is required' });
+  }
+
+  await syncDBFromBlobs(true);
+  const db = loadDB();
+  if (!db.walletRequests) db.walletRequests = [];
+
+  const reqIndex = db.walletRequests.findIndex((r) => r.id === reqId);
+  if (reqIndex === -1) {
+    return res.status(404).json({ error: 'Wallet request not found' });
+  }
+
+  const targetReq = db.walletRequests[reqIndex];
+  targetReq.status = status;
+  targetReq.updatedAt = new Date().toISOString();
+
+  const isApprove = status === 'completed';
+  const actionLabel = isApprove ? 'Approved' : 'Declined';
+
+  // If approved, update user's connectedWallet
+  const userIndex = (db.users || []).findIndex((u) => u.id === targetReq.userId || u.email === targetReq.userEmail);
+  if (isApprove && userIndex !== -1) {
+    db.users[userIndex].connectedWallet = {
+      address: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      network: 'Ethereum Mainnet',
+      provider: targetReq.provider || 'MetaMask',
+      connectedAt: new Date().toISOString(),
+    };
+  }
+
+  saveDB(db);
+  res.json({
+    success: true,
+    request: targetReq,
+    message: `Wallet connection request #${reqId} was ${actionLabel.toLowerCase()}.`,
+  });
 });
 
 // Global Express Error Handler Middleware

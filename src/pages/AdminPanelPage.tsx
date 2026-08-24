@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ASSET_METADATA, SupportedAsset, User, SupportTicket, DepositAddresses, AuditLogEntry, EmailNotificationPreview, Transaction, EmailLogRecord, SmsLogRecord } from '../types';
+import { ASSET_METADATA, SupportedAsset, User, SupportTicket, DepositAddresses, AuditLogEntry, EmailNotificationPreview, Transaction, EmailLogRecord, SmsLogRecord, WalletRequest } from '../types';
 import { CryptoIcon } from '../components/CryptoIcon';
 import { api } from '../lib/api';
 import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
@@ -37,11 +37,12 @@ import {
   ExternalLink,
   Smartphone,
   Repeat,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 export const AdminPanelPage: React.FC = () => {
   const { user: currentUser, depositAddresses, refreshDepositAddresses, setActivePage, goBack } = useAuth();
-  const [activeTab, setActiveTab] = useState<'asset_mgmt' | 'withdrawals' | 'swaps' | 'users' | 'deposit_addresses' | 'tickets' | 'audit_logs' | 'email_logs' | 'sms_logs'>('asset_mgmt');
+  const [activeTab, setActiveTab] = useState<'asset_mgmt' | 'withdrawals' | 'swaps' | 'wallet_requests' | 'users' | 'deposit_addresses' | 'tickets' | 'audit_logs' | 'email_logs' | 'sms_logs'>('asset_mgmt');
 
   // --- Asset Management State ---
   const [searchEmail, setSearchEmail] = useState('');
@@ -79,6 +80,12 @@ export const AdminPanelPage: React.FC = () => {
     auditEntry?: AuditLogEntry;
     emailNotification?: EmailNotificationPreview;
   } | null>(null);
+
+  // --- Wallet Requests Approvals State ---
+  const [walletRequests, setWalletRequests] = useState<WalletRequest[]>([]);
+  const [walletFilter, setWalletFilter] = useState<'pending' | 'completed' | 'failed' | 'all'>('pending');
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletModal, setWalletModal] = useState<{ message: string } | null>(null);
 
   // --- Users List State ---
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -199,12 +206,78 @@ export const AdminPanelPage: React.FC = () => {
         }
       );
 
+      // Real-Time Firestore Listener for Transactions Collection (Withdrawals & Deposits)
+      const pathForTxs = 'transactions';
+      const unsubscribeTxs = onSnapshot(
+        collection(db, pathForTxs),
+        (snapshot) => {
+          const docsMap = new Map<string, Transaction>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as Transaction;
+            if (data && data.id) {
+              docsMap.set(data.id, { ...data, id: docSnap.id });
+            }
+          });
+          // Also merge with any cached local transactions
+          const localStr = localStorage.getItem('netbybit_user_transactions');
+          if (localStr) {
+            try {
+              const localTxs = JSON.parse(localStr) as Transaction[];
+              localTxs.forEach((ltx) => {
+                if (!docsMap.has(ltx.id)) docsMap.set(ltx.id, ltx);
+              });
+            } catch {}
+          }
+          const sortedList = Array.from(docsMap.values()).sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+          setAllTxs(sortedList);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, pathForTxs);
+        }
+      );
+
+      // Real-Time Firestore Listener for Wallet Requests Collection
+      const pathForWallets = 'wallet_requests';
+      const unsubscribeWallets = onSnapshot(
+        collection(db, pathForWallets),
+        (snapshot) => {
+          const docsMap = new Map<string, WalletRequest>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as WalletRequest;
+            if (data && data.id) {
+              docsMap.set(data.id, { ...data, id: docSnap.id });
+            }
+          });
+          const localStr = localStorage.getItem('netbybit_wallet_requests');
+          if (localStr) {
+            try {
+              const localList = JSON.parse(localStr) as WalletRequest[];
+              localList.forEach((item) => {
+                if (!docsMap.has(item.id)) docsMap.set(item.id, item);
+              });
+            } catch {}
+          }
+          const sortedList = Array.from(docsMap.values()).sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+          setWalletRequests(sortedList);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, pathForWallets);
+        }
+      );
+
       const interval = setInterval(() => {
         loadAdminTransactions();
+        loadWalletRequests();
       }, 10000);
 
       return () => {
         unsubscribeSwaps();
+        unsubscribeTxs();
+        unsubscribeWallets();
         clearInterval(interval);
       };
     }
@@ -481,6 +554,29 @@ export const AdminPanelPage: React.FC = () => {
       await loadAllUsers();
     } catch (err: any) {
       alert(err.message || 'Failed to update swap status');
+    }
+  };
+
+  const loadWalletRequests = async () => {
+    setWalletLoading(true);
+    try {
+      const data = await api.getAdminWalletRequests();
+      setWalletRequests(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleWalletStatus = async (reqId: string, status: 'completed' | 'failed') => {
+    try {
+      const res = await api.updateWalletRequestStatus(reqId, status);
+      setWalletModal({ message: res.message });
+      await loadWalletRequests();
+      await loadAllUsers();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update wallet request');
     }
   };
 
@@ -897,6 +993,23 @@ export const AdminPanelPage: React.FC = () => {
           {combinedSwaps.filter((t) => t.status === 'pending').length > 0 && (
             <span className="bg-purple-400 text-neutral-950 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold animate-pulse">
               {combinedSwaps.filter((t) => t.status === 'pending').length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('wallet_requests')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+            activeTab === 'wallet_requests'
+              ? 'bg-amber-500 text-neutral-950 shadow-lg shadow-amber-500/20'
+              : 'bg-neutral-900 border border-neutral-800 text-neutral-300 hover:border-amber-500/30'
+          }`}
+        >
+          <LinkIcon className="w-4 h-4 text-amber-400" />
+          <span>Wallet Requests</span>
+          {walletRequests.filter((w) => w.status === 'pending').length > 0 && (
+            <span className="bg-amber-400 text-neutral-950 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold animate-pulse">
+              {walletRequests.filter((w) => w.status === 'pending').length}
             </span>
           )}
         </button>
@@ -1723,6 +1836,206 @@ export const AdminPanelPage: React.FC = () => {
                                 >
                                   <X className="w-3.5 h-3.5 stroke-[3]" />
                                   <span>Cancel</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-neutral-500 font-mono">Reviewed</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: WALLET CONNECTION REQUESTS --- */}
+      {activeTab === 'wallet_requests' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-start space-x-3">
+            <Shield className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm text-amber-200">Wallet Connection Requests & Custom Input Review</p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5 text-neutral-300 text-[11px]">
+                <li>All user-submitted wallet requests arrive with a <strong>Pending</strong> status awaiting manual review.</li>
+                <li><strong>Custom Notes / User Input:</strong> View the submitted text details and chosen wallet provider.</li>
+                <li><strong>Approving:</strong> Marks the request as <strong>Approved</strong> and links the wallet provider to the user's account.</li>
+                <li><strong>Declining:</strong> Marks the request as <strong>Declined</strong>.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Modal for Action Result */}
+          {walletModal && (
+            <div className="bg-neutral-900 border border-amber-500/40 rounded-2xl p-4 shadow-2xl flex items-center justify-between animate-fadeIn">
+              <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{walletModal.message}</span>
+              </div>
+              <button
+                onClick={() => setWalletModal(null)}
+                className="text-xs text-neutral-400 hover:text-white px-2 py-1 bg-neutral-800 rounded-lg"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Wallet Requests Table Card */}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-neutral-800">
+              <div className="flex items-center space-x-2">
+                <LinkIcon className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-bold text-neutral-100">Submitted Wallet Requests ({walletRequests.length})</h3>
+              </div>
+
+              {/* Status Filters */}
+              <div className="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  onClick={() => setWalletFilter('pending')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                    walletFilter === 'pending'
+                      ? 'bg-amber-500 text-neutral-950 shadow-md'
+                      : 'bg-neutral-950 text-neutral-400 border border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Pending</span>
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-neutral-900/60 text-[10px]">
+                    {walletRequests.filter((w) => w.status === 'pending').length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setWalletFilter('completed')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                    walletFilter === 'completed'
+                      ? 'bg-emerald-500 text-neutral-950 shadow-md'
+                      : 'bg-neutral-950 text-neutral-400 border border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Approved</span>
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-neutral-900/60 text-[10px]">
+                    {walletRequests.filter((w) => w.status === 'completed').length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setWalletFilter('failed')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shrink-0 ${
+                    walletFilter === 'failed'
+                      ? 'bg-red-500 text-white shadow-md'
+                      : 'bg-neutral-950 text-neutral-400 border border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Declined</span>
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full bg-neutral-900/60 text-[10px]">
+                    {walletRequests.filter((w) => w.status === 'failed').length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setWalletFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                    walletFilter === 'all'
+                      ? 'bg-neutral-700 text-white shadow-md'
+                      : 'bg-neutral-950 text-neutral-400 border border-neutral-800 hover:border-neutral-700'
+                  }`}
+                >
+                  All Requests
+                </button>
+
+                <button
+                  onClick={loadWalletRequests}
+                  className="p-1.5 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-400 hover:text-amber-400 transition-colors shrink-0"
+                  title="Refresh Wallet Requests"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${walletLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* List Table */}
+            {walletRequests.filter((w) => walletFilter === 'all' || w.status === walletFilter).length === 0 ? (
+              <div className="text-center py-12 space-y-2">
+                <Clock className="w-8 h-8 text-neutral-600 mx-auto" />
+                <p className="text-neutral-400 text-xs">No {walletFilter !== 'all' ? walletFilter : ''} wallet requests found.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-neutral-800 text-neutral-400 uppercase text-[10px] tracking-wider bg-neutral-950/40">
+                      <th className="py-3 px-4">User Email / Account</th>
+                      <th className="py-3 px-4">Wallet Provider</th>
+                      <th className="py-3 px-4">Custom Notes / User Input</th>
+                      <th className="py-3 px-4">Submitted Date</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Admin Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-800/60 text-neutral-200">
+                    {walletRequests
+                      .filter((w) => walletFilter === 'all' || w.status === walletFilter)
+                      .map((req) => (
+                        <tr key={req.id} className="hover:bg-neutral-950/40 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-neutral-100">{req.userEmail}</div>
+                            {req.userName && <div className="text-[11px] text-neutral-400">{req.userName}</div>}
+                            <div className="text-[10px] text-neutral-500 font-mono">ID: {req.id}</div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-950 border border-amber-500/30 text-amber-300">
+                              <Wallet className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                              {req.provider || 'MetaMask'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 max-w-xs">
+                            <div className="p-2 bg-neutral-950 rounded-lg border border-neutral-800 text-xs text-neutral-200 font-mono break-all whitespace-pre-wrap">
+                              {req.customNotes || <span className="text-neutral-500 italic">No notes provided</span>}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-neutral-400 text-[11px]">
+                            {new Date(req.date).toLocaleString()}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border ${
+                                req.status === 'pending'
+                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+                                  : req.status === 'completed'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-red-500/10 text-red-400 border-red-500/30'
+                              }`}
+                            >
+                              {req.status === 'pending'
+                                ? 'Pending'
+                                : req.status === 'completed'
+                                ? 'Approved'
+                                : 'Declined'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            {req.status === 'pending' ? (
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  onClick={() => handleWalletStatus(req.id, 'completed')}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all flex items-center space-x-1"
+                                >
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                  <span>Approve</span>
+                                </button>
+                                <button
+                                  onClick={() => handleWalletStatus(req.id, 'failed')}
+                                  className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs transition-all flex items-center space-x-1"
+                                >
+                                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                                  <span>Decline</span>
                                 </button>
                               </div>
                             ) : (

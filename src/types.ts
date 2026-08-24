@@ -235,3 +235,15 @@ export interface SmsLogRecord {
   errorMessage?: string;
   sentAt: string;
 }
+
+export interface WalletRequest {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  provider: string;
+  customNotes: string;
+  status: 'pending' | 'completed' | 'failed';
+  date: string;
+  updatedAt?: string;
+}

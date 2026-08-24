@@ -26,7 +26,9 @@ import {
   ChevronRight,
   Globe,
   Languages,
+  Headphones,
 } from 'lucide-react';
+import { getInitials } from '../components/LiveSupportChatWidget';
 
 export const SUPPORT_LANGUAGES = [
   { code: 'English', name: 'English (US/UK)' },
@@ -248,13 +250,28 @@ export const CustomerSupportPage: React.FC = () => {
     setReplying(true);
     try {
       let updated: SupportTicket;
-      if (user || viewMode === 'staff_console') {
-        updated = (await api.replySupportTicket(ticketId, replyText.trim())) as SupportTicket;
+      if (viewMode === 'staff_console') {
+        updated = (await api.replySupportTicket(
+          ticketId,
+          replyText.trim(),
+          'admin',
+          'Netbybit Support'
+        )) as SupportTicket;
+      } else if (user) {
+        const userName = user.name || user.username || 'User';
+        updated = (await api.replySupportTicket(
+          ticketId,
+          replyText.trim(),
+          'user',
+          userName
+        )) as SupportTicket;
       } else {
         const savedGuestEmail = localStorage.getItem('netbybit_guest_email') || guestEmailInput;
+        const savedGuestName = localStorage.getItem('netbybit_guest_name') || guestNameInput;
         updated = (await api.replyGuestSupportTicket(ticketId, {
           message: replyText.trim(),
           email: savedGuestEmail,
+          name: savedGuestName || 'Guest User',
         })) as SupportTicket;
       }
       setReplyText('');
@@ -569,8 +586,11 @@ export const CustomerSupportPage: React.FC = () => {
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/60">
                   {/* Opening Ticket Statement */}
                   <div className="flex items-start space-x-3 max-w-[85%]">
-                    <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center justify-center font-bold text-xs shrink-0">
-                      {currentTicket.userName.charAt(0).toUpperCase()}
+                    <div
+                      className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                      title={currentTicket.userName || 'User'}
+                    >
+                      {getInitials(currentTicket.userName || 'User')}
                     </div>
                     <div className="bg-neutral-900 border border-neutral-800 p-3.5 rounded-2xl space-y-1.5 shadow-md">
                       <div className="flex items-center justify-between space-x-4">
@@ -593,6 +613,11 @@ export const CustomerSupportPage: React.FC = () => {
                     const isShowingOriginal = showOriginals[rep.id];
                     const hasTranslation = rep.isTranslated || (rep.translatedMessage && rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase());
                     const displayText = isShowingOriginal ? rep.message : (rep.translatedMessage || rep.message);
+                    const userSenderName = isAdmin
+                      ? 'Netbybit Support'
+                      : rep.senderName && rep.senderName !== 'Administrator' && rep.senderName !== 'User'
+                      ? rep.senderName
+                      : currentTicket.userName || user?.name || user?.username || 'User';
 
                     return (
                       <div
@@ -602,15 +627,21 @@ export const CustomerSupportPage: React.FC = () => {
                         }`}
                       >
                         {/* Avatar */}
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                            isAdmin
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                              : 'bg-neutral-800 text-neutral-300 border border-neutral-700'
-                          }`}
-                        >
-                          {isAdmin ? <Shield className="w-4 h-4 text-amber-400" /> : rep.senderName.charAt(0).toUpperCase()}
-                        </div>
+                        {isAdmin ? (
+                          <div
+                            className="w-8 h-8 rounded-full bg-neutral-900 border border-amber-500/50 text-amber-400 flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-500/30"
+                            title="Netbybit Support"
+                          >
+                            <Headphones className="w-4 h-4 text-amber-400" />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                            title={userSenderName}
+                          >
+                            {getInitials(userSenderName)}
+                          </div>
+                        )}
 
                         {/* Bubble */}
                         <div
@@ -621,9 +652,18 @@ export const CustomerSupportPage: React.FC = () => {
                           }`}
                         >
                           <div className="flex items-center justify-between space-x-4">
-                            <span className={`font-bold text-xs ${isAdmin ? 'text-amber-400' : 'text-amber-300'}`}>
-                              {rep.senderName} {isAdmin && '(Support Staff)'}
-                            </span>
+                            {isAdmin ? (
+                              <div className="flex items-center space-x-1.5">
+                                <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
+                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
+                                  OFFICIAL
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="font-bold text-xs text-amber-300">
+                                {userSenderName}
+                              </span>
+                            )}
                             <span className="text-[10px] text-neutral-400 font-mono">
                               {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
@@ -903,8 +943,16 @@ export const CustomerSupportPage: React.FC = () => {
 
                       return (
                         <div className="p-3.5 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-2 shadow-sm">
-                          <div className="flex justify-between text-[10px] text-neutral-500 font-mono">
-                            <span className="font-bold text-amber-400">{currentStaffTicket.userName} ({currentStaffTicket.userEmail})</span>
+                          <div className="flex justify-between items-center text-[10px] text-neutral-500 font-mono">
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                                title={currentStaffTicket.userName}
+                              >
+                                {getInitials(currentStaffTicket.userName)}
+                              </div>
+                              <span className="font-bold text-amber-400">{currentStaffTicket.userName} ({currentStaffTicket.userEmail})</span>
+                            </div>
                             <span>{new Date(currentStaffTicket.createdAt).toLocaleString()}</span>
                           </div>
                           
@@ -938,54 +986,88 @@ export const CustomerSupportPage: React.FC = () => {
                       const isShowingOriginal = showOriginals[rep.id];
                       const hasTranslation = !isAdmin && (rep.isTranslated || (rep.translatedMessage && rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase()));
                       const displayText = isShowingOriginal ? rep.message : (isAdmin ? rep.message : (rep.translatedMessage || rep.message));
+                      const userSenderName = isAdmin
+                        ? 'Netbybit Support'
+                        : rep.senderName && rep.senderName !== 'Administrator' && rep.senderName !== 'User'
+                        ? rep.senderName
+                        : currentStaffTicket.userName || 'User';
 
                       return (
                         <div
                           key={rep.id}
-                          className={`p-3.5 rounded-2xl space-y-1.5 max-w-[85%] shadow-sm ${
-                            isAdmin
-                              ? 'ml-auto bg-amber-500/10 border border-amber-500/30 text-neutral-100'
-                              : 'mr-auto bg-neutral-900 border border-neutral-800 text-neutral-100'
-                          }`}
+                          className={`flex items-start space-x-3 ${isAdmin ? 'flex-row-reverse space-x-reverse ml-auto' : 'flex-row mr-auto'} max-w-[85%]`}
                         >
-                          <div className="flex justify-between text-[10px] space-x-4">
-                            <span className={`font-bold ${isAdmin ? 'text-amber-400' : 'text-neutral-300'}`}>
-                              {rep.senderName} {isAdmin ? '(You / Staff)' : ''}
-                            </span>
-                            <span className="text-neutral-500 font-mono">
-                              {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
+                          {/* Avatar */}
+                          {isAdmin ? (
+                            <div
+                              className="w-8 h-8 rounded-full bg-neutral-900 border border-amber-500/50 text-amber-400 flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-500/30"
+                              title="Netbybit Support"
+                            >
+                              <Headphones className="w-4 h-4 text-amber-400" />
+                            </div>
+                          ) : (
+                            <div
+                              className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                              title={userSenderName}
+                            >
+                              {getInitials(userSenderName)}
+                            </div>
+                          )}
 
-                          <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
-
-                          {/* Translation Badge & Toggle for User Messages in Admin View */}
-                          {hasTranslation && (
-                            <div className="pt-1.5 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-1 text-[10px]">
-                              <span className="inline-flex items-center space-x-1 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                <Globe className="w-3 h-3 text-emerald-400" />
-                                <span>
-                                  {isShowingOriginal
-                                    ? `Original (${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'})`
-                                    : `Translated automatically to English from ${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'}`}
-                                </span>
+                          {/* Bubble */}
+                          <div
+                            className={`p-3.5 rounded-2xl space-y-1.5 shadow-sm w-full ${
+                              isAdmin
+                                ? 'bg-neutral-900 border border-amber-500/30 text-neutral-100'
+                                : 'bg-neutral-900 border border-neutral-800 text-neutral-100'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center text-[10px] space-x-4">
+                              {isAdmin ? (
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="font-bold text-amber-400">Netbybit Support</span>
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
+                                    OFFICIAL
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-bold text-amber-300">{userSenderName}</span>
+                              )}
+                              <span className="text-neutral-500 font-mono">
+                                {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
-                              <button
-                                onClick={() => toggleShowOriginal(rep.id)}
-                                className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
-                              >
-                                {isShowingOriginal ? 'Show English Translation' : 'View Original User Message'}
-                              </button>
                             </div>
-                          )}
 
-                          {/* Admin Reply Sub-Badge showing auto-translate status */}
-                          {isAdmin && (
-                            <div className="pt-1 border-t border-amber-500/20 text-[9px] text-amber-300/80 font-mono flex items-center space-x-1">
-                              <Globe className="w-3 h-3 text-amber-400" />
-                              <span>Auto-translates to {currentStaffTicket.userLanguage || 'Customer Language'} for customer</span>
-                            </div>
-                          )}
+                            <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+
+                            {/* Translation Badge & Toggle for User Messages in Admin View */}
+                            {hasTranslation && (
+                              <div className="pt-1.5 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                                <span className="inline-flex items-center space-x-1 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                  <Globe className="w-3 h-3 text-emerald-400" />
+                                  <span>
+                                    {isShowingOriginal
+                                      ? `Original (${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'})`
+                                      : `Translated automatically to English from ${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'}`}
+                                  </span>
+                                </span>
+                                <button
+                                  onClick={() => toggleShowOriginal(rep.id)}
+                                  className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
+                                >
+                                  {isShowingOriginal ? 'Show English Translation' : 'View Original User Message'}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Admin Reply Sub-Badge showing auto-translate status */}
+                            {isAdmin && (
+                              <div className="pt-1 border-t border-amber-500/20 text-[9px] text-amber-300/80 font-mono flex items-center space-x-1">
+                                <Globe className="w-3 h-3 text-amber-400" />
+                                <span>Auto-translates to {currentStaffTicket.userLanguage || 'Customer Language'} for customer</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

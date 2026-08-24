@@ -21,6 +21,26 @@ import {
 } from 'lucide-react';
 import { SUPPORT_LANGUAGES } from '../pages/CustomerSupportPage';
 
+export const getInitials = (name?: string, fallback = 'US'): string => {
+  if (!name || !name.trim()) return fallback;
+  const clean = name.trim();
+  const parts = clean.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0].replace(/[^a-zA-Z0-9]/g, '')[0] || '';
+    const second = parts[1].replace(/[^a-zA-Z0-9]/g, '')[0] || '';
+    const combined = (first + second).toUpperCase();
+    if (combined.length >= 1) return combined.padEnd(2, combined[0]);
+  }
+  const lettersOnly = clean.replace(/[^a-zA-Z0-9]/g, '');
+  if (lettersOnly.length >= 2) {
+    return lettersOnly.slice(0, 2).toUpperCase();
+  }
+  if (lettersOnly.length === 1) {
+    return (lettersOnly + lettersOnly).toUpperCase();
+  }
+  return fallback;
+};
+
 export const LiveSupportChatWidget: React.FC = () => {
   const { user, activePage } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -213,15 +233,18 @@ export const LiveSupportChatWidget: React.FC = () => {
 
     try {
       if (user) {
-        const updatedTicket = await api.replySupportTicket(activeTicket.id, content);
+        const userName = user.name || user.username || 'User';
+        const updatedTicket = await api.replySupportTicket(activeTicket.id, content, 'user', userName);
         setActiveTicket(updatedTicket);
         setUserTickets((prev) =>
           prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
         );
       } else {
+        const guestDisplayName = guestName.trim() || activeTicket.userName || 'Guest User';
         const updatedTicket = await api.replyGuestSupportTicket(activeTicket.id, {
           message: content,
           email: guestEmail,
+          name: guestDisplayName,
         });
         setActiveTicket(updatedTicket);
       }
@@ -558,13 +581,31 @@ export const LiveSupportChatWidget: React.FC = () => {
                 </div>
 
                 {/* Original Inquiry Message */}
-                <div className="flex flex-col items-end space-y-1">
-                  <div className="bg-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-tr-none max-w-[85%] leading-relaxed shadow-sm">
-                    {activeTicket.message}
+                <div className="flex items-start space-x-2 flex-row-reverse space-x-reverse">
+                  {/* User Avatar with Initials */}
+                  <div
+                    className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                    title={activeTicket.userName || user?.name || user?.username || 'User'}
+                  >
+                    {getInitials(activeTicket.userName || user?.name || user?.username || 'User')}
                   </div>
-                  <span className="text-[9px] text-neutral-400 font-mono">
-                    {new Date(activeTicket.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+
+                  <div className="flex flex-col items-end space-y-1 max-w-[80%]">
+                    <div className="flex items-center space-x-1.5 mb-0.5">
+                      <span className="text-[10px] font-bold text-amber-300">
+                        {activeTicket.userName || user?.name || user?.username || 'You'}
+                      </span>
+                    </div>
+                    <div className="bg-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-tr-none leading-relaxed shadow-sm text-xs">
+                      {activeTicket.message}
+                    </div>
+                    <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1">
+                      <span>
+                        {new Date(activeTicket.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <CheckCheck className="w-3 h-3 text-amber-400" />
+                    </span>
+                  </div>
                 </div>
 
                 {/* Replies Thread */}
@@ -573,57 +614,84 @@ export const LiveSupportChatWidget: React.FC = () => {
                   const isShowingOriginal = showOriginals[reply.id];
                   const hasTranslation = reply.isTranslated || (reply.translatedMessage && reply.translatedMessage.trim().toLowerCase() !== reply.message.trim().toLowerCase());
                   const displayText = isShowingOriginal ? reply.message : (reply.translatedMessage || reply.message);
+                  const userSenderName = isStaff
+                    ? 'Netbybit Support'
+                    : reply.senderName && reply.senderName !== 'Administrator' && reply.senderName !== 'User'
+                    ? reply.senderName
+                    : activeTicket.userName || user?.name || user?.username || 'User';
 
                   return (
                     <div
                       key={reply.id}
-                      className={`flex flex-col ${isStaff ? 'items-start' : 'items-end'} space-y-1`}
+                      className={`flex items-start space-x-2 ${isStaff ? 'flex-row' : 'flex-row-reverse space-x-reverse'}`}
                     >
-                      <div className="flex items-center space-x-1.5 mb-0.5">
-                        <span className={`text-[9px] font-bold ${isStaff ? 'text-amber-400' : 'text-neutral-400'}`}>
-                          {isStaff ? 'NETBYBIT Support Staff' : reply.senderName || 'You'}
-                        </span>
-                        {isStaff && (
-                          <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
-                            OFFICIAL
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        className={`p-3 rounded-2xl max-w-[85%] leading-relaxed shadow-sm space-y-1 ${
-                          isStaff
-                            ? 'bg-neutral-800 border border-neutral-700 text-white rounded-tl-none'
-                            : 'bg-amber-500/20 border border-amber-500/40 text-amber-100 rounded-tr-none'
-                        }`}
-                      >
-                        <div>{displayText}</div>
+                      {/* Avatar */}
+                      {isStaff ? (
+                        <div
+                          className="w-7 h-7 rounded-full bg-neutral-900 border border-amber-500/50 text-amber-400 flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-500/30"
+                          title="Netbybit Support"
+                        >
+                          <Headphones className="w-3.5 h-3.5" />
+                        </div>
+                      ) : (
+                        <div
+                          className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                          title={userSenderName}
+                        >
+                          {getInitials(userSenderName)}
+                        </div>
+                      )}
 
-                        {/* Translation Badge & Toggle */}
-                        {hasTranslation && (
-                          <div className="pt-1 border-t border-neutral-700/60 flex flex-wrap items-center justify-between gap-1 text-[9px] text-neutral-400">
-                            <span className="inline-flex items-center space-x-1 text-amber-400 font-medium">
-                              <Globe className="w-2.5 h-2.5 text-amber-400" />
-                              <span>
-                                {isShowingOriginal
-                                  ? 'Original'
-                                  : `Translated (${reply.targetLanguage || activeTicket.userLanguage || userPreferredLang})`}
-                              </span>
+                      {/* Message Content */}
+                      <div
+                        className={`flex flex-col ${isStaff ? 'items-start' : 'items-end'} space-y-1 max-w-[80%]`}
+                      >
+                        <div className="flex items-center space-x-1.5 mb-0.5">
+                          <span className={`text-[10px] font-bold ${isStaff ? 'text-amber-400' : 'text-amber-300'}`}>
+                            {isStaff ? 'Netbybit Support' : userSenderName}
+                          </span>
+                          {isStaff && (
+                            <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold border border-amber-500/30">
+                              OFFICIAL
                             </span>
-                            <button
-                              onClick={() => toggleShowOriginal(reply.id)}
-                              className="text-amber-400/90 hover:text-amber-300 underline font-mono cursor-pointer"
-                            >
-                              {isShowingOriginal ? 'Translation' : 'View Original'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1">
-                        <span>
-                          {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          )}
+                        </div>
+                        <div
+                          className={`p-3 rounded-2xl leading-relaxed shadow-sm space-y-1 text-xs ${
+                            isStaff
+                              ? 'bg-neutral-800 border border-neutral-700 text-white rounded-tl-none'
+                              : 'bg-amber-500/20 border border-amber-500/40 text-amber-100 rounded-tr-none'
+                          }`}
+                        >
+                          <div className="whitespace-pre-wrap">{displayText}</div>
+
+                          {/* Translation Badge & Toggle */}
+                          {hasTranslation && (
+                            <div className="pt-1 border-t border-neutral-700/60 flex flex-wrap items-center justify-between gap-1 text-[9px] text-neutral-400">
+                              <span className="inline-flex items-center space-x-1 text-amber-400 font-medium">
+                                <Globe className="w-2.5 h-2.5 text-amber-400" />
+                                <span>
+                                  {isShowingOriginal
+                                    ? 'Original'
+                                    : `Translated (${reply.targetLanguage || activeTicket.userLanguage || userPreferredLang})`}
+                                </span>
+                              </span>
+                              <button
+                                onClick={() => toggleShowOriginal(reply.id)}
+                                className="text-amber-400/90 hover:text-amber-300 underline font-mono cursor-pointer"
+                              >
+                                {isShowingOriginal ? 'Translation' : 'View Original'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1">
+                          <span>
+                            {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <CheckCheck className="w-3 h-3 text-amber-400" />
                         </span>
-                        <CheckCheck className="w-3 h-3 text-amber-400" />
-                      </span>
+                      </div>
                     </div>
                   );
                 })}

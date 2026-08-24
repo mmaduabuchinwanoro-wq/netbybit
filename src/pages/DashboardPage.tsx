@@ -874,17 +874,17 @@ export const DashboardPage: React.FC = () => {
                           <span
                             className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
                               tx.status === 'pending'
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
                                 : tx.status === 'completed'
                                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                 : 'bg-red-500/10 text-red-400 border-red-500/30'
                             }`}
                           >
                             {tx.status === 'pending'
-                              ? 'Pending'
+                              ? 'PROCESSING'
                               : tx.status === 'completed'
-                              ? 'Completed'
-                              : 'Failed'}
+                              ? 'SUCCESSFUL'
+                              : 'DECLINED'}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-neutral-400 text-[11px] font-sans">

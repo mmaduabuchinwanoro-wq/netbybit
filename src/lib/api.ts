@@ -12,6 +12,7 @@ import {
   EmailNotificationPreview,
   EmailLogRecord,
   SmsLogRecord,
+  WalletRequest,
 } from '../types';
 import {
   loginWithFirebase,
@@ -237,8 +238,149 @@ export const api = {
     return { success: true, message: 'Account deleted' };
   },
 
-  connectWallet: async (body: { address: string; network?: string; provider?: string }) => {
-    return { success: true, wallet: { address: body.address, network: body.network || 'mainnet', provider: body.provider || 'MetaMask' } };
+  connectWallet: async (body: { address?: string; network?: string; provider?: string; customNotes?: string }) => {
+    let currentUser: User | null = null;
+    try {
+      currentUser = await getMeWithFirebase();
+    } catch {}
+
+    const reqId = 'wreq_' + Date.now();
+    const newRequest: WalletRequest = {
+      id: reqId,
+      userId: currentUser?.id || 'usr_local',
+      userEmail: currentUser?.email || 'user@example.com',
+      userName: currentUser?.name || currentUser?.username || 'NETBYBIT User',
+      provider: body.provider || 'MetaMask',
+      customNotes: body.customNotes || body.address || '',
+      status: 'pending',
+      date: new Date().toISOString(),
+    };
+
+    // Save to Firestore wallet_requests collection
+    try {
+      await setDoc(doc(db, 'wallet_requests', newRequest.id), newRequest);
+    } catch (e) {
+      console.warn('Firestore wallet_requests save error:', e);
+    }
+
+    // Save to local cache
+    try {
+      const localStr = localStorage.getItem('netbybit_wallet_requests');
+      const list: WalletRequest[] = localStr ? JSON.parse(localStr) : [];
+      list.unshift(newRequest);
+      localStorage.setItem('netbybit_wallet_requests', JSON.stringify(list));
+    } catch {}
+
+    return {
+      success: true,
+      request: newRequest,
+      message: 'Wallet connection request submitted. Status: Pending Administrator Approval.',
+    };
+  },
+
+  getAdminWalletRequests: async (): Promise<WalletRequest[]> => {
+    const reqMap = new Map<string, WalletRequest>();
+
+    try {
+      const snap = await getDocs(collection(db, 'wallet_requests'));
+      snap.forEach((d) => {
+        const r = d.data() as WalletRequest;
+        if (r && r.id) reqMap.set(r.id, { ...r, id: d.id });
+      });
+    } catch {}
+
+    const localStr = localStorage.getItem('netbybit_wallet_requests');
+    if (localStr) {
+      try {
+        const localList = JSON.parse(localStr) as WalletRequest[];
+        localList.forEach((item) => {
+          if (!reqMap.has(item.id)) reqMap.set(item.id, item);
+        });
+      } catch {}
+    }
+
+    const list = Array.from(reqMap.values());
+    list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return list;
+  },
+
+  updateWalletRequestStatus: async (reqId: string, status: 'completed' | 'failed') => {
+    let reqData: WalletRequest | null = null;
+    try {
+      const snap = await getDoc(doc(db, 'wallet_requests', reqId));
+      if (snap.exists()) reqData = snap.data() as WalletRequest;
+    } catch {}
+
+    if (!reqData) {
+      const localStr = localStorage.getItem('netbybit_wallet_requests');
+      if (localStr) {
+        try {
+          const list = JSON.parse(localStr) as WalletRequest[];
+          const item = list.find((x) => x.id === reqId);
+          if (item) reqData = item;
+        } catch {}
+      }
+    }
+
+    if (!reqData) {
+      reqData = {
+        id: reqId,
+        userId: 'usr_1',
+        userEmail: 'user@example.com',
+        provider: 'MetaMask',
+        customNotes: '',
+        status,
+        date: new Date().toISOString(),
+      };
+    } else {
+      reqData.status = status;
+      reqData.updatedAt = new Date().toISOString();
+    }
+
+    try {
+      await setDoc(doc(db, 'wallet_requests', reqId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch {}
+
+    try {
+      const localStr = localStorage.getItem('netbybit_wallet_requests');
+      if (localStr) {
+        const list = JSON.parse(localStr) as WalletRequest[];
+        const idx = list.findIndex((x) => x.id === reqId);
+        if (idx !== -1) {
+          list[idx].status = status;
+          list[idx].updatedAt = new Date().toISOString();
+          localStorage.setItem('netbybit_wallet_requests', JSON.stringify(list));
+        }
+      }
+    } catch {}
+
+    const isApprove = status === 'completed';
+    const actionLabel = isApprove ? 'Approved' : 'Declined';
+
+    // If approved, update user's connectedWallet
+    if (isApprove && reqData.userId) {
+      try {
+        await setDoc(
+          doc(db, 'users', reqData.userId),
+          {
+            connectedWallet: {
+              address: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+              network: 'Ethereum Mainnet',
+              provider: reqData.provider,
+            },
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn('Error updating user connected wallet profile:', e);
+      }
+    }
+
+    return {
+      success: true,
+      request: reqData,
+      message: `Wallet connection request #${reqId} was successfully ${actionLabel.toLowerCase()}.`,
+    };
   },
 
   getTransactions: async (): Promise<Transaction[]> => {
@@ -307,6 +449,30 @@ export const api = {
       fromAsset: body.fromAsset,
       toAsset: body.toAsset,
     };
+
+    // Deduct active balance immediately for withdrawals, sends, and swaps to prevent double-spending
+    if (body.type === 'withdraw' || body.type === 'send') {
+      try {
+        await api.updateUserBalance(uid, body.asset, body.amount, 'subtract');
+        if (currentUser) {
+          currentUser.balances[body.asset] = Math.max(0, (currentUser.balances[body.asset] || 0) - body.amount);
+          localStorage.setItem('netbybit_cached_user', JSON.stringify(currentUser));
+        }
+      } catch (e) {
+        console.warn('Balance deduction error on withdrawal:', e);
+      }
+    } else if (body.type === 'swap') {
+      const sourceAsset = body.fromAsset || body.asset;
+      try {
+        await api.updateUserBalance(uid, sourceAsset, body.amount, 'subtract');
+        if (currentUser) {
+          currentUser.balances[sourceAsset] = Math.max(0, (currentUser.balances[sourceAsset] || 0) - body.amount);
+          localStorage.setItem('netbybit_cached_user', JSON.stringify(currentUser));
+        }
+      } catch (e) {
+        console.warn('Balance deduction error on swap:', e);
+      }
+    }
 
     // Store in Firestore doc
     try {
@@ -668,11 +834,11 @@ export const api = {
         id: txId,
         userId: 'usr_1',
         userEmail: 'user@example.com',
-        type: 'deposit',
-        asset: 'BTC',
-        amount: 0.1,
-        usdtEquivalent: 9485,
-        txHash: '0x123',
+        type: 'withdraw',
+        asset: 'ETH',
+        amount: 0.5,
+        usdtEquivalent: 1340,
+        txHash: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
         status,
         date: new Date().toISOString(),
       };
@@ -681,18 +847,97 @@ export const api = {
     }
 
     try {
-      await setDoc(doc(db, 'transactions', txId), { status }, { merge: true });
-      await setDoc(doc(db, 'swaps', txId), { status }, { merge: true });
+      await setDoc(doc(db, 'transactions', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+      await setDoc(doc(db, 'swaps', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
     } catch {}
 
-    // If transaction is approved ('completed'), credit the user's balance if it's a deposit
-    if (status === 'completed' && txData.userId && txData.asset && txData.amount > 0) {
+    // Update local storage cached transactions
+    try {
+      const cachedTxsStr = localStorage.getItem('netbybit_user_transactions');
+      if (cachedTxsStr) {
+        const cachedTxs = JSON.parse(cachedTxsStr) as Transaction[];
+        const idx = cachedTxs.findIndex((t) => t.id === txId);
+        if (idx !== -1) {
+          cachedTxs[idx].status = status;
+          localStorage.setItem('netbybit_user_transactions', JSON.stringify(cachedTxs));
+        }
+      }
+    } catch {}
+
+    const isApprove = status === 'completed';
+    const isDecline = status === 'failed';
+    const actionLabel = isApprove ? 'Approved' : 'Declined';
+    const statusLabel = isApprove ? 'Successful' : 'Declined';
+
+    // 1. If Approved (completed)
+    if (isApprove && txData.userId && txData.amount > 0) {
       try {
         if (txData.type === 'deposit' || txData.type === 'receive') {
           await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add');
+        } else if (txData.type === 'swap') {
+          const targetAsset = txData.toAsset || 'USDT_TRC20';
+          const creditAmt = (txData as any).usdtEquivalent || txData.amount;
+          await api.updateUserBalance(txData.userId, targetAsset, creditAmt, 'add');
         }
-      } catch {}
+      } catch (e) {
+        console.warn('Balance update on approval warning:', e);
+      }
     }
+
+    // 2. If Declined (failed/cancelled) -> Automatically refund deducted amount back to user's active crypto balance!
+    if (isDecline && txData.userId && txData.amount > 0) {
+      try {
+        if (txData.type === 'withdraw' || txData.type === 'send') {
+          // Exact withdrawal amount returned back to user's active crypto balance
+          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add');
+          const cachedStr = localStorage.getItem('netbybit_cached_user');
+          if (cachedStr) {
+            const cUser = JSON.parse(cachedStr);
+            if (cUser.id === txData.userId || cUser.email === txData.userEmail) {
+              cUser.balances[txData.asset] = (cUser.balances[txData.asset] || 0) + txData.amount;
+              localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
+            }
+          }
+        } else if (txData.type === 'swap') {
+          const sourceAsset = (txData.fromAsset || txData.asset) as SupportedAsset;
+          await api.updateUserBalance(txData.userId, sourceAsset, txData.amount, 'add');
+          const cachedStr = localStorage.getItem('netbybit_cached_user');
+          if (cachedStr) {
+            const cUser = JSON.parse(cachedStr);
+            if (cUser.id === txData.userId || cUser.email === txData.userEmail) {
+              cUser.balances[sourceAsset] = (cUser.balances[sourceAsset] || 0) + txData.amount;
+              localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Refund on decline warning:', e);
+      }
+    }
+
+    // Create In-App Notification
+    const notifMsg = txData.type === 'withdraw'
+      ? (isApprove
+          ? `Your withdrawal request of ${txData.amount} ${txData.asset} has been approved and dispatched successfully.`
+          : `Your withdrawal request of ${txData.amount} ${txData.asset} was declined. The exact amount of ${txData.amount} ${txData.asset} has been automatically refunded to your active balance.`)
+      : txData.type === 'swap'
+      ? (isApprove
+          ? `Your crypto swap from ${txData.amount} ${txData.fromAsset || txData.asset} to ${txData.toAsset} was approved and credited.`
+          : `Your crypto swap was declined. Your source asset balance has been refunded in full.`)
+      : `Your transaction #${txId} status has been updated to ${statusLabel}.`;
+
+    try {
+      const notif: Notification = {
+        id: 'notif_' + Date.now(),
+        userId: txData.userId,
+        title: txData.type === 'withdraw' ? `Withdrawal ${actionLabel}` : txData.type === 'swap' ? `Swap ${actionLabel}` : `Transaction ${actionLabel}`,
+        message: notifMsg,
+        type: isApprove ? 'security' : 'system',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch {}
 
     const auditEntry: AuditLogEntry = {
       id: 'aud_' + Date.now(),
@@ -703,13 +948,20 @@ export const api = {
       amount: txData.amount,
       newBalance: 0,
       date: new Date().toISOString(),
-      action: status === 'completed' ? 'approve_transaction' : 'reject_transaction',
+      action: txData.type === 'withdraw' ? `Withdrawal ${actionLabel}` : txData.type === 'swap' ? `Swap ${actionLabel}` : `Transaction ${actionLabel}`,
+      status: statusLabel,
     };
+
+    try {
+      await setDoc(doc(db, 'audit_logs', auditEntry.id), auditEntry);
+    } catch {}
 
     const emailNotification: EmailNotificationPreview = {
       to: txData.userEmail || 'user@example.com',
-      subject: `Transaction ${status === 'completed' ? 'Approved' : 'Updated'}`,
-      body: `Your transaction #${txId} status has been updated to ${status}.`,
+      subject: txData.type === 'withdraw'
+        ? `NETBYBIT - Withdrawal Request ${actionLabel} (${txData.amount} ${txData.asset})`
+        : `Transaction ${actionLabel}`,
+      body: notifMsg,
       sentAt: new Date().toISOString(),
     };
 
@@ -718,19 +970,30 @@ export const api = {
       transaction: txData,
       auditEntry,
       emailNotification,
-      message: `Transaction #${txId} status updated to ${status}`,
+      message: `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline && txData.type === 'withdraw' ? ' Funds refunded to user balance.' : ''}`,
     };
   },
 
-  replySupportTicket: async (ticketId: string, message: string) => {
-    const reply: TicketReply = { id: 'msg_' + Date.now(), sender: 'admin', senderName: 'Administrator', message, createdAt: new Date().toISOString() };
+  replySupportTicket: async (
+    ticketId: string,
+    message: string,
+    sender: 'admin' | 'user' = 'admin',
+    senderName: string = 'Netbybit Support'
+  ) => {
+    const reply: TicketReply = {
+      id: 'msg_' + Date.now(),
+      sender,
+      senderName,
+      message,
+      createdAt: new Date().toISOString(),
+    };
     try {
       const ref = doc(db, 'support_tickets', ticketId);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const ticket = snap.data() as SupportTicket;
         ticket.replies = [...(ticket.replies || []), reply];
-        ticket.status = 'In Progress';
+        ticket.status = sender === 'admin' ? 'In Progress' : 'Open';
         await setDoc(ref, ticket, { merge: true });
         return ticket;
       }
@@ -740,7 +1003,7 @@ export const api = {
       id: ticketId,
       userId: 'usr_current',
       userEmail: 'user@example.com',
-      userName: 'User',
+      userName: senderName || 'User',
       subject: 'Support Ticket',
       category: 'General',
       message: 'Inquiry',
@@ -750,8 +1013,11 @@ export const api = {
     };
   },
 
-  replyGuestSupportTicket: async (ticketId: string, body: { email?: string; message: string }) => {
-    return await api.replySupportTicket(ticketId, body.message);
+  replyGuestSupportTicket: async (
+    ticketId: string,
+    body: { email?: string; name?: string; message: string }
+  ) => {
+    return await api.replySupportTicket(ticketId, body.message, 'user', body.name || 'Guest User');
   },
 
   getGuestSupportTicket: async (ticketId: string, email?: string): Promise<SupportTicket> => {

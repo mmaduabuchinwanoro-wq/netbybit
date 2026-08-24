@@ -162,11 +162,11 @@ export const HistoryPage: React.FC = () => {
                             tx.status === 'completed'
                               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                               : tx.status === 'pending'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
                               : 'bg-red-500/10 text-red-400 border border-red-500/20'
                           }`}
                         >
-                          {tx.status}
+                          {tx.status === 'pending' ? 'PROCESSING' : tx.status === 'completed' ? 'SUCCESSFUL' : 'DECLINED'}
                         </span>
                       </td>
                     </tr>
