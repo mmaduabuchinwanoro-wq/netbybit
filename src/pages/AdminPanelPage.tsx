@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
+  ArrowLeft,
   Shield,
   Search,
   PlusCircle,
@@ -39,7 +40,7 @@ import {
 } from 'lucide-react';
 
 export const AdminPanelPage: React.FC = () => {
-  const { user: currentUser, depositAddresses, refreshDepositAddresses, setActivePage } = useAuth();
+  const { user: currentUser, depositAddresses, refreshDepositAddresses, setActivePage, goBack } = useAuth();
   const [activeTab, setActiveTab] = useState<'asset_mgmt' | 'withdrawals' | 'swaps' | 'users' | 'deposit_addresses' | 'tickets' | 'audit_logs' | 'email_logs' | 'sms_logs'>('asset_mgmt');
 
   // --- Asset Management State ---
@@ -772,7 +773,22 @@ export const AdminPanelPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
+      {/* Navigation Back Button */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => goBack('dashboard')}
+          className="group inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 text-neutral-300 hover:text-amber-300 text-xs font-semibold transition-all shadow-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1 text-amber-400" />
+          <span>Back to Dashboard</span>
+        </button>
+
+        <div className="text-[11px] font-mono text-neutral-500">
+          NETBYBIT <span className="text-amber-400 font-bold">/ MASTER ADMIN PORTAL</span>
+        </div>
+      </div>
+
       {/* Admin Title Header */}
       <div className="bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/30 border border-amber-500/40 rounded-2xl p-6 sm:p-8 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>

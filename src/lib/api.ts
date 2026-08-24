@@ -301,7 +301,7 @@ export const api = {
       amount: body.amount,
       usdtEquivalent: body.usdtEquivalent || body.amount,
       txHash: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-      status: body.type === 'deposit' ? 'completed' : 'pending',
+      status: 'pending',
       date: new Date().toISOString(),
       destinationAddress: body.destinationAddress,
       fromAsset: body.fromAsset,

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ASSET_METADATA, SupportedAsset } from '../types';
 import { CryptoIcon } from '../components/CryptoIcon';
+import { PageHeader } from '../components/PageHeader';
 import { api } from '../lib/api';
-import { Repeat, ArrowDown, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Repeat, ArrowDown, CheckCircle2, AlertCircle, Clock, ShieldCheck, Lock } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db } from '../lib/firebase';
 
 export const SwapPage: React.FC = () => {
   const { user, prices, refreshUser } = useAuth();
@@ -36,7 +37,7 @@ export const SwapPage: React.FC = () => {
   const handleExecuteSwap = async (e: React.FormEvent) => {
     e.preventDefault();
     if (parsedFrom <= 0) {
-      setMessage({ type: 'error', text: 'Enter valid swap amount' });
+      setMessage({ type: 'error', text: 'Please enter a valid swap amount' });
       return;
     }
     if (parsedFrom > availableFromBal) {
@@ -102,7 +103,7 @@ export const SwapPage: React.FC = () => {
       await refreshUser();
       setMessage({
         type: 'success',
-        text: 'Your crypto swap request has been submitted successfully and is currently Pending Approval.',
+        text: 'Your crypto swap order has been submitted successfully. Status: Pending Manual Admin Approval.',
       });
       setFromAmount('');
     } catch (err: any) {
@@ -114,42 +115,66 @@ export const SwapPage: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto space-y-8 pb-12">
-      <div className="text-center space-y-2">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 mx-auto flex items-center justify-center">
-          <Repeat className="w-6 h-6" />
-        </div>
-        <h1 className="text-2xl font-extrabold text-neutral-100">Swap Cryptocurrencies</h1>
-        <p className="text-xs text-neutral-400">
-          Instant low-fee exchange between multi-chain crypto assets
-        </p>
-      </div>
+      {/* Page Header with Back Button */}
+      <PageHeader
+        title="Swap Cryptocurrencies"
+        subtitle="Institutional multi-pair digital asset liquidity and conversion terminal"
+        icon={Repeat}
+        badge="Manual Compliance Clearance"
+        badgeType="gold"
+      />
 
-      <div className="bg-neutral-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+      <div className="bg-neutral-900/95 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Admin Review Notice */}
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-3">
+          <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">
+              Strict Manual Review
+            </h4>
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              Swaps are audited for slippage and reserves, and settle immediately upon administrator authorization.
+            </p>
+          </div>
+        </div>
+
         {message && (
           <div
-            className={`p-3.5 rounded-xl text-xs flex items-center space-x-2 ${
+            className={`p-4 rounded-2xl text-xs flex items-center space-x-3 shadow-lg ${
               message.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'bg-red-500/10 text-red-400 border border-red-500/30'
+                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
+                : 'bg-red-500/15 text-red-300 border border-red-500/40'
             }`}
           >
             {message.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
             ) : (
-              <AlertCircle className="w-4 h-4 shrink-0" />
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
             )}
-            <span>{message.text}</span>
+            <span className="font-medium">{message.text}</span>
           </div>
         )}
 
-        <form onSubmit={handleExecuteSwap} className="space-y-4">
-          {/* From Card */}
-          <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-            <div className="flex justify-between items-center text-xs text-neutral-400">
-              <span>You Pay</span>
-              <span>Avail: {availableFromBal.toFixed(4)}</span>
+        <form onSubmit={handleExecuteSwap} className="space-y-5">
+          {/* FROM ASSET */}
+          <div className="p-4 bg-neutral-950/90 border border-neutral-800 rounded-2xl space-y-2 shadow-inner">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-neutral-400 font-medium">You Pay</span>
+              <span className="text-neutral-500 font-mono text-[11px]">
+                Available:{' '}
+                <button
+                  type="button"
+                  onClick={() => setFromAmount(availableFromBal.toString())}
+                  className="text-amber-400 hover:underline font-bold"
+                >
+                  {availableFromBal.toFixed(4)} {fromAsset}
+                </button>
+              </span>
             </div>
-            <div className="flex items-center space-x-2">
+
+            <div className="flex items-center space-x-3">
               <input
                 type="number"
                 step="any"
@@ -157,69 +182,76 @@ export const SwapPage: React.FC = () => {
                 value={fromAmount}
                 onChange={(e) => setFromAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-transparent text-lg font-mono font-bold text-neutral-100 focus:outline-none"
+                className="flex-1 bg-transparent text-xl font-bold font-mono text-neutral-100 focus:outline-none"
               />
-              <div className="flex items-center space-x-1.5 bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1">
-                <CryptoIcon asset={fromAsset} size="xs" />
-                <select
-                  value={fromAsset}
-                  onChange={(e) => setFromAsset(e.target.value as SupportedAsset)}
-                  className="bg-transparent text-amber-400 font-bold text-xs focus:outline-none"
-                >
-                  {Object.values(ASSET_METADATA).map((a) => (
-                    <option key={a.id} value={a.id} className="bg-neutral-900 text-neutral-200">
-                      {a.symbol}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={fromAsset}
+                onChange={(e) => setFromAsset(e.target.value as SupportedAsset)}
+                className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold text-neutral-200 focus:outline-none focus:border-amber-500/50"
+              >
+                {Object.values(ASSET_METADATA).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.symbol} ({a.network})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Swap direction button */}
+          {/* SWAP TOGGLE BUTTON */}
           <div className="flex justify-center -my-2 relative z-10">
             <button
               type="button"
               onClick={handleSwapAssets}
-              className="w-9 h-9 rounded-full bg-neutral-900 border border-amber-500/40 text-amber-400 flex items-center justify-center hover:bg-neutral-800 transition-all shadow-md"
+              className="p-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-lg shadow-amber-500/30 transition-transform hover:scale-110 active:rotate-180 duration-200"
+              title="Reverse Swap Direction"
             >
-              <ArrowDown className="w-4 h-4" />
+              <Repeat className="w-4 h-4" />
             </button>
           </div>
 
-          {/* To Card */}
-          <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-            <div className="flex justify-between items-center text-xs text-neutral-400">
-              <span>You Receive (Estimated)</span>
-              <span>Rate: 1 {fromAsset} = {toPrice > 0 ? (fromPrice / toPrice).toFixed(4) : 0} {toAsset}</span>
+          {/* TO ASSET */}
+          <div className="p-4 bg-neutral-950/90 border border-neutral-800 rounded-2xl space-y-2 shadow-inner">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-neutral-400 font-medium">You Receive (Estimated)</span>
+              <span className="text-[10px] font-mono text-neutral-500">Live Rate Valuation</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-full text-lg font-mono font-bold text-amber-400">
-                {estimatedToAmount > 0 ? estimatedToAmount.toFixed(4) : '0.00'}
+
+            <div className="flex items-center space-x-3">
+              <div className="flex-1 text-xl font-bold font-mono text-amber-300">
+                {estimatedToAmount > 0 ? estimatedToAmount.toFixed(4) : '0.0000'}
               </div>
-              <div className="flex items-center space-x-1.5 bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1">
-                <CryptoIcon asset={toAsset} size="xs" />
-                <select
-                  value={toAsset}
-                  onChange={(e) => setToAsset(e.target.value as SupportedAsset)}
-                  className="bg-transparent text-amber-400 font-bold text-xs focus:outline-none"
-                >
-                  {Object.values(ASSET_METADATA).map((a) => (
-                    <option key={a.id} value={a.id} className="bg-neutral-900 text-neutral-200">
-                      {a.symbol}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={toAsset}
+                onChange={(e) => setToAsset(e.target.value as SupportedAsset)}
+                className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-xs font-bold text-neutral-200 focus:outline-none focus:border-amber-500/50"
+              >
+                {Object.values(ASSET_METADATA).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.symbol} ({a.network})
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div className="p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-2xl space-y-1 text-[11px] text-neutral-400">
+            <div className="flex items-center space-x-1.5 text-amber-400 font-semibold">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Custody Conversion Policy</span>
+            </div>
+            <p className="leading-relaxed">
+              Upon placing your swap, the source asset is reserved in your custody account. The converted asset is credited immediately upon administrator clearance.
+            </p>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl font-bold text-xs shadow-lg transition-all flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 hover:from-amber-400 hover:to-yellow-300 shadow-amber-500/20"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 active:scale-[0.99]"
           >
-            <span>{loading ? 'Swapping...' : 'Swap Assets Now'}</span>
+            <span>{loading ? 'Submitting Swap to Compliance...' : `Submit Swap Order`}</span>
+            <Repeat className="w-4 h-4" />
           </button>
         </form>
       </div>

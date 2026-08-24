@@ -15,6 +15,7 @@ interface AuthContextType {
   pricesLoading: boolean;
   activePage: string;
   setActivePage: (page: string) => void;
+  goBack: (fallback?: string) => void;
   // Currency Switcher & Value Conversion
   selectedCurrency: string;
   setSelectedCurrency: (curr: string) => Promise<void>;
@@ -55,13 +56,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(true);
+  const [pageHistory, setPageHistory] = useState<string[]>([]);
   const [activePage, setActivePageState] = useState<string>(() => {
     return localStorage.getItem('netbybit_active_page') || 'home';
   });
 
   const setActivePage = (page: string) => {
-    setActivePageState(page);
+    setActivePageState((prev) => {
+      if (prev && prev !== page) {
+        setPageHistory((history) => [...history.slice(-15), prev]);
+      }
+      return page;
+    });
     localStorage.setItem('netbybit_active_page', page);
+  };
+
+  const goBack = (fallback?: string) => {
+    setPageHistory((prev) => {
+      const copy = [...prev];
+      const previous = copy.pop();
+      const target = previous || fallback || (user ? (user.role === 'admin' ? 'admin' : 'dashboard') : 'home');
+      setActivePageState(target);
+      localStorage.setItem('netbybit_active_page', target);
+      return copy;
+    });
   };
 
   // Fiat & Privacy State
@@ -322,6 +340,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         pricesLoading,
         activePage,
         setActivePage,
+        goBack,
         selectedCurrency,
         setSelectedCurrency,
         fiatRates,

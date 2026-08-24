@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ASSET_METADATA, SupportedAsset } from '../types';
 import { CryptoIcon } from '../components/CryptoIcon';
+import { PageHeader } from '../components/PageHeader';
 import { api } from '../lib/api';
 import {
   ArrowUpRight,
@@ -10,6 +11,8 @@ import {
   CheckCircle2,
   Lock,
   Wallet,
+  Clock,
+  Info,
 } from 'lucide-react';
 
 export const WithdrawPage: React.FC = () => {
@@ -81,7 +84,7 @@ export const WithdrawPage: React.FC = () => {
         [selectedAsset]: destinationAddress.trim(),
       } as Record<SupportedAsset, string>);
 
-      // Submit withdrawal transaction
+      // Submit withdrawal transaction (always strictly pending admin manual review)
       await api.createTransaction({
         type: 'withdraw',
         asset: selectedAsset,
@@ -92,7 +95,7 @@ export const WithdrawPage: React.FC = () => {
       await refreshUser();
       setMessage({
         type: 'success',
-        text: 'Withdrawal request submitted successfully. Status: Pending Approval.',
+        text: 'Withdrawal request submitted successfully. Status: Pending Manual Admin Approval.',
       });
       setAmount('');
     } catch (err: any) {
@@ -104,42 +107,54 @@ export const WithdrawPage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800 pb-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-              <ArrowUpRight className="w-4 h-4" />
-            </div>
-            <h1 className="text-2xl font-extrabold text-neutral-100">Withdraw Crypto</h1>
-          </div>
-          <p className="text-xs text-neutral-400 mt-1">
-            Request asset withdrawal to external Web3 blockchain wallet
-          </p>
-        </div>
-      </div>
+      {/* Page Header with Back Button */}
+      <PageHeader
+        title="Withdraw Crypto"
+        subtitle="Initiate institutional outbound asset dispatch to external multi-chain addresses"
+        icon={ArrowUpRight}
+        badge="Manual Compliance Required"
+        badgeType="gold"
+      />
 
-      <div className="bg-neutral-900 border border-amber-500/30 rounded-2xl p-6 sm:p-8 shadow-2xl text-neutral-100 space-y-6">
+      <div className="bg-neutral-900/95 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl text-neutral-100 space-y-6 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Security & Admin Approval Policy Notice */}
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-3">
+          <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">
+              Strict Manual Admin Approval Policy
+            </h4>
+            <p className="text-xs text-neutral-300 leading-relaxed">
+              Every withdrawal undergoes rigorous multi-sig compliance review and manual administrator clearance prior to blockchain broadcasting.
+            </p>
+          </div>
+        </div>
+
         {message && (
           <div
-            className={`p-3.5 rounded-xl text-xs flex items-center space-x-2 ${
+            className={`p-4 rounded-2xl text-xs flex items-center space-x-3 shadow-lg ${
               message.type === 'success'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'bg-red-500/10 text-red-400 border border-red-500/30'
+                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
+                : 'bg-red-500/15 text-red-300 border border-red-500/40'
             }`}
           >
             {message.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
             ) : (
-              <AlertCircle className="w-4 h-4 shrink-0" />
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
             )}
-            <span>{message.text}</span>
+            <span className="font-medium">{message.text}</span>
           </div>
         )}
 
         {/* Asset Selector */}
         <div>
-          <label className="block text-xs font-medium text-neutral-300 mb-2">Select Asset to Withdraw</label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <label className="block text-xs font-semibold text-neutral-300 mb-2.5 uppercase tracking-wider">
+            Select Asset to Withdraw
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {Object.values(ASSET_METADATA).map((asset) => {
               const isSelected = selectedAsset === asset.id;
               const bal = user.balances[asset.id] || 0;
@@ -148,16 +163,18 @@ export const WithdrawPage: React.FC = () => {
                   key={asset.id}
                   type="button"
                   onClick={() => handleAssetChange(asset.id)}
-                  className={`p-3 rounded-xl border text-left transition-all flex items-center space-x-2.5 ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all flex items-center space-x-3 ${
                     isSelected
-                      ? 'bg-amber-500/15 border-amber-500 text-amber-300'
-                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                      ? 'bg-amber-500/15 border-amber-500/80 text-amber-300 shadow-md ring-1 ring-amber-500/30'
+                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200'
                   }`}
                 >
                   <CryptoIcon asset={asset.id} size="sm" />
                   <div className="overflow-hidden">
                     <p className="font-bold text-xs truncate">{asset.symbol}</p>
-                    <p className="text-[10px] text-neutral-500 font-mono mt-0.5 truncate">Bal: {bal.toFixed(4)}</p>
+                    <p className="text-[10px] text-neutral-400 font-mono mt-0.5 truncate">
+                      Bal: <span className="text-amber-400 font-semibold">{bal.toFixed(4)}</span>
+                    </p>
                   </div>
                 </button>
               );
@@ -167,11 +184,11 @@ export const WithdrawPage: React.FC = () => {
 
         {/* Balance & Amount Input */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl flex justify-between items-center text-xs">
+          <div className="p-4 bg-neutral-950/90 border border-neutral-800 rounded-2xl flex justify-between items-center text-xs shadow-inner">
             <div className="flex items-center space-x-3">
               <CryptoIcon asset={selectedAsset} size="md" showNetworkBadge />
               <div>
-                <span className="text-neutral-500 block">Available Balance</span>
+                <span className="text-neutral-500 block text-[11px]">Available Vault Balance</span>
                 <span className="font-bold font-mono text-neutral-100 text-sm">
                   {currentBalance.toFixed(4)} {assetInfo.symbol}
                 </span>
@@ -180,14 +197,14 @@ export const WithdrawPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setAmount(currentBalance.toString())}
-              className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px] hover:bg-amber-500/20"
+              className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-xs hover:bg-amber-500/20 transition-all font-mono"
             >
               MAX
             </button>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-1">Withdrawal Amount</label>
+            <label className="block text-xs font-semibold text-neutral-300 mb-1.5">Withdrawal Amount</label>
             <div className="relative">
               <input
                 type="number"
@@ -196,24 +213,24 @@ export const WithdrawPage: React.FC = () => {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-xs text-neutral-100 font-mono focus:outline-none focus:border-amber-500/50"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-100 font-mono focus:outline-none focus:border-amber-500/50"
               />
-              <span className="absolute right-3 top-2.5 text-xs text-amber-400 font-bold font-mono">
+              <span className="absolute right-4 top-3 text-xs text-amber-400 font-bold font-mono">
                 {assetInfo.symbol}
               </span>
             </div>
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-xs font-medium text-neutral-300">
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-xs font-semibold text-neutral-300">
                 Destination Wallet Address ({assetInfo.network})
               </label>
               {user.connectedWallet && (
                 <button
                   type="button"
                   onClick={() => setDestinationAddress(user.connectedWallet?.address || '')}
-                  className="text-[10px] text-amber-400 hover:underline"
+                  className="text-[11px] text-amber-400 hover:underline font-mono"
                 >
                   Use Connected Wallet
                 </button>
@@ -225,26 +242,26 @@ export const WithdrawPage: React.FC = () => {
               value={destinationAddress}
               onChange={(e) => setDestinationAddress(e.target.value)}
               placeholder={`Enter valid ${assetInfo.network} address`}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2.5 text-xs text-neutral-100 font-mono focus:outline-none focus:border-amber-500/50"
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-4 py-3 text-xs text-neutral-100 font-mono focus:outline-none focus:border-amber-500/50"
             />
           </div>
 
-          <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1 text-[11px] text-neutral-400">
+          <div className="p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-2xl space-y-1 text-[11px] text-neutral-400">
             <div className="flex items-center space-x-1.5 text-amber-400 font-semibold">
               <Lock className="w-3.5 h-3.5" />
-              <span>Security Notice</span>
+              <span>Custody Safeguard Notice</span>
             </div>
-            <p>
-              Please verify your withdrawal details carefully before submitting your request. Cryptocurrency transactions cannot be reversed once they have been processed.
+            <p className="leading-relaxed">
+              Upon submission, funds are moved into encrypted escrow. Manual authorization by the compliance administration will release transaction batching to the blockchain.
             </p>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 active:scale-[0.99]"
           >
-            <span>{loading ? 'Processing Withdrawal...' : `Submit Withdrawal of ${amount || '0'} ${assetInfo.symbol}`}</span>
+            <span>{loading ? 'Submitting to Compliance Queue...' : `Submit Withdrawal (${amount || '0'} ${assetInfo.symbol})`}</span>
             <ArrowUpRight className="w-4 h-4" />
           </button>
         </form>

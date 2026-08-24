@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { SupportTicket, TicketReply } from '../types';
 import { api } from '../lib/api';
 import {
+  ArrowLeft,
   LifeBuoy,
   Plus,
   MessageSquare,
@@ -46,7 +47,7 @@ export const SUPPORT_LANGUAGES = [
 ];
 
 export const CustomerSupportPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, goBack } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [adminTickets, setAdminTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,6 +318,21 @@ export const CustomerSupportPage: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
+      {/* Navigation Back Button */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => goBack('dashboard')}
+          className="group inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/40 text-neutral-300 hover:text-amber-300 text-xs font-semibold transition-all shadow-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1 text-amber-400" />
+          <span>Back to Dashboard</span>
+        </button>
+
+        <div className="text-[11px] font-mono text-neutral-500">
+          NETBYBIT VAULT <span className="text-amber-400">/ SUPPORT CONCIERGE</span>
+        </div>
+      </div>
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-neutral-900 via-neutral-900 to-amber-950/40 border border-amber-500/30 rounded-2xl p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
