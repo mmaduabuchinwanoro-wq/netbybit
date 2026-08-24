@@ -103,7 +103,7 @@ export const SwapPage: React.FC = () => {
       await refreshUser();
       setMessage({
         type: 'success',
-        text: 'Your crypto swap order has been submitted successfully. Status: Pending Manual Admin Approval.',
+        text: 'Your crypto swap order has been submitted successfully.',
       });
       setFromAmount('');
     } catch (err: any) {
@@ -120,25 +120,10 @@ export const SwapPage: React.FC = () => {
         title="Swap Cryptocurrencies"
         subtitle="Institutional multi-pair digital asset liquidity and conversion terminal"
         icon={Repeat}
-        badge="Manual Compliance Clearance"
-        badgeType="gold"
       />
 
       <div className="bg-neutral-900/95 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 backdrop-blur-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Admin Review Notice */}
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-3">
-          <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">
-              Strict Manual Review
-            </h4>
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              Swaps are audited for slippage and reserves, and settle immediately upon administrator authorization.
-            </p>
-          </div>
-        </div>
 
         {message && (
           <div
@@ -241,7 +226,7 @@ export const SwapPage: React.FC = () => {
               <span>Custody Conversion Policy</span>
             </div>
             <p className="leading-relaxed">
-              Upon placing your swap, the source asset is reserved in your custody account. The converted asset is credited immediately upon administrator clearance.
+              Upon placing your swap, the source asset is reserved in your vault and converted at the locked institutional liquidity rate.
             </p>
           </div>
 
@@ -250,7 +235,7 @@ export const SwapPage: React.FC = () => {
             disabled={loading}
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 active:scale-[0.99]"
           >
-            <span>{loading ? 'Submitting Swap to Compliance...' : `Submit Swap Order`}</span>
+            <span>{loading ? 'Processing Swap...' : `Submit Swap Order`}</span>
             <Repeat className="w-4 h-4" />
           </button>
         </form>

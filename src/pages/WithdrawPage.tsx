@@ -95,7 +95,7 @@ export const WithdrawPage: React.FC = () => {
       await refreshUser();
       setMessage({
         type: 'success',
-        text: 'Withdrawal request submitted successfully. Status: Pending Manual Admin Approval.',
+        text: 'Withdrawal request submitted successfully.',
       });
       setAmount('');
     } catch (err: any) {
@@ -112,25 +112,10 @@ export const WithdrawPage: React.FC = () => {
         title="Withdraw Crypto"
         subtitle="Initiate institutional outbound asset dispatch to external multi-chain addresses"
         icon={ArrowUpRight}
-        badge="Manual Compliance Required"
-        badgeType="gold"
       />
 
       <div className="bg-neutral-900/95 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl text-neutral-100 space-y-6 backdrop-blur-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Security & Admin Approval Policy Notice */}
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-3">
-          <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">
-              Strict Manual Admin Approval Policy
-            </h4>
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              Every withdrawal undergoes rigorous multi-sig compliance review and manual administrator clearance prior to blockchain broadcasting.
-            </p>
-          </div>
-        </div>
 
         {message && (
           <div
@@ -252,7 +237,7 @@ export const WithdrawPage: React.FC = () => {
               <span>Custody Safeguard Notice</span>
             </div>
             <p className="leading-relaxed">
-              Upon submission, funds are moved into encrypted escrow. Manual authorization by the compliance administration will release transaction batching to the blockchain.
+              Upon submission, funds are securely encrypted and dispatched across validated blockchain network nodes.
             </p>
           </div>
 
@@ -261,7 +246,7 @@ export const WithdrawPage: React.FC = () => {
             disabled={loading}
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 active:scale-[0.99]"
           >
-            <span>{loading ? 'Submitting to Compliance Queue...' : `Submit Withdrawal (${amount || '0'} ${assetInfo.symbol})`}</span>
+            <span>{loading ? 'Processing Withdrawal...' : `Submit Withdrawal (${amount || '0'} ${assetInfo.symbol})`}</span>
             <ArrowUpRight className="w-4 h-4" />
           </button>
         </form>

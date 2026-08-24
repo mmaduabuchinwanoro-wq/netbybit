@@ -160,7 +160,7 @@ export const DepositPage: React.FC = () => {
               <span>Automated On-Chain Node Settlement</span>
             </div>
             <p className="text-xs text-neutral-300 leading-relaxed">
-              Inflows to this vault address are detected automatically by NETBYBIT's custody nodes. For safety and regulatory governance, each incoming transfer undergoes confirmation verification and strict compliance approval before settlement.
+              Inflows to this vault address are detected automatically by NETBYBIT's custody nodes and credited directly to your balance upon required blockchain network confirmations.
             </p>
             <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono text-neutral-400">
               <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-2.5">

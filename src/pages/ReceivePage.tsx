@@ -102,7 +102,7 @@ export const ReceivePage: React.FC = () => {
             <span>Settlement Requirements</span>
           </div>
           <p className="leading-relaxed">
-            Send only {assetInfo.symbol} on the {assetInfo.network} network. Deposits are verified on-chain and credited to your balance following automated node confirmation and administrator compliance clearance.
+            Send only {assetInfo.symbol} on the {assetInfo.network} network. Deposits are verified on-chain and credited to your balance following automated node confirmation.
           </p>
         </div>
       </div>

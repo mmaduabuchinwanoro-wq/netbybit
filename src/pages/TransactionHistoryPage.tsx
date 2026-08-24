@@ -143,12 +143,12 @@ export const TransactionHistoryPage: React.FC = () => {
                         {isPending ? (
                           <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 text-amber-300 border border-amber-500/40">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                            <span>Pending Admin Review</span>
+                            <span>Processing</span>
                           </span>
                         ) : isCompleted ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            <span>Settled & Approved</span>
+                            <span>Completed</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">

@@ -65,19 +65,19 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* CUSTODY AUDIT POLICY CARD */}
+        {/* INSTITUTIONAL COLD VAULT SECURITY */}
         <div className="p-6 bg-neutral-900/95 border border-neutral-800 rounded-3xl space-y-3 shadow-xl backdrop-blur-xl">
           <div className="flex items-center space-x-2 text-neutral-100 font-bold text-sm">
             <Lock className="w-4 h-4 text-amber-400" />
-            <span>Manual Compliance & Admin Approval Requirement</span>
+            <span>Institutional Cold Vault Security</span>
           </div>
           <p className="text-xs text-neutral-400 leading-relaxed">
-            All user transactions (withdrawals, sends, and swaps) are subjected to strict administrative manual approval and multi-sig compliance review before on-chain execution.
+            All user vault balances and digital asset reserves are secured with multi-signature cryptographic isolation and real-time distributed node verification.
           </p>
           <div className="pt-1">
             <span className="inline-flex items-center space-x-1.5 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-mono font-bold">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Compliance Guard Active</span>
+              <span>Vault Isolation Active</span>
             </span>
           </div>
         </div>

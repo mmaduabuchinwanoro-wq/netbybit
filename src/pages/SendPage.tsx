@@ -69,7 +69,7 @@ export const SendPage: React.FC = () => {
       await refreshUser();
       setMessage({
         type: 'success',
-        text: `Send request of ${parsedAmount} ${selectedAsset} to ${recipient} submitted successfully. Status: Pending Manual Admin Approval.`,
+        text: `Send request of ${parsedAmount} ${selectedAsset} to ${recipient} submitted successfully.`,
       });
       setAmount('');
       setRecipient('');
@@ -87,25 +87,10 @@ export const SendPage: React.FC = () => {
         title="Send Crypto"
         subtitle="Transfer assets securely to external addresses or NETBYBIT verified users"
         icon={Send}
-        badge="Manual Clearance Required"
-        badgeType="gold"
       />
 
       <div className="bg-neutral-900/95 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 backdrop-blur-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Admin Approval Notice */}
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-3">
-          <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono">
-              Institutional Transfer Approval
-            </h4>
-            <p className="text-xs text-neutral-300 leading-relaxed">
-              All transfers are held in pending queue and dispatched following compliance administrator review.
-            </p>
-          </div>
-        </div>
 
         {message && (
           <div
@@ -210,10 +195,10 @@ export const SendPage: React.FC = () => {
           <div className="p-3.5 bg-neutral-950/80 border border-neutral-800 rounded-2xl space-y-1 text-[11px] text-neutral-400">
             <div className="flex items-center space-x-1.5 text-amber-400 font-semibold">
               <Lock className="w-3.5 h-3.5" />
-              <span>Multi-Sig Verification</span>
+              <span>Multi-Sig Protection</span>
             </div>
             <p className="leading-relaxed">
-              Outbound transfer requests are verified against wallet authorization rules and pending administrative clearance before dispatch.
+              Outbound transfer requests are verified cryptographically and dispatched securely to the destination network.
             </p>
           </div>
 
@@ -222,7 +207,7 @@ export const SendPage: React.FC = () => {
             disabled={loading}
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 active:scale-[0.99]"
           >
-            <span>{loading ? 'Submitting Transfer Request...' : `Send ${amount || '0'} ${assetInfo.symbol}`}</span>
+            <span>{loading ? 'Processing Transfer...' : `Send ${amount || '0'} ${assetInfo.symbol}`}</span>
             <Send className="w-4 h-4" />
           </button>
         </form>
