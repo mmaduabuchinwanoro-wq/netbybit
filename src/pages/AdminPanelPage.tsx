@@ -207,7 +207,7 @@ export const AdminPanelPage: React.FC = () => {
         }
       );
 
-      // Real-Time Firestore Listener for Transactions Collection (Withdrawals & Deposits)
+      // Real-Time Firestore Listener for Transactions Collection (Withdrawals & Deposits & Sends)
       const pathForTxs = 'transactions';
       const unsubscribeTxs = onSnapshot(
         collection(db, pathForTxs),
@@ -215,8 +215,9 @@ export const AdminPanelPage: React.FC = () => {
           const docsMap = new Map<string, Transaction>();
           snapshot.forEach((docSnap) => {
             const data = docSnap.data() as Transaction;
-            if (data && data.id) {
-              docsMap.set(data.id, { ...data, id: docSnap.id });
+            if (data) {
+              const txId = docSnap.id || data.id;
+              docsMap.set(txId, { ...data, id: txId });
             }
           });
           // Also merge with any cached local transactions
@@ -225,7 +226,7 @@ export const AdminPanelPage: React.FC = () => {
             try {
               const localTxs = JSON.parse(localStr) as Transaction[];
               localTxs.forEach((ltx) => {
-                if (!docsMap.has(ltx.id)) docsMap.set(ltx.id, ltx);
+                if (ltx && ltx.id && !docsMap.has(ltx.id)) docsMap.set(ltx.id, ltx);
               });
             } catch {}
           }
@@ -1540,7 +1541,15 @@ export const AdminPanelPage: React.FC = () => {
           <div className="flex flex-wrap gap-2 justify-between items-center bg-neutral-900 p-4 border border-neutral-800 rounded-2xl">
             <div className="flex space-x-2 overflow-x-auto">
               {(['pending', 'completed', 'failed', 'all'] as const).map((st) => {
-                const count = allTxs.filter((t) => (t.type === 'withdraw' || t.type === 'send') && (st === 'all' || t.status === st)).length;
+                const count = allTxs.filter((t) => {
+                  const isWithdraw = t.type === 'withdraw' || t.type === 'send';
+                  if (!isWithdraw) return false;
+                  if (st === 'all') return true;
+                  if (st === 'pending') return t.status === 'pending' || (t.status as string) === 'processing';
+                  if (st === 'completed') return t.status === 'completed' || (t.status as string) === 'approved' || (t.status as string) === 'success';
+                  if (st === 'failed') return t.status === 'failed' || (t.status as string) === 'declined' || (t.status as string) === 'cancelled' || (t.status as string) === 'rejected';
+                  return t.status === st;
+                }).length;
                 return (
                   <button
                     key={st}
@@ -1570,7 +1579,15 @@ export const AdminPanelPage: React.FC = () => {
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
             {txsLoading ? (
               <p className="text-xs text-neutral-400 text-center py-8">Loading withdrawal requests...</p>
-            ) : allTxs.filter((t) => (t.type === 'withdraw' || t.type === 'send') && (withdrawalFilter === 'all' || t.status === withdrawalFilter)).length === 0 ? (
+            ) : allTxs.filter((t) => {
+                const isWithdraw = t.type === 'withdraw' || t.type === 'send';
+                if (!isWithdraw) return false;
+                if (withdrawalFilter === 'all') return true;
+                if (withdrawalFilter === 'pending') return t.status === 'pending' || (t.status as string) === 'processing';
+                if (withdrawalFilter === 'completed') return t.status === 'completed' || (t.status as string) === 'approved' || (t.status as string) === 'success';
+                if (withdrawalFilter === 'failed') return t.status === 'failed' || (t.status as string) === 'declined' || (t.status as string) === 'cancelled' || (t.status as string) === 'rejected';
+                return t.status === withdrawalFilter;
+              }).length === 0 ? (
               <div className="text-center py-12 space-y-1">
                 <p className="text-xs text-neutral-400 font-bold">No withdrawal requests found</p>
                 <p className="text-[11px] text-neutral-500">There are no {withdrawalFilter === 'all' ? '' : withdrawalFilter} withdrawal requests recorded.</p>
@@ -1592,8 +1609,20 @@ export const AdminPanelPage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-neutral-950 text-neutral-200 font-mono">
                     {allTxs
-                      .filter((t) => (t.type === 'withdraw' || t.type === 'send') && (withdrawalFilter === 'all' || t.status === withdrawalFilter))
-                      .map((tx) => (
+                      .filter((t) => {
+                        const isWithdraw = t.type === 'withdraw' || t.type === 'send';
+                        if (!isWithdraw) return false;
+                        if (withdrawalFilter === 'all') return true;
+                        if (withdrawalFilter === 'pending') return t.status === 'pending' || (t.status as string) === 'processing';
+                        if (withdrawalFilter === 'completed') return t.status === 'completed' || (t.status as string) === 'approved' || (t.status as string) === 'success';
+                        if (withdrawalFilter === 'failed') return t.status === 'failed' || (t.status as string) === 'declined' || (t.status as string) === 'cancelled' || (t.status as string) === 'rejected';
+                        return t.status === withdrawalFilter;
+                      })
+                      .map((tx) => {
+                        const isPendingTx = tx.status === 'pending' || (tx.status as string) === 'processing';
+                        const isCompletedTx = tx.status === 'completed' || (tx.status as string) === 'approved' || (tx.status as string) === 'success';
+
+                        return (
                         <tr key={tx.id} className="hover:bg-neutral-950/40 transition-colors">
                           <td className="py-3.5 px-4 font-sans text-neutral-100 font-semibold">{tx.userEmail || tx.userId}</td>
                           <td className="py-3.5 px-4 font-sans">
@@ -1625,18 +1654,18 @@ export const AdminPanelPage: React.FC = () => {
                           <td className="py-3.5 px-4 font-sans">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${
-                                tx.status === 'pending'
+                                isPendingTx
                                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
-                                  : tx.status === 'completed'
+                                  : isCompletedTx
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                   : 'bg-red-500/10 text-red-400 border-red-500/30'
                               }`}
                             >
-                              {tx.status === 'pending' ? 'Pending Approval' : tx.status === 'completed' ? 'Successful' : 'Declined'}
+                              {isPendingTx ? 'Pending Approval' : isCompletedTx ? 'Successful' : 'Declined'}
                             </span>
                           </td>
                           <td className="py-3.5 px-4 font-sans">
-                            {tx.status === 'pending' ? (
+                            {isPendingTx ? (
                               <div className="flex items-center space-x-2">
                                 <button
                                   onClick={() => handleWithdrawalStatus(tx.id, 'completed')}
@@ -1658,7 +1687,8 @@ export const AdminPanelPage: React.FC = () => {
                             )}
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
