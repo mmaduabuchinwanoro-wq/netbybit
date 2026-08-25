@@ -30,7 +30,7 @@ const DEFAULT_WITHDRAWAL_ADDRESSES: Record<SupportedAsset, string> = {
 export const DEFAULT_ADMIN_USER: User = {
   id: 'usr_admin_primary',
   email: ADMIN_EMAIL,
-  name: 'Platform Administrator',
+  name: 'Netbybit Support',
   username: 'netbybit_admin',
   role: 'admin',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',

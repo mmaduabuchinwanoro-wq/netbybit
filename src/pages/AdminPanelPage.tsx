@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ASSET_METADATA, SupportedAsset, User, SupportTicket, DepositAddresses, AuditLogEntry, EmailNotificationPreview, Transaction, EmailLogRecord, SmsLogRecord, WalletRequest } from '../types';
 import { CryptoIcon } from '../components/CryptoIcon';
+import { SupportAvatar, isStaffSender, getInitials } from '../components/LiveSupportChatWidget';
 import { api } from '../lib/api';
 import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -2473,26 +2474,59 @@ export const AdminPanelPage: React.FC = () => {
                         <span className="text-[10px] text-neutral-500 font-bold block uppercase tracking-wider">
                           Conversation Thread ({t.replies.length} replies):
                         </span>
-                        {t.replies.map((r) => (
-                          <div
-                            key={r.id}
-                            className={`p-3 rounded-lg text-xs space-y-1 ${
-                              r.sender === 'admin'
-                                ? 'bg-amber-500/10 border border-amber-500/30 ml-4'
-                                : 'bg-neutral-900 border border-neutral-800'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center text-[10px]">
-                              <span className={`font-bold ${r.sender === 'admin' ? 'text-amber-400' : 'text-neutral-300'}`}>
-                                {r.senderName} {r.sender === 'admin' ? '(NETBYBIT Support Staff)' : ''}
-                              </span>
-                              <span className="text-neutral-500 font-mono">
-                                {new Date(r.createdAt).toLocaleString()}
-                              </span>
-                            </div>
-                            <p className="text-neutral-200">{r.message}</p>
-                          </div>
-                        ))}
+                        <div className="space-y-2.5">
+                          {t.replies.map((r) => {
+                            const isAdmin = isStaffSender(r);
+                            const userSenderName = isAdmin
+                              ? 'Netbybit Support'
+                              : r.senderName || t.userName || 'User';
+
+                            return (
+                              <div
+                                key={r.id}
+                                className={`flex items-start gap-2.5 ${
+                                  isAdmin ? 'flex-row-reverse justify-start' : 'flex-row justify-start'
+                                }`}
+                              >
+                                {isAdmin ? (
+                                  <SupportAvatar size="sm" />
+                                ) : (
+                                  <div
+                                    className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                                    title={userSenderName}
+                                  >
+                                    {getInitials(userSenderName)}
+                                  </div>
+                                )}
+
+                                <div
+                                  className={`p-3 rounded-2xl text-xs space-y-1 max-w-[80%] ${
+                                    isAdmin
+                                      ? 'bg-amber-500/10 border border-amber-500/30 rounded-tr-xs'
+                                      : 'bg-neutral-900 border border-neutral-800 rounded-tl-xs'
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-center text-[10px] gap-3">
+                                    <div className="flex items-center space-x-1.5">
+                                      <span className={`font-bold ${isAdmin ? 'text-amber-400' : 'text-amber-300'}`}>
+                                        {userSenderName}
+                                      </span>
+                                      {isAdmin && (
+                                        <span className="bg-amber-500/20 text-amber-300 px-1 py-0.2 text-[8px] rounded font-mono font-bold border border-amber-500/30">
+                                          OFFICIAL
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-neutral-500 font-mono">
+                                      {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <p className="text-neutral-200 whitespace-pre-wrap">{r.message}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
 

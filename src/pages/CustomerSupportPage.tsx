@@ -28,7 +28,7 @@ import {
   Languages,
   Headphones,
 } from 'lucide-react';
-import { getInitials } from '../components/LiveSupportChatWidget';
+import { getInitials, SupportAvatar, isStaffSender } from '../components/LiveSupportChatWidget';
 
 export const SUPPORT_LANGUAGES = [
   { code: 'English', name: 'English (US/UK)' },
@@ -593,118 +593,119 @@ export const CustomerSupportPage: React.FC = () => {
                 </div>
 
                 {/* Messages Body Scroll Container */}
-                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/60">
-                  {/* Opening Ticket Statement */}
-                  <div className="flex items-start space-x-3 max-w-[85%]">
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-neutral-950/60">
+                  {/* Opening User Ticket Statement (Outgoing - Right Aligned) */}
+                  <div className="w-full flex justify-end items-end gap-2 my-1">
+                    <div className="max-w-[80%] flex flex-col items-end">
+                      <div className="flex items-center space-x-1.5 mb-1 px-1">
+                        <span className="font-bold text-xs text-amber-300">
+                          {currentTicket.userName || user?.name || user?.username || 'You'}
+                        </span>
+                      </div>
+                      <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3.5 rounded-2xl rounded-br-xs space-y-1.5 shadow-md break-words">
+                        <p className="text-xs leading-relaxed whitespace-pre-wrap">{currentTicket.message}</p>
+                      </div>
+                      <div className="flex items-center space-x-1.5 mt-1 px-1 text-[10px] text-neutral-400 font-mono">
+                        <span>{new Date(currentTicket.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
+                      </div>
+                    </div>
                     <div
                       className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
                       title={currentTicket.userName || 'User'}
                     >
                       {getInitials(currentTicket.userName || 'User')}
                     </div>
-                    <div className="bg-neutral-900 border border-neutral-800 p-3.5 rounded-2xl space-y-1.5 shadow-md">
-                      <div className="flex items-center justify-between space-x-4">
-                        <span className="font-bold text-xs text-amber-400">{currentTicket.userName}</span>
-                        <span className="text-[10px] text-neutral-500 font-mono">
-                          {new Date(currentTicket.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-neutral-200 leading-relaxed">{currentTicket.message}</p>
-                      <div className="flex items-center justify-end space-x-1 text-[10px] text-emerald-400 font-mono">
-                        <CheckCheck className="w-3.5 h-3.5" />
-                        <span>Delivered</span>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Reply Thread */}
                   {currentTicket.replies?.map((rep) => {
-                    const isAdmin = rep.sender === 'admin';
+                    const isAdmin = isStaffSender(rep);
                     const isShowingOriginal = showOriginals[rep.id];
-                    const hasTranslation = rep.isTranslated || (rep.translatedMessage && rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase());
+                    const hasTranslation =
+                      rep.isTranslated ||
+                      (rep.translatedMessage &&
+                        rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase());
                     const displayText = isShowingOriginal ? rep.message : (rep.translatedMessage || rep.message);
                     const userSenderName = isAdmin
                       ? 'Netbybit Support'
-                      : rep.senderName && rep.senderName !== 'Administrator' && rep.senderName !== 'User'
+                      : rep.senderName &&
+                        !rep.senderName.toLowerCase().includes('admin') &&
+                        !rep.senderName.toLowerCase().includes('support') &&
+                        rep.senderName !== 'User'
                       ? rep.senderName
                       : currentTicket.userName || user?.name || user?.username || 'User';
 
-                    return (
-                      <div
-                        key={rep.id}
-                        className={`flex items-start space-x-3 ${isAdmin ? 'flex-row' : 'flex-row-reverse space-x-reverse'} max-w-[85%] ${
-                          isAdmin ? 'mr-auto' : 'ml-auto'
-                        }`}
-                      >
-                        {/* Avatar */}
-                        {isAdmin ? (
-                          <div
-                            className="w-8 h-8 rounded-full bg-neutral-900 border border-amber-500/50 text-amber-400 flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-500/30"
-                            title="Netbybit Support"
-                          >
-                            <Headphones className="w-4 h-4 text-amber-400" />
-                          </div>
-                        ) : (
-                          <div
-                            className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                            title={userSenderName}
-                          >
-                            {getInitials(userSenderName)}
-                          </div>
-                        )}
+                    if (isAdmin) {
+                      // Support Reply (Incoming - Left Aligned)
+                      return (
+                        <div key={rep.id} className="w-full flex justify-start items-end gap-2 my-1">
+                          <SupportAvatar size="md" />
 
-                        {/* Bubble */}
-                        <div
-                          className={`p-3.5 rounded-2xl space-y-1.5 shadow-md ${
-                            isAdmin
-                              ? 'bg-neutral-900 border border-amber-500/30 text-neutral-100'
-                              : 'bg-gradient-to-r from-amber-600/20 to-amber-500/20 border border-amber-500/40 text-neutral-100'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between space-x-4">
-                            {isAdmin ? (
-                              <div className="flex items-center space-x-1.5">
-                                <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
-                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
-                                  OFFICIAL
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="font-bold text-xs text-amber-300">
-                                {userSenderName}
+                          <div className="max-w-[80%] flex flex-col items-start">
+                            <div className="flex items-center space-x-1.5 mb-1 px-1">
+                              <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
+                              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
+                                OFFICIAL
                               </span>
-                            )}
-                            <span className="text-[10px] text-neutral-400 font-mono">
+                            </div>
+
+                            <div className="bg-neutral-900 border border-neutral-700/80 text-neutral-100 p-3.5 rounded-2xl rounded-bl-xs space-y-1.5 shadow-md break-words">
+                              <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+
+                              {/* Translation Badge & Toggle */}
+                              {hasTranslation && (
+                                <div className="pt-1.5 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                                  <span className="inline-flex items-center space-x-1 text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                                    <Globe className="w-3 h-3 text-amber-400" />
+                                    <span>
+                                      {isShowingOriginal
+                                        ? 'Original English Version'
+                                        : `Translated automatically (${rep.targetLanguage || currentTicket.userLanguage || userPreferredLang})`}
+                                    </span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleShowOriginal(rep.id)}
+                                    className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
+                                  >
+                                    {isShowingOriginal ? 'Show Translation' : 'View Original (English)'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-neutral-500 font-mono mt-1 px-1">
                               {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
+                        </div>
+                      );
+                    }
 
-                          <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
-
-                          {/* Translation Badge & Toggle */}
-                          {hasTranslation && (
-                            <div className="pt-1.5 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-1 text-[10px]">
-                              <span className="inline-flex items-center space-x-1 text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                                <Globe className="w-3 h-3 text-amber-400" />
-                                <span>
-                                  {isShowingOriginal
-                                    ? 'Original English Version'
-                                    : `Translated automatically (${rep.targetLanguage || currentTicket.userLanguage || userPreferredLang})`}
-                                </span>
-                              </span>
-                              <button
-                                onClick={() => toggleShowOriginal(rep.id)}
-                                className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
-                              >
-                                {isShowingOriginal ? 'Show Translation' : 'View Original (English)'}
-                              </button>
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-end space-x-1 text-[10px] text-emerald-400 font-mono">
-                            <CheckCheck className="w-3.5 h-3.5" />
-                            <span>{rep.status || 'Delivered'}</span>
+                    // User Reply (Outgoing - Right Aligned)
+                    return (
+                      <div key={rep.id} className="w-full flex justify-end items-end gap-2 my-1">
+                        <div className="max-w-[80%] flex flex-col items-end">
+                          <div className="flex items-center space-x-1.5 mb-1 px-1">
+                            <span className="font-bold text-xs text-amber-300">{userSenderName}</span>
                           </div>
+
+                          <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3.5 rounded-2xl rounded-br-xs space-y-1.5 shadow-md break-words">
+                            <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+                          </div>
+
+                          <div className="flex items-center space-x-1.5 mt-1 px-1 text-[10px] text-neutral-400 font-mono">
+                            <span>{new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
+                          </div>
+                        </div>
+
+                        <div
+                          className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                          title={userSenderName}
+                        >
+                          {getInitials(userSenderName)}
                         </div>
                       </div>
                     );
@@ -943,140 +944,166 @@ export const CustomerSupportPage: React.FC = () => {
                   </div>
 
                   {/* Staff Thread Body */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/60">
-                    {/* Opening Customer Ticket Message */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-neutral-950/60">
+                    {/* Opening Customer Ticket Message (Incoming User - Left Aligned in Staff Console) */}
                     {(() => {
                       const msgId = `ticket-opening-${currentStaffTicket.id}`;
                       const isShowingOriginal = showOriginals[msgId];
-                      const hasTranslation = currentStaffTicket.isTranslated || (currentStaffTicket.translatedMessage && currentStaffTicket.translatedMessage.trim().toLowerCase() !== currentStaffTicket.message.trim().toLowerCase());
-                      const displayText = isShowingOriginal ? currentStaffTicket.message : (currentStaffTicket.translatedMessage || currentStaffTicket.message);
+                      const hasTranslation =
+                        currentStaffTicket.isTranslated ||
+                        (currentStaffTicket.translatedMessage &&
+                          currentStaffTicket.translatedMessage.trim().toLowerCase() !==
+                            currentStaffTicket.message.trim().toLowerCase());
+                      const displayText = isShowingOriginal
+                        ? currentStaffTicket.message
+                        : currentStaffTicket.translatedMessage || currentStaffTicket.message;
 
                       return (
-                        <div className="p-3.5 bg-neutral-900 border border-neutral-800 rounded-2xl space-y-2 shadow-sm">
-                          <div className="flex justify-between items-center text-[10px] text-neutral-500 font-mono">
-                            <div className="flex items-center space-x-2">
-                              <div
-                                className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                                title={currentStaffTicket.userName}
-                              >
-                                {getInitials(currentStaffTicket.userName)}
-                              </div>
-                              <span className="font-bold text-amber-400">{currentStaffTicket.userName} ({currentStaffTicket.userEmail})</span>
-                            </div>
-                            <span>{new Date(currentStaffTicket.createdAt).toLocaleString()}</span>
+                        <div className="w-full flex justify-start items-end gap-2 my-1">
+                          <div
+                            className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                            title={currentStaffTicket.userName}
+                          >
+                            {getInitials(currentStaffTicket.userName)}
                           </div>
-                          
-                          <p className="text-xs text-neutral-200 leading-relaxed whitespace-pre-wrap">{displayText}</p>
 
-                          {hasTranslation && (
-                            <div className="pt-2 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-1 text-[10px]">
-                              <span className="inline-flex items-center space-x-1 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                <Globe className="w-3 h-3 text-emerald-400" />
-                                <span>
-                                  {isShowingOriginal
-                                    ? `Original (${currentStaffTicket.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'})`
-                                    : `Translated automatically to English from ${currentStaffTicket.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'}`}
-                                </span>
+                          <div className="max-w-[80%] flex flex-col items-start">
+                            <div className="flex items-center space-x-1.5 mb-1 px-1">
+                              <span className="font-bold text-xs text-amber-300">
+                                {currentStaffTicket.userName} ({currentStaffTicket.userEmail})
                               </span>
-                              <button
-                                onClick={() => toggleShowOriginal(msgId)}
-                                className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
-                              >
-                                {isShowingOriginal ? 'Show English Translation' : 'View Original User Message'}
-                              </button>
                             </div>
-                          )}
+
+                            <div className="bg-neutral-900 border border-neutral-800 text-neutral-100 p-3.5 rounded-2xl rounded-bl-xs space-y-1.5 shadow-md break-words">
+                              <p className="text-xs text-neutral-200 leading-relaxed whitespace-pre-wrap">{displayText}</p>
+
+                              {hasTranslation && (
+                                <div className="pt-2 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                                  <span className="inline-flex items-center space-x-1 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                    <Globe className="w-3 h-3 text-emerald-400" />
+                                    <span>
+                                      {isShowingOriginal
+                                        ? `Original (${currentStaffTicket.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'})`
+                                        : `Translated automatically to English from ${currentStaffTicket.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'}`}
+                                    </span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleShowOriginal(msgId)}
+                                    className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
+                                  >
+                                    {isShowingOriginal ? 'Show English Translation' : 'View Original User Message'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-neutral-500 font-mono mt-1 px-1">
+                              {new Date(currentStaffTicket.createdAt).toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       );
                     })()}
 
                     {/* Staff & User Replies */}
                     {currentStaffTicket.replies?.map((rep) => {
-                      const isAdmin = rep.sender === 'admin';
+                      const isAdmin = isStaffSender(rep);
                       const isShowingOriginal = showOriginals[rep.id];
-                      const hasTranslation = !isAdmin && (rep.isTranslated || (rep.translatedMessage && rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase()));
-                      const displayText = isShowingOriginal ? rep.message : (isAdmin ? rep.message : (rep.translatedMessage || rep.message));
+                      const hasTranslation =
+                        !isAdmin &&
+                        (rep.isTranslated ||
+                          (rep.translatedMessage &&
+                            rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase()));
+                      const displayText = isShowingOriginal
+                        ? rep.message
+                        : isAdmin
+                        ? rep.message
+                        : rep.translatedMessage || rep.message;
                       const userSenderName = isAdmin
                         ? 'Netbybit Support'
-                        : rep.senderName && rep.senderName !== 'Administrator' && rep.senderName !== 'User'
+                        : rep.senderName &&
+                          !rep.senderName.toLowerCase().includes('admin') &&
+                          !rep.senderName.toLowerCase().includes('support') &&
+                          rep.senderName !== 'User'
                         ? rep.senderName
                         : currentStaffTicket.userName || 'User';
 
-                      return (
-                        <div
-                          key={rep.id}
-                          className={`flex items-start space-x-3 ${isAdmin ? 'flex-row-reverse space-x-reverse ml-auto' : 'flex-row mr-auto'} max-w-[85%]`}
-                        >
-                          {/* Avatar */}
-                          {isAdmin ? (
-                            <div
-                              className="w-8 h-8 rounded-full bg-neutral-900 border border-amber-500/50 text-amber-400 flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-500/30"
-                              title="Netbybit Support"
-                            >
-                              <Headphones className="w-4 h-4 text-amber-400" />
-                            </div>
-                          ) : (
-                            <div
-                              className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                              title={userSenderName}
-                            >
-                              {getInitials(userSenderName)}
-                            </div>
-                          )}
-
-                          {/* Bubble */}
-                          <div
-                            className={`p-3.5 rounded-2xl space-y-1.5 shadow-sm w-full ${
-                              isAdmin
-                                ? 'bg-neutral-900 border border-amber-500/30 text-neutral-100'
-                                : 'bg-neutral-900 border border-neutral-800 text-neutral-100'
-                            }`}
-                          >
-                            <div className="flex justify-between items-center text-[10px] space-x-4">
-                              {isAdmin ? (
-                                <div className="flex items-center space-x-1.5">
-                                  <span className="font-bold text-amber-400">Netbybit Support</span>
-                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
-                                    OFFICIAL
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="font-bold text-amber-300">{userSenderName}</span>
-                              )}
-                              <span className="text-neutral-500 font-mono">
-                                {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-
-                            <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
-
-                            {/* Translation Badge & Toggle for User Messages in Admin View */}
-                            {hasTranslation && (
-                              <div className="pt-1.5 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-1 text-[10px]">
-                                <span className="inline-flex items-center space-x-1 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                  <Globe className="w-3 h-3 text-emerald-400" />
-                                  <span>
-                                    {isShowingOriginal
-                                      ? `Original (${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'})`
-                                      : `Translated automatically to English from ${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'}`}
-                                  </span>
+                      if (isAdmin) {
+                        // Staff Outgoing Reply in Staff Console (Right Aligned)
+                        return (
+                          <div key={rep.id} className="w-full flex justify-end items-end gap-2 my-1">
+                            <div className="max-w-[80%] flex flex-col items-end">
+                              <div className="flex items-center space-x-1.5 mb-1 px-1">
+                                <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
+                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
+                                  OFFICIAL
                                 </span>
-                                <button
-                                  onClick={() => toggleShowOriginal(rep.id)}
-                                  className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
-                                >
-                                  {isShowingOriginal ? 'Show English Translation' : 'View Original User Message'}
-                                </button>
                               </div>
-                            )}
 
-                            {/* Admin Reply Sub-Badge showing auto-translate status */}
-                            {isAdmin && (
-                              <div className="pt-1 border-t border-amber-500/20 text-[9px] text-amber-300/80 font-mono flex items-center space-x-1">
-                                <Globe className="w-3 h-3 text-amber-400" />
-                                <span>Auto-translates to {currentStaffTicket.userLanguage || 'Customer Language'} for customer</span>
+                              <div className="bg-neutral-900 border border-amber-500/40 text-neutral-100 p-3.5 rounded-2xl rounded-br-xs space-y-1.5 shadow-md break-words">
+                                <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+
+                                <div className="pt-1.5 border-t border-amber-500/20 text-[9px] text-amber-300/80 font-mono flex items-center space-x-1">
+                                  <Globe className="w-3 h-3 text-amber-400" />
+                                  <span>Auto-translates to {currentStaffTicket.userLanguage || 'Customer Language'} for customer</span>
+                                </div>
                               </div>
-                            )}
+
+                              <div className="flex items-center space-x-1.5 mt-1 px-1 text-[10px] text-neutral-400 font-mono">
+                                <span>{new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
+                              </div>
+                            </div>
+
+                            <SupportAvatar size="md" />
+                          </div>
+                        );
+                      }
+
+                      // Incoming User Reply in Staff Console (Left Aligned)
+                      return (
+                        <div key={rep.id} className="w-full flex justify-start items-end gap-2 my-1">
+                          <div
+                            className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                            title={userSenderName}
+                          >
+                            {getInitials(userSenderName)}
+                          </div>
+
+                          <div className="max-w-[80%] flex flex-col items-start">
+                            <div className="flex items-center space-x-1.5 mb-1 px-1">
+                              <span className="font-bold text-xs text-amber-300">{userSenderName}</span>
+                            </div>
+
+                            <div className="bg-neutral-900 border border-neutral-800 text-neutral-100 p-3.5 rounded-2xl rounded-bl-xs space-y-1.5 shadow-md break-words">
+                              <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+
+                              {/* Translation Badge & Toggle for User Messages in Admin View */}
+                              {hasTranslation && (
+                                <div className="pt-1.5 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                                  <span className="inline-flex items-center space-x-1 text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                    <Globe className="w-3 h-3 text-emerald-400" />
+                                    <span>
+                                      {isShowingOriginal
+                                        ? `Original (${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'})`
+                                        : `Translated automatically to English from ${rep.originalLanguage || currentStaffTicket.userLanguage || 'Customer Language'}`}
+                                    </span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleShowOriginal(rep.id)}
+                                    className="text-neutral-400 hover:text-amber-300 underline font-mono cursor-pointer transition-colors"
+                                  >
+                                    {isShowingOriginal ? 'Show English Translation' : 'View Original User Message'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] text-neutral-500 font-mono mt-1 px-1">
+                              {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                           </div>
                         </div>
                       );

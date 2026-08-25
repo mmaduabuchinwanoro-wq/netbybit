@@ -41,6 +41,72 @@ export const getInitials = (name?: string, fallback = 'US'): string => {
   return fallback;
 };
 
+export const isStaffSender = (replyOrSender?: { sender?: string; senderName?: string } | string): boolean => {
+  if (!replyOrSender) return false;
+  if (typeof replyOrSender === 'string') {
+    const s = replyOrSender.toLowerCase();
+    return (
+      s === 'admin' ||
+      s === 'staff' ||
+      s === 'support' ||
+      s.includes('support') ||
+      s.includes('admin') ||
+      s.includes('netbybit')
+    );
+  }
+  const senderRole = (replyOrSender.sender || '').toLowerCase();
+  const name = (replyOrSender.senderName || '').toLowerCase();
+  if (senderRole === 'admin' || senderRole === 'staff' || senderRole === 'support') return true;
+  if (
+    name.includes('support') ||
+    name.includes('admin') ||
+    name.includes('netbybit') ||
+    name === 'platform administrator'
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const SupportAvatar: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: string }> = ({
+  size = 'md',
+  className = '',
+}) => {
+  const sizeClasses =
+    size === 'sm'
+      ? 'w-7 h-7'
+      : size === 'lg'
+      ? 'w-10 h-10'
+      : 'w-8 h-8';
+  const iconSizeClasses =
+    size === 'sm'
+      ? 'w-3.5 h-3.5'
+      : size === 'lg'
+      ? 'w-5 h-5'
+      : 'w-4 h-4';
+  const dotSize =
+    size === 'sm'
+      ? 'w-2 h-2 -bottom-0.5 -right-0.5 border'
+      : size === 'lg'
+      ? 'w-3 h-3 bottom-0 right-0 border-2'
+      : 'w-2.5 h-2.5 -bottom-0.5 -right-0.5 border-2';
+
+  return (
+    <div
+      className={`relative ${sizeClasses} rounded-full bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 p-[1.5px] shadow-md shadow-amber-500/25 shrink-0 ring-1 ring-amber-400/40 ${className}`}
+      title="Netbybit Support Agent (Online 24/7)"
+    >
+      <div className="w-full h-full rounded-full bg-neutral-950 flex items-center justify-center text-amber-400">
+        <Headphones className={iconSizeClasses} />
+      </div>
+      <span
+        className={`absolute ${dotSize} bg-emerald-500 border-neutral-950 rounded-full shadow`}
+        title="Agent Online"
+      />
+    </div>
+  );
+};
+
 export const LiveSupportChatWidget: React.FC = () => {
   const { user, activePage } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -594,117 +660,127 @@ export const LiveSupportChatWidget: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Original Inquiry Message */}
-                <div className="flex items-start space-x-2 flex-row-reverse space-x-reverse">
-                  {/* User Avatar with Initials */}
-                  <div
-                    className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                    title={activeTicket.userName || user?.name || user?.username || 'User'}
-                  >
-                    {getInitials(activeTicket.userName || user?.name || user?.username || 'User')}
-                  </div>
-
-                  <div className="flex flex-col items-end space-y-1 max-w-[80%]">
-                    <div className="flex items-center space-x-1.5 mb-0.5">
+                {/* Original User Inquiry Message (Outgoing - Right Aligned) */}
+                <div className="w-full flex justify-end items-end gap-2 my-1">
+                  <div className="max-w-[80%] flex flex-col items-end">
+                    <div className="flex items-center space-x-1.5 mb-1 px-1">
                       <span className="text-[10px] font-bold text-amber-300">
                         {activeTicket.userName || user?.name || user?.username || 'You'}
                       </span>
                     </div>
-                    <div className="bg-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-tr-none leading-relaxed shadow-sm text-xs">
-                      {activeTicket.message}
+                    <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-br-xs leading-relaxed shadow-md text-xs break-words">
+                      <p className="whitespace-pre-wrap">{activeTicket.message}</p>
                     </div>
-                    <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1">
+                    <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1 mt-1 px-1">
                       <span>
                         {new Date(activeTicket.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       <CheckCheck className="w-3 h-3 text-amber-400" />
                     </span>
                   </div>
+
+                  {/* User Avatar */}
+                  <div
+                    className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                    title={activeTicket.userName || user?.name || user?.username || 'User'}
+                  >
+                    {getInitials(activeTicket.userName || user?.name || user?.username || 'User')}
+                  </div>
                 </div>
 
                 {/* Replies Thread */}
                 {activeTicket.replies?.map((reply) => {
-                  const isStaff = reply.sender === 'admin';
+                  const isStaff = isStaffSender(reply);
                   const isShowingOriginal = showOriginals[reply.id];
-                  const hasTranslation = reply.isTranslated || (reply.translatedMessage && reply.translatedMessage.trim().toLowerCase() !== reply.message.trim().toLowerCase());
+                  const hasTranslation =
+                    reply.isTranslated ||
+                    (reply.translatedMessage &&
+                      reply.translatedMessage.trim().toLowerCase() !== reply.message.trim().toLowerCase());
                   const displayText = isShowingOriginal ? reply.message : (reply.translatedMessage || reply.message);
                   const userSenderName = isStaff
                     ? 'Netbybit Support'
-                    : reply.senderName && reply.senderName !== 'Administrator' && reply.senderName !== 'User'
+                    : reply.senderName &&
+                      !reply.senderName.toLowerCase().includes('admin') &&
+                      !reply.senderName.toLowerCase().includes('support') &&
+                      reply.senderName !== 'User'
                     ? reply.senderName
                     : activeTicket.userName || user?.name || user?.username || 'User';
 
-                  return (
-                    <div
-                      key={reply.id}
-                      className={`flex items-start space-x-2 ${isStaff ? 'flex-row' : 'flex-row-reverse space-x-reverse'}`}
-                    >
-                      {/* Avatar */}
-                      {isStaff ? (
-                        <div
-                          className="w-7 h-7 rounded-full bg-neutral-900 border border-amber-500/50 text-amber-400 flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-500/30"
-                          title="Netbybit Support"
-                        >
-                          <Headphones className="w-3.5 h-3.5" />
-                        </div>
-                      ) : (
-                        <div
-                          className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                          title={userSenderName}
-                        >
-                          {getInitials(userSenderName)}
-                        </div>
-                      )}
+                  if (isStaff) {
+                    // Support Message (Incoming - Left Aligned)
+                    return (
+                      <div key={reply.id} className="w-full flex justify-start items-end gap-2 my-1">
+                        {/* Support Profile Avatar */}
+                        <SupportAvatar size="sm" />
 
-                      {/* Message Content */}
-                      <div
-                        className={`flex flex-col ${isStaff ? 'items-start' : 'items-end'} space-y-1 max-w-[80%]`}
-                      >
-                        <div className="flex items-center space-x-1.5 mb-0.5">
-                          <span className={`text-[10px] font-bold ${isStaff ? 'text-amber-400' : 'text-amber-300'}`}>
-                            {isStaff ? 'Netbybit Support' : userSenderName}
-                          </span>
-                          {isStaff && (
+                        {/* Support Bubble */}
+                        <div className="max-w-[80%] flex flex-col items-start">
+                          <div className="flex items-center space-x-1.5 mb-1 px-1">
+                            <span className="text-[10px] font-bold text-amber-400">Netbybit Support</span>
                             <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold border border-amber-500/30">
                               OFFICIAL
                             </span>
-                          )}
-                        </div>
-                        <div
-                          className={`p-3 rounded-2xl leading-relaxed shadow-sm space-y-1 text-xs ${
-                            isStaff
-                              ? 'bg-neutral-800 border border-neutral-700 text-white rounded-tl-none'
-                              : 'bg-amber-500/20 border border-amber-500/40 text-amber-100 rounded-tr-none'
-                          }`}
-                        >
-                          <div className="whitespace-pre-wrap">{displayText}</div>
+                          </div>
 
-                          {/* Translation Badge & Toggle */}
-                          {hasTranslation && (
-                            <div className="pt-1 border-t border-neutral-700/60 flex flex-wrap items-center justify-between gap-1 text-[9px] text-neutral-400">
-                              <span className="inline-flex items-center space-x-1 text-amber-400 font-medium">
-                                <Globe className="w-2.5 h-2.5 text-amber-400" />
-                                <span>
-                                  {isShowingOriginal
-                                    ? 'Original'
-                                    : `Translated (${reply.targetLanguage || activeTicket.userLanguage || userPreferredLang})`}
+                          <div className="bg-neutral-800 border border-neutral-700/80 text-neutral-100 p-3 rounded-2xl rounded-bl-xs leading-relaxed shadow-md space-y-1 text-xs break-words">
+                            <p className="whitespace-pre-wrap">{displayText}</p>
+
+                            {/* Translation Badge & Toggle */}
+                            {hasTranslation && (
+                              <div className="pt-1.5 border-t border-neutral-700/60 flex flex-wrap items-center justify-between gap-1 text-[9px] text-neutral-400">
+                                <span className="inline-flex items-center space-x-1 text-amber-400 font-medium">
+                                  <Globe className="w-2.5 h-2.5 text-amber-400" />
+                                  <span>
+                                    {isShowingOriginal
+                                      ? 'Original'
+                                      : `Translated (${reply.targetLanguage || activeTicket.userLanguage || userPreferredLang})`}
+                                  </span>
                                 </span>
-                              </span>
-                              <button
-                                onClick={() => toggleShowOriginal(reply.id)}
-                                className="text-amber-400/90 hover:text-amber-300 underline font-mono cursor-pointer"
-                              >
-                                {isShowingOriginal ? 'Translation' : 'View Original'}
-                              </button>
-                            </div>
-                          )}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleShowOriginal(reply.id)}
+                                  className="text-amber-400/90 hover:text-amber-300 underline font-mono cursor-pointer"
+                                >
+                                  {isShowingOriginal ? 'Translation' : 'View Original'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <span className="text-[9px] text-neutral-500 font-mono mt-1 px-1">
+                            {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
-                        <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1">
+                      </div>
+                    );
+                  }
+
+                  // User Reply (Outgoing - Right Aligned)
+                  return (
+                    <div key={reply.id} className="w-full flex justify-end items-end gap-2 my-1">
+                      <div className="max-w-[80%] flex flex-col items-end">
+                        <div className="flex items-center space-x-1.5 mb-1 px-1">
+                          <span className="text-[10px] font-bold text-amber-300">{userSenderName}</span>
+                        </div>
+
+                        <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-br-xs leading-relaxed shadow-md space-y-1 text-xs break-words">
+                          <p className="whitespace-pre-wrap">{displayText}</p>
+                        </div>
+
+                        <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1 mt-1 px-1">
                           <span>
                             {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                           <CheckCheck className="w-3 h-3 text-amber-400" />
                         </span>
+                      </div>
+
+                      {/* User Avatar */}
+                      <div
+                        className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
+                        title={userSenderName}
+                      >
+                        {getInitials(userSenderName)}
                       </div>
                     </div>
                   );
