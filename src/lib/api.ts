@@ -747,42 +747,63 @@ export const api = {
         const t = d.data() as Transaction;
         if (t) {
           const id = t.id || d.id;
-          txMap.set(id, { ...t, id });
+          txMap.set(id, { ...t, id, status: t.status || 'pending' });
         }
       });
     } catch (e) {
       console.warn('Firestore admin tx fetch warning:', e);
     }
 
-    // 2. Fetch from Firestore 'swaps' collection
+    // 2. Fetch from Firestore 'withdrawals' collection
+    try {
+      const wSnap = await getDocs(collection(db, 'withdrawals'));
+      wSnap.forEach((d) => {
+        const w = d.data() as Transaction;
+        if (w) {
+          const id = w.id || d.id;
+          const existing = txMap.get(id);
+          txMap.set(id, {
+            ...(existing || {}),
+            ...w,
+            id,
+            type: w.type || 'withdraw',
+            status: w.status || (existing ? existing.status : 'pending'),
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Firestore withdrawals fetch warning:', e);
+    }
+
+    // 3. Fetch from Firestore 'swaps' collection
     try {
       const swapSnap = await getDocs(collection(db, 'swaps'));
       swapSnap.forEach((d) => {
         const s = d.data() as any;
         if (s) {
           const id = s.id || d.id;
-          if (!txMap.has(id)) {
-            txMap.set(id, {
-              id,
-              userId: s.userId || 'usr_unknown',
-              userEmail: s.userEmail || 'user@example.com',
-              type: 'swap',
-              asset: s.fromAsset || s.asset || 'USDT',
-              fromAsset: s.fromAsset,
-              toAsset: s.toAsset,
-              amount: s.amount || 0,
-              usdtEquivalent: s.usdtEquivalent || s.amount || 0,
-              txHash: s.txHash || ('0x' + id),
-              status: s.status || 'pending',
-              date: s.date || s.timestamp || new Date().toISOString(),
-              destinationAddress: s.destinationAddress || '',
-            });
-          }
+          const existing = txMap.get(id);
+          txMap.set(id, {
+            ...(existing || {}),
+            id,
+            userId: s.userId || (existing ? existing.userId : 'usr_unknown'),
+            userEmail: s.userEmail || (existing ? existing.userEmail : 'user@example.com'),
+            type: 'swap',
+            asset: s.fromAsset || s.asset || 'USDT',
+            fromAsset: s.fromAsset,
+            toAsset: s.toAsset,
+            amount: s.amount || 0,
+            usdtEquivalent: s.usdtEquivalent || s.amount || 0,
+            txHash: s.txHash || ('0x' + id),
+            status: s.status || (existing ? existing.status : 'pending'),
+            date: s.date || s.timestamp || (existing ? existing.date : new Date().toISOString()),
+            destinationAddress: s.destinationAddress || '',
+          });
         }
       });
     } catch {}
 
-    // 3. Fetch from Server backend API /api/admin/transactions
+    // 4. Fetch from Server backend API /api/admin/transactions
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token') || 'fb_admin_token';
       const res = await fetch('/api/admin/transactions', {
@@ -794,22 +815,52 @@ export const api = {
           serverTxs.forEach((st) => {
             if (st && st.id) {
               const existing = txMap.get(st.id);
-              txMap.set(st.id, { ...(existing || {}), ...st });
+              if (!existing) {
+                txMap.set(st.id, st);
+              } else {
+                // If existing in Firestore is pending, keep pending over stale completed
+                const keepStatus = (existing.status === 'pending' || existing.status === 'processing') ? existing.status : (st.status || existing.status);
+                txMap.set(st.id, {
+                  ...st,
+                  ...existing,
+                  userEmail: st.userEmail && st.userEmail !== 'Unknown' ? st.userEmail : (existing.userEmail || 'user@example.com'),
+                  status: keepStatus,
+                });
+              }
             }
           });
         }
       }
     } catch {}
 
-    // 4. Merge with locally cached user transactions
+    // 5. Merge with locally cached user transactions
     const localStr = localStorage.getItem('netbybit_user_transactions');
     if (localStr) {
       try {
         const localTxs = JSON.parse(localStr) as Transaction[];
         if (Array.isArray(localTxs)) {
           localTxs.forEach((ltx) => {
-            if (ltx && ltx.id && !txMap.has(ltx.id)) {
-              txMap.set(ltx.id, ltx);
+            if (ltx && ltx.id) {
+              const existing = txMap.get(ltx.id);
+              if (!existing) {
+                txMap.set(ltx.id, ltx);
+              } else {
+                txMap.set(ltx.id, { ...existing, ...ltx, status: existing.status || ltx.status });
+              }
+            }
+          });
+        }
+      } catch {}
+    }
+
+    const allStr = localStorage.getItem('netbybit_all_transactions');
+    if (allStr) {
+      try {
+        const allLocal = JSON.parse(allStr) as Transaction[];
+        if (Array.isArray(allLocal)) {
+          allLocal.forEach((atx) => {
+            if (atx && atx.id && !txMap.has(atx.id)) {
+              txMap.set(atx.id, atx);
             }
           });
         }
@@ -817,7 +868,7 @@ export const api = {
     }
 
     const list = Array.from(txMap.values());
-    list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
     return list;
   },
 

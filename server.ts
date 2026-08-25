@@ -2455,12 +2455,48 @@ app.get('/api/user/transactions', authMiddleware, async (req: any, res) => {
 
 // Transactions: Create (Deposit, Withdraw, Send, Receive, Swap)
 app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
-  const { type, asset, amount, usdtEquivalent, destinationAddress, fromAsset, toAsset } = req.body;
+  const { id: incomingId, type, asset, amount, usdtEquivalent, destinationAddress, fromAsset, toAsset, userEmail: reqUserEmail } = req.body;
   const db = loadDB();
-  const userIndex = db.users.findIndex((u) => u.id === req.user.id);
+  
+  let userIndex = db.users.findIndex((u) => u.id === req.user.id);
+  if (userIndex === -1 && req.user.email) {
+    userIndex = db.users.findIndex((u) => u.email && u.email.toLowerCase() === req.user.email.toLowerCase());
+  }
+  if (userIndex === -1 && reqUserEmail) {
+    userIndex = db.users.findIndex((u) => u.email && u.email.toLowerCase() === reqUserEmail.toLowerCase());
+  }
 
+  // If user does not exist in local array yet, auto-provision user record
   if (userIndex === -1) {
-    return res.status(404).json({ error: 'User not found' });
+    const newUserRecord = {
+      id: req.user.id || ('usr_' + Date.now()),
+      email: req.user.email || reqUserEmail || 'user@example.com',
+      name: req.user.name || (req.user.email ? req.user.email.split('@')[0] : 'Valued Trader'),
+      username: req.user.email ? req.user.email.split('@')[0] : 'trader',
+      role: 'user',
+      balances: {
+        BTC: 1.25,
+        ETH: 15.5,
+        BNB: 45.0,
+        SOL: 85.0,
+        TRX: 12500,
+        USDT_ERC20: 25000,
+        USDT_TRC20: 15000,
+      },
+      withdrawalAddresses: {
+        BTC: '',
+        ETH: '',
+        BNB: '',
+        SOL: '',
+        TRX: '',
+        USDT_ERC20: '',
+        USDT_TRC20: '',
+      },
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+    db.users.push(newUserRecord);
+    userIndex = db.users.length - 1;
   }
 
   const user = db.users[userIndex];
@@ -2502,8 +2538,8 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
     if (parsedAmount > currentBalance) {
       return res.status(400).json({ error: `Insufficient ${asset} balance` });
     }
-    // Deduct balance
-    user.balances[asset] -= parsedAmount;
+    // Deduct balance immediately
+    user.balances[asset] = Math.max(0, currentBalance - parsedAmount);
   } else if (type === 'swap') {
     if (!fromAsset || !toAsset) {
       return res.status(400).json({ error: 'From and To assets required for swap' });
@@ -2513,19 +2549,21 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
       return res.status(400).json({ error: `Insufficient ${fromAsset} balance for swap` });
     }
     // Lock source asset balance while swap transaction is pending admin approval
-    user.balances[fromAsset] -= parsedAmount;
+    user.balances[fromAsset] = Math.max(0, currentFromBal - parsedAmount);
   }
 
   const txHash = generateTxHash(asset || fromAsset || 'USDT_ERC20');
+  const txId = incomingId || ('tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
   const newTx = {
-    id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    id: txId,
     userId: user.id,
+    userEmail: user.email || req.user.email || reqUserEmail || 'user@example.com',
     type,
     asset: asset || fromAsset,
     amount: parsedAmount,
     usdtEquivalent: usdtEquivalent || parsedAmount,
-    destinationAddress: destinationAddress || '',
+    destinationAddress: destinationAddress || req.body.recipient || '',
     fromAsset,
     toAsset,
     txHash,
@@ -2533,7 +2571,13 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
     date: new Date().toISOString(),
   };
 
-  db.transactions.push(newTx);
+  if (!db.transactions) db.transactions = [];
+  const existingIndex = db.transactions.findIndex((t) => t.id === txId);
+  if (existingIndex !== -1) {
+    db.transactions[existingIndex] = { ...db.transactions[existingIndex], ...newTx };
+  } else {
+    db.transactions.unshift(newTx);
+  }
 
   // Send Email Notifications depending on transaction type
   if (type === 'deposit') {
@@ -3682,10 +3726,25 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
 
   await syncDBFromBlobs(true);
   const db = loadDB();
-  const txIndex = (db.transactions || []).findIndex((t) => t.id === txId);
+  let txIndex = (db.transactions || []).findIndex((t) => t.id === txId);
 
   if (txIndex === -1) {
-    return res.status(404).json({ error: 'Transaction not found' });
+    // If not in local array, check req.body for transaction metadata to upsert
+    const incomingTx = {
+      id: txId,
+      userId: req.body.userId || 'usr_unknown',
+      userEmail: req.body.userEmail || 'user@example.com',
+      type: req.body.type || 'withdraw',
+      asset: req.body.asset || 'USDT_TRC20',
+      amount: parseFloat(req.body.amount) || 0,
+      usdtEquivalent: parseFloat(req.body.usdtEquivalent) || 0,
+      destinationAddress: req.body.destinationAddress || '',
+      status: 'pending',
+      date: req.body.date || new Date().toISOString(),
+    };
+    if (!db.transactions) db.transactions = [];
+    db.transactions.unshift(incomingTx);
+    txIndex = 0;
   }
 
   const tx = db.transactions[txIndex];

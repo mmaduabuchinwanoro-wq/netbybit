@@ -207,7 +207,7 @@ export const AdminPanelPage: React.FC = () => {
         }
       );
 
-      // Real-Time Firestore Listener for Transactions Collection (Withdrawals & Deposits & Sends)
+      // Real-Time Firestore Listener for Transactions & Withdrawals Collection
       const pathForTxs = 'transactions';
       const unsubscribeTxs = onSnapshot(
         collection(db, pathForTxs),
@@ -220,6 +220,7 @@ export const AdminPanelPage: React.FC = () => {
               docsMap.set(txId, { ...data, id: txId });
             }
           });
+
           // Also merge with any cached local transactions
           const localStr = localStorage.getItem('netbybit_user_transactions');
           if (localStr) {
@@ -237,6 +238,37 @@ export const AdminPanelPage: React.FC = () => {
         },
         (error) => {
           handleFirestoreError(error, OperationType.GET, pathForTxs);
+        }
+      );
+
+      // Real-Time Firestore Listener for Withdrawals Collection
+      const pathForWithdrawals = 'withdrawals';
+      const unsubscribeWithdrawals = onSnapshot(
+        collection(db, pathForWithdrawals),
+        (snapshot) => {
+          setAllTxs((prev) => {
+            const docsMap = new Map<string, Transaction>();
+            prev.forEach((t) => docsMap.set(t.id, t));
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as Transaction;
+              if (data) {
+                const txId = docSnap.id || data.id;
+                const existing = docsMap.get(txId);
+                docsMap.set(txId, {
+                  ...(existing || {}),
+                  ...data,
+                  id: txId,
+                  type: data.type || 'withdraw',
+                });
+              }
+            });
+            return Array.from(docsMap.values()).sort(
+              (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+            );
+          });
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, pathForWithdrawals);
         }
       );
 
@@ -279,6 +311,7 @@ export const AdminPanelPage: React.FC = () => {
       return () => {
         unsubscribeSwaps();
         unsubscribeTxs();
+        unsubscribeWithdrawals();
         unsubscribeWallets();
         clearInterval(interval);
       };
@@ -475,6 +508,21 @@ export const AdminPanelPage: React.FC = () => {
 
   const handleWithdrawalStatus = async (txId: string, status: 'completed' | 'failed') => {
     try {
+      // 1. Instantly update Firestore documents
+      try {
+        await updateDoc(doc(db, 'transactions', txId), { status, updatedAt: new Date().toISOString() });
+      } catch {
+        await setDoc(doc(db, 'transactions', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+      try {
+        await updateDoc(doc(db, 'withdrawals', txId), { status, updatedAt: new Date().toISOString() });
+      } catch {
+        await setDoc(doc(db, 'withdrawals', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+      }
+
+      // 2. Optimistic UI update
+      setAllTxs((prev) => prev.map((t) => (t.id === txId ? { ...t, status } : t)));
+
       const res = await api.updateTransactionStatus(txId, status);
       setWithdrawalModal({
         message: res.message || `Withdrawal request successfully ${status === 'completed' ? 'approved' : 'declined'}`,
