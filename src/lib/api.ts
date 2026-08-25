@@ -28,6 +28,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -717,11 +718,42 @@ export const api = {
   },
 
   getAdminSupportTickets: async (): Promise<SupportTicket[]> => {
-    const list: SupportTicket[] = [];
+    const ticketMap = new Map<string, SupportTicket>();
     try {
       const snap = await getDocs(collection(db, 'support_tickets'));
-      snap.forEach((d) => list.push(d.data() as SupportTicket));
+      snap.forEach((d) => {
+        const t = d.data() as SupportTicket;
+        if (t && t.id) ticketMap.set(t.id, t);
+      });
     } catch {}
+
+    try {
+      const snap2 = await getDocs(collection(db, 'supportTickets'));
+      snap2.forEach((d) => {
+        const t = d.data() as SupportTicket;
+        if (t && t.id) ticketMap.set(t.id, t);
+      });
+    } catch {}
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch('/api/admin/tickets', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const serverTickets = await res.json();
+          if (Array.isArray(serverTickets)) {
+            serverTickets.forEach((t) => {
+              if (t && t.id) ticketMap.set(t.id, t);
+            });
+          }
+        }
+      }
+    } catch {}
+
+    const list = Array.from(ticketMap.values());
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     return list;
   },
 
@@ -1035,36 +1067,89 @@ export const api = {
     ticketId: string,
     message: string,
     sender: 'admin' | 'user' = 'admin',
-    senderName: string = 'Netbybit Support'
+    senderName?: string
   ) => {
-    const reply: TicketReply = {
-      id: 'msg_' + Date.now(),
-      sender,
-      senderName,
-      message,
-      createdAt: new Date().toISOString(),
-    };
+    let currentUser: User | null = null;
     try {
-      const ref = doc(db, 'support_tickets', ticketId);
-      const snap = await getDoc(ref);
+      currentUser = await getMeWithFirebase();
+    } catch {}
+
+    const resolvedSenderName =
+      senderName ||
+      (sender === 'admin' ? 'Netbybit Support' : currentUser?.name || currentUser?.username || 'User');
+
+    const reply: TicketReply = {
+      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      sender,
+      senderName: resolvedSenderName,
+      message: message.trim(),
+      createdAt: new Date().toISOString(),
+      status: 'Delivered',
+    };
+
+    let updatedTicket: SupportTicket | null = null;
+
+    // 1. Update in Firestore doc
+    try {
+      let ref = doc(db, 'support_tickets', ticketId);
+      let snap = await getDoc(ref);
+      if (!snap.exists()) {
+        ref = doc(db, 'supportTickets', ticketId);
+        snap = await getDoc(ref);
+      }
+
       if (snap.exists()) {
         const ticket = snap.data() as SupportTicket;
-        ticket.replies = [...(ticket.replies || []), reply];
+        const currentReplies = ticket.replies || [];
+        currentReplies.push(reply);
+        ticket.replies = currentReplies;
         ticket.status = sender === 'admin' ? 'In Progress' : 'Open';
-        await setDoc(ref, ticket, { merge: true });
-        return ticket;
+
+        await setDoc(doc(db, 'support_tickets', ticketId), ticket, { merge: true });
+        await setDoc(doc(db, 'supportTickets', ticketId), ticket, { merge: true });
+        updatedTicket = ticket;
+      }
+    } catch (e) {
+      console.warn('Firestore reply support ticket error:', e);
+    }
+
+    // 2. Call backend API for auto-translation and alert notifications
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      const endpoint =
+        sender === 'admin'
+          ? `/api/admin/tickets/${ticketId}/reply`
+          : `/api/support/tickets/${ticketId}/reply`;
+
+      if (token) {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ message: message.trim() }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.ticket) {
+            return json.ticket as SupportTicket;
+          }
+        }
       }
     } catch {}
 
+    if (updatedTicket) return updatedTicket;
+
     return {
       id: ticketId,
-      userId: 'usr_current',
-      userEmail: 'user@example.com',
-      userName: senderName || 'User',
-      subject: 'Support Ticket',
-      category: 'General',
-      message: 'Inquiry',
-      status: 'In Progress' as const,
+      userId: currentUser?.id || 'usr_current',
+      userEmail: currentUser?.email || 'user@example.com',
+      userName: resolvedSenderName,
+      subject: 'Support Conversation',
+      category: 'General Inquiry',
+      message: message,
+      status: sender === 'admin' ? ('In Progress' as const) : ('Open' as const),
       createdAt: new Date().toISOString(),
       replies: [reply],
     };
@@ -1074,13 +1159,56 @@ export const api = {
     ticketId: string,
     body: { email?: string; name?: string; message: string }
   ) => {
+    // 1. Try backend guest reply endpoint
+    try {
+      const res = await fetch(`/api/support/guest/tickets/${ticketId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: body.message,
+          email: body.email,
+          name: body.name,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ticket) {
+          try {
+            await setDoc(doc(db, 'support_tickets', ticketId), json.ticket, { merge: true });
+            await setDoc(doc(db, 'supportTickets', ticketId), json.ticket, { merge: true });
+          } catch {}
+          return json.ticket as SupportTicket;
+        }
+      }
+    } catch {}
+
     return await api.replySupportTicket(ticketId, body.message, 'user', body.name || 'Guest User');
   },
 
   getGuestSupportTicket: async (ticketId: string, email?: string): Promise<SupportTicket> => {
+    // 1. Try Firestore
     try {
-      const snap = await getDoc(doc(db, 'support_tickets', ticketId));
-      if (snap.exists()) return snap.data() as SupportTicket;
+      let snap = await getDoc(doc(db, 'support_tickets', ticketId));
+      if (!snap.exists()) {
+        snap = await getDoc(doc(db, 'supportTickets', ticketId));
+      }
+      if (snap.exists()) {
+        const ticket = snap.data() as SupportTicket;
+        if (!email || ticket.userEmail.toLowerCase() === email.toLowerCase().trim()) {
+          return ticket;
+        }
+      }
+    } catch {}
+
+    // 2. Try Backend Guest endpoint
+    try {
+      const res = await fetch(
+        `/api/support/guest/tickets/${ticketId}${email ? `?email=${encodeURIComponent(email.trim())}` : ''}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ticket) return json.ticket as SupportTicket;
+      }
     } catch {}
 
     return {
@@ -1088,9 +1216,9 @@ export const api = {
       userId: 'guest',
       userEmail: email || 'guest@example.com',
       userName: 'Guest User',
-      subject: 'Guest Ticket',
+      subject: 'Guest Inquiry',
       category: 'Support',
-      message: 'Guest query',
+      message: 'Inquiry',
       status: 'Open',
       createdAt: new Date().toISOString(),
       replies: [],
@@ -1098,11 +1226,115 @@ export const api = {
   },
 
   getSupportTickets: async (): Promise<SupportTicket[]> => {
-    const list: SupportTicket[] = [];
+    let currentUser: User | null = null;
     try {
-      const snap = await getDocs(collection(db, 'support_tickets'));
-      snap.forEach((d) => list.push(d.data() as SupportTicket));
+      currentUser = await getMeWithFirebase();
     } catch {}
+
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        try {
+          currentUser = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
+    // Strict Data Isolation: If unauthenticated, NEVER fetch other users' tickets
+    if (!currentUser || !currentUser.id) {
+      const guestTicketId = localStorage.getItem('netbybit_guest_ticket_id');
+      const guestEmail = localStorage.getItem('netbybit_guest_email');
+      if (guestTicketId) {
+        try {
+          const guestTicket = await api.getGuestSupportTicket(guestTicketId, guestEmail || undefined);
+          if (guestTicket && guestTicket.id === guestTicketId) {
+            return [guestTicket];
+          }
+        } catch {}
+      }
+      return [];
+    }
+
+    const currentUserId = currentUser.id;
+    const currentUserEmail = currentUser.email?.toLowerCase().trim();
+    const ticketMap = new Map<string, SupportTicket>();
+
+    // 1. Fetch from Firestore filtered strictly by current authenticated user's ID
+    try {
+      const q1 = query(collection(db, 'support_tickets'), where('userId', '==', currentUserId));
+      const snap1 = await getDocs(q1);
+      snap1.forEach((d) => {
+        const t = d.data() as SupportTicket;
+        if (t && (t.userId === currentUserId || (currentUserEmail && t.userEmail?.toLowerCase() === currentUserEmail))) {
+          ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+        }
+      });
+    } catch {}
+
+    try {
+      const q1b = query(collection(db, 'supportTickets'), where('userId', '==', currentUserId));
+      const snap1b = await getDocs(q1b);
+      snap1b.forEach((d) => {
+        const t = d.data() as SupportTicket;
+        if (t && (t.userId === currentUserId || (currentUserEmail && t.userEmail?.toLowerCase() === currentUserEmail))) {
+          ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+        }
+      });
+    } catch {}
+
+    // 2. Fetch from Firestore filtered by user's email if available
+    if (currentUserEmail) {
+      try {
+        const q2 = query(collection(db, 'support_tickets'), where('userEmail', '==', currentUserEmail));
+        const snap2 = await getDocs(q2);
+        snap2.forEach((d) => {
+          const t = d.data() as SupportTicket;
+          if (t && (t.userId === currentUserId || t.userEmail?.toLowerCase() === currentUserEmail)) {
+            ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+          }
+        });
+      } catch {}
+
+      try {
+        const q2b = query(collection(db, 'supportTickets'), where('userEmail', '==', currentUserEmail));
+        const snap2b = await getDocs(q2b);
+        snap2b.forEach((d) => {
+          const t = d.data() as SupportTicket;
+          if (t && (t.userId === currentUserId || t.userEmail?.toLowerCase() === currentUserEmail)) {
+            ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+          }
+        });
+      } catch {}
+    }
+
+    // 3. Fetch from backend API /api/support/tickets (server-enforced JWT user isolation)
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch('/api/support/tickets', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const serverTickets = await res.json();
+          if (Array.isArray(serverTickets)) {
+            serverTickets.forEach((t) => {
+              if (t && t.id) {
+                ticketMap.set(t.id, t);
+              }
+            });
+          }
+        }
+      }
+    } catch {}
+
+    // 4. Strict isolation filter: drop any tickets belonging to other user IDs or emails
+    const list = Array.from(ticketMap.values()).filter((t) => {
+      const matchId = t.userId === currentUserId;
+      const matchEmail = currentUserEmail && t.userEmail?.toLowerCase().trim() === currentUserEmail;
+      return matchId || matchEmail;
+    });
+
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     return list;
   },
 
@@ -1115,23 +1347,74 @@ export const api = {
     userLanguage?: string;
     priority?: string;
   }) => {
+    let currentUser: User | null = null;
+    try {
+      currentUser = await getMeWithFirebase();
+    } catch {}
+
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        try {
+          currentUser = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
+    const userId = currentUser?.id || 'usr_' + Date.now();
+    const userEmail = body.userEmail || currentUser?.email || 'user@example.com';
+    const userName = body.userName || currentUser?.name || currentUser?.username || 'User';
+    const ticketId = 'TKT-' + Math.floor(100000 + Math.random() * 900000);
+
     const ticket: SupportTicket = {
-      id: 'tkt_' + Date.now(),
-      userId: 'usr_current',
-      userEmail: body.userEmail || 'user@example.com',
-      userName: body.userName || 'User',
-      subject: body.subject,
-      category: body.category,
-      message: body.message,
-      userLanguage: body.userLanguage,
-      priority: body.priority,
+      id: ticketId,
+      userId,
+      userEmail,
+      userName,
+      subject: body.subject.trim(),
+      category: body.category || 'General Inquiry',
+      message: body.message.trim(),
+      userLanguage: body.userLanguage || 'English',
+      priority: body.priority || 'medium',
       status: 'Open',
       createdAt: new Date().toISOString(),
       replies: [],
     };
+
+    // 1. Save to Firestore
     try {
       await setDoc(doc(db, 'support_tickets', ticket.id), ticket);
+      await setDoc(doc(db, 'supportTickets', ticket.id), ticket);
+    } catch (e) {
+      console.warn('Firestore ticket create note:', e);
+    }
+
+    // 2. Sync to Backend API
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch('/api/support/tickets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            subject: body.subject,
+            category: body.category,
+            message: body.message,
+            userLanguage: body.userLanguage,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.ticket) {
+            return json.ticket as SupportTicket;
+          }
+        }
+      }
     } catch {}
+
     return ticket;
   },
 
@@ -1144,22 +1427,106 @@ export const api = {
     userLanguage?: string;
     priority?: string;
   }) => {
-    return await api.createSupportTicket({ ...body, userEmail: body.email, userName: body.name });
+    // 1. Try backend guest ticket creation
+    try {
+      const res = await fetch('/api/support/guest/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: body.email.trim(),
+          name: body.name.trim(),
+          subject: body.subject.trim(),
+          category: body.category,
+          message: body.message.trim(),
+          userLanguage: body.userLanguage,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ticket) {
+          try {
+            await setDoc(doc(db, 'support_tickets', json.ticket.id), json.ticket);
+            await setDoc(doc(db, 'supportTickets', json.ticket.id), json.ticket);
+          } catch {}
+          return json.ticket as SupportTicket;
+        }
+      }
+    } catch {}
+
+    // Fallback: create directly
+    const ticketId = 'TKT-GUEST-' + Math.floor(100000 + Math.random() * 900000);
+    const newTicket: SupportTicket = {
+      id: ticketId,
+      userId: 'guest_' + Date.now(),
+      userEmail: body.email.trim(),
+      userName: body.name.trim() || 'Guest Visitor',
+      subject: body.subject.trim(),
+      category: body.category || 'General Inquiry',
+      message: body.message.trim(),
+      userLanguage: body.userLanguage || 'English',
+      status: 'Open',
+      createdAt: new Date().toISOString(),
+      replies: [
+        {
+          id: 'rpl_greeting',
+          sender: 'admin',
+          senderName: 'Netbybit Support',
+          message: `Hello ${body.name || 'valued visitor'}! Thank you for contacting NETBYBIT 24/7 Live Support. Your inquiry has been assigned room #${ticketId}. A live support representative has been notified and will respond shortly.`,
+          createdAt: new Date().toISOString(),
+          status: 'Delivered',
+        },
+      ],
+    };
+
+    try {
+      await setDoc(doc(db, 'support_tickets', newTicket.id), newTicket);
+      await setDoc(doc(db, 'supportTickets', newTicket.id), newTicket);
+    } catch {}
+
+    return newTicket;
   },
 
   updateTicketStatus: async (ticketId: string, status: 'Open' | 'In Progress' | 'Closed') => {
+    let updatedTicket: SupportTicket | null = null;
     try {
       await updateDoc(doc(db, 'support_tickets', ticketId), { status });
+      await updateDoc(doc(db, 'supportTickets', ticketId), { status });
     } catch {}
+
+    try {
+      const snap = await getDoc(doc(db, 'support_tickets', ticketId));
+      if (snap.exists()) {
+        updatedTicket = snap.data() as SupportTicket;
+      }
+    } catch {}
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch(`/api/admin/tickets/${ticketId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.ticket) updatedTicket = json.ticket;
+        }
+      }
+    } catch {}
+
     return {
       success: true,
-      ticket: {
+      ticket: updatedTicket || {
         id: ticketId,
         userId: 'usr_current',
         userEmail: 'user@example.com',
         userName: 'User',
         subject: 'Ticket',
-        category: 'General',
+        category: 'General Inquiry',
         message: 'Inquiry',
         status,
         createdAt: new Date().toISOString(),
@@ -1170,12 +1537,47 @@ export const api = {
 
   updateTicketLanguage: async (ticketId: string, language: string) => {
     try {
-      await updateDoc(doc(db, 'support_tickets', ticketId), { language });
+      await updateDoc(doc(db, 'support_tickets', ticketId), { userLanguage: language });
+      await updateDoc(doc(db, 'supportTickets', ticketId), { userLanguage: language });
     } catch {}
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch(`/api/support/tickets/${ticketId}/language`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userLanguage: language }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.ticket) return json.ticket as SupportTicket;
+        }
+      }
+    } catch {}
+
     return { success: true };
   },
 
   deleteTicket: async (ticketId: string) => {
+    try {
+      await deleteDoc(doc(db, 'support_tickets', ticketId));
+      await deleteDoc(doc(db, 'supportTickets', ticketId));
+    } catch {}
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        await fetch(`/api/admin/tickets/${ticketId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch {}
+
     return { success: true };
   },
 

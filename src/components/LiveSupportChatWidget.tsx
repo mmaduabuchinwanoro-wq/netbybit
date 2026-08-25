@@ -104,7 +104,13 @@ export const LiveSupportChatWidget: React.FC = () => {
       const tickets = await api.getSupportTickets();
       setUserTickets(tickets);
       if (tickets.length > 0) {
-        setActiveTicket(tickets[0]);
+        setActiveTicket((prev) => {
+          if (!prev) return tickets[0];
+          const matched = tickets.find((t) => t.id === prev.id);
+          return matched || tickets[0];
+        });
+      } else {
+        setActiveTicket(null);
       }
     } catch (err) {
       console.error('Error fetching user support tickets:', err);
@@ -119,25 +125,33 @@ export const LiveSupportChatWidget: React.FC = () => {
     if (!silent) setLoading(true);
     try {
       const ticket = await api.getGuestSupportTicket(activeGuestTicketId, guestEmail);
-      setActiveTicket(ticket);
+      if (ticket && ticket.id === activeGuestTicketId) {
+        setActiveTicket(ticket);
+      } else {
+        setActiveTicket(null);
+        setActiveGuestTicketId(null);
+        localStorage.removeItem('netbybit_guest_ticket_id');
+      }
     } catch (err) {
       console.error('Error fetching guest ticket:', err);
       // If ticket not found, reset local state
       setActiveGuestTicketId(null);
+      setActiveTicket(null);
       localStorage.removeItem('netbybit_guest_ticket_id');
     } finally {
       if (!silent) setLoading(false);
     }
   };
 
-  // Initial load
+  // Reset & load on user / guest change
   useEffect(() => {
+    setActiveTicket(null);
     if (user) {
       fetchUserSupport();
     } else if (activeGuestTicketId) {
       fetchGuestSupport();
     }
-  }, [user, activeGuestTicketId]);
+  }, [user?.id, activeGuestTicketId]);
 
   // Real-time chat polling every 3 seconds when chat popup is open
   useEffect(() => {

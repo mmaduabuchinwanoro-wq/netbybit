@@ -569,11 +569,19 @@ async function syncDBFromFirestore(force = false): Promise<void> {
     }
 
     // Sync tickets
-    const ticketSnap = await getDocs(collection(dbInstance, 'supportTickets'));
     const firestoreTickets: any[] = [];
-    ticketSnap.forEach((docSnap) => {
-      if (docSnap.exists()) firestoreTickets.push(docSnap.data());
-    });
+    try {
+      const ticketSnap = await getDocs(collection(dbInstance, 'supportTickets'));
+      ticketSnap.forEach((docSnap) => {
+        if (docSnap.exists()) firestoreTickets.push(docSnap.data());
+      });
+    } catch {}
+    try {
+      const ticketSnap2 = await getDocs(collection(dbInstance, 'support_tickets'));
+      ticketSnap2.forEach((docSnap) => {
+        if (docSnap.exists()) firestoreTickets.push(docSnap.data());
+      });
+    } catch {}
 
     if (firestoreTickets.length > 0 && cachedDbState) {
       const ticketMap = new Map<string, any>();
@@ -646,7 +654,9 @@ async function saveDBToFirestore(data: DBData): Promise<void> {
       for (const st of data.supportTickets) {
         if (st && st.id) {
           const docRef = doc(dbInstance, 'supportTickets', st.id);
+          const docRef2 = doc(dbInstance, 'support_tickets', st.id);
           promises.push(setDoc(docRef, JSON.parse(JSON.stringify(st)), { merge: true }));
+          promises.push(setDoc(docRef2, JSON.parse(JSON.stringify(st)), { merge: true }));
         }
       }
     }

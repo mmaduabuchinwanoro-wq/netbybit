@@ -124,18 +124,28 @@ export const CustomerSupportPage: React.FC = () => {
       if (user) {
         const data = await api.getSupportTickets();
         setTickets(data);
-        if (data.length > 0 && !selectedTicketId) {
-          setSelectedTicketId(data[0].id);
+        if (data.length > 0) {
+          if (!selectedTicketId || !data.some((t) => t.id === selectedTicketId)) {
+            setSelectedTicketId(data[0].id);
+          }
+        } else {
+          setSelectedTicketId(null);
         }
       } else {
         const guestTicketId = localStorage.getItem('netbybit_guest_ticket_id');
         const savedGuestEmail = localStorage.getItem('netbybit_guest_email');
         if (guestTicketId) {
           const guestTicket = await api.getGuestSupportTicket(guestTicketId, savedGuestEmail || undefined);
-          if (guestTicket) {
+          if (guestTicket && guestTicket.id === guestTicketId) {
             setTickets([guestTicket]);
             setSelectedTicketId(guestTicket.id);
+          } else {
+            setTickets([]);
+            setSelectedTicketId(null);
           }
+        } else {
+          setTickets([]);
+          setSelectedTicketId(null);
         }
       }
     } catch (err) {
