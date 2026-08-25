@@ -595,26 +595,26 @@ export const CustomerSupportPage: React.FC = () => {
                 {/* Messages Body Scroll Container */}
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-neutral-950/60">
                   {/* Opening User Ticket Statement (Outgoing - Right Aligned) */}
-                  <div className="w-full flex justify-end items-end gap-2 my-1">
-                    <div className="max-w-[80%] flex flex-col items-end">
-                      <div className="flex items-center space-x-1.5 mb-1 px-1">
+                  <div className="w-full flex justify-end items-start gap-2.5 my-2">
+                    <div className="max-w-[78%] sm:max-w-[75%] flex flex-col items-end">
+                      <div className="flex items-center space-x-1.5 mb-1 pr-1">
                         <span className="font-bold text-xs text-amber-300">
-                          {currentTicket.userName || user?.name || user?.username || 'You'}
+                          {user ? 'You' : (currentTicket.userName || 'You')}
                         </span>
                       </div>
-                      <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3.5 rounded-2xl rounded-br-xs space-y-1.5 shadow-md break-words">
+                      <div className="bg-gradient-to-r from-amber-600/35 via-amber-500/25 to-yellow-600/20 border border-amber-500/40 text-amber-50 px-4 py-3 rounded-2xl rounded-tr-xs space-y-1.5 shadow-md break-words">
                         <p className="text-xs leading-relaxed whitespace-pre-wrap">{currentTicket.message}</p>
                       </div>
-                      <div className="flex items-center space-x-1.5 mt-1 px-1 text-[10px] text-neutral-400 font-mono">
+                      <div className="flex items-center space-x-1.5 mt-1 pr-1 text-[10px] text-neutral-400 font-mono">
                         <span>{new Date(currentTicket.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
                       </div>
                     </div>
                     <div
-                      className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                      title={currentTicket.userName || 'User'}
+                      className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40 mt-1"
+                      title={user?.name || user?.username || currentTicket.userName || 'You'}
                     >
-                      {getInitials(currentTicket.userName || 'User')}
+                      {getInitials(user?.name || user?.username || currentTicket.userName || 'You')}
                     </div>
                   </div>
 
@@ -627,35 +627,29 @@ export const CustomerSupportPage: React.FC = () => {
                       (rep.translatedMessage &&
                         rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase());
                     const displayText = isShowingOriginal ? rep.message : (rep.translatedMessage || rep.message);
-                    const userSenderName = isAdmin
-                      ? 'Netbybit Support'
-                      : rep.senderName &&
-                        !rep.senderName.toLowerCase().includes('admin') &&
-                        !rep.senderName.toLowerCase().includes('support') &&
-                        rep.senderName !== 'User'
-                      ? rep.senderName
-                      : currentTicket.userName || user?.name || user?.username || 'User';
 
                     if (isAdmin) {
                       // Support Reply (Incoming - Left Aligned)
                       return (
-                        <div key={rep.id} className="w-full flex justify-start items-end gap-2 my-1">
-                          <SupportAvatar size="md" />
+                        <div key={rep.id} className="w-full flex justify-start items-start gap-2.5 my-2">
+                          <div className="mt-1 shrink-0">
+                            <SupportAvatar size="md" />
+                          </div>
 
-                          <div className="max-w-[80%] flex flex-col items-start">
-                            <div className="flex items-center space-x-1.5 mb-1 px-1">
+                          <div className="max-w-[78%] sm:max-w-[75%] flex flex-col items-start">
+                            <div className="flex items-center space-x-1.5 mb-1 pl-1">
                               <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
                               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
                                 OFFICIAL
                               </span>
                             </div>
 
-                            <div className="bg-neutral-900 border border-neutral-700/80 text-neutral-100 p-3.5 rounded-2xl rounded-bl-xs space-y-1.5 shadow-md break-words">
+                            <div className="bg-neutral-850 border border-neutral-700/80 text-neutral-100 px-4 py-3 rounded-2xl rounded-tl-xs space-y-1.5 shadow-md break-words">
                               <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
 
                               {/* Translation Badge & Toggle */}
                               {hasTranslation && (
-                                <div className="pt-1.5 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-1 text-[10px]">
+                                <div className="pt-1.5 border-t border-neutral-750 flex flex-wrap items-center justify-between gap-1 text-[10px]">
                                   <span className="inline-flex items-center space-x-1 text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
                                     <Globe className="w-3 h-3 text-amber-400" />
                                     <span>
@@ -675,7 +669,7 @@ export const CustomerSupportPage: React.FC = () => {
                               )}
                             </div>
 
-                            <span className="text-[10px] text-neutral-500 font-mono mt-1 px-1">
+                            <span className="text-[10px] text-neutral-500 font-mono mt-1 pl-1">
                               {new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
@@ -685,27 +679,29 @@ export const CustomerSupportPage: React.FC = () => {
 
                     // User Reply (Outgoing - Right Aligned)
                     return (
-                      <div key={rep.id} className="w-full flex justify-end items-end gap-2 my-1">
-                        <div className="max-w-[80%] flex flex-col items-end">
-                          <div className="flex items-center space-x-1.5 mb-1 px-1">
-                            <span className="font-bold text-xs text-amber-300">{userSenderName}</span>
+                      <div key={rep.id} className="w-full flex justify-end items-start gap-2.5 my-2">
+                        <div className="max-w-[78%] sm:max-w-[75%] flex flex-col items-end">
+                          <div className="flex items-center space-x-1.5 mb-1 pr-1">
+                            <span className="font-bold text-xs text-amber-300">
+                              {user ? 'You' : (currentTicket.userName || 'You')}
+                            </span>
                           </div>
 
-                          <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3.5 rounded-2xl rounded-br-xs space-y-1.5 shadow-md break-words">
+                          <div className="bg-gradient-to-r from-amber-600/35 via-amber-500/25 to-yellow-600/20 border border-amber-500/40 text-amber-50 px-4 py-3 rounded-2xl rounded-tr-xs space-y-1.5 shadow-md break-words">
                             <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
                           </div>
 
-                          <div className="flex items-center space-x-1.5 mt-1 px-1 text-[10px] text-neutral-400 font-mono">
+                          <div className="flex items-center space-x-1.5 mt-1 pr-1 text-[10px] text-neutral-400 font-mono">
                             <span>{new Date(rep.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                             <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
                           </div>
                         </div>
 
                         <div
-                          className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                          title={userSenderName}
+                          className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40 mt-1"
+                          title={user?.name || user?.username || currentTicket.userName || 'You'}
                         >
-                          {getInitials(userSenderName)}
+                          {getInitials(user?.name || user?.username || currentTicket.userName || 'You')}
                         </div>
                       </div>
                     );

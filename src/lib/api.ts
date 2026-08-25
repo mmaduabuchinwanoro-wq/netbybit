@@ -1089,7 +1089,7 @@ export const api = {
 
     let updatedTicket: SupportTicket | null = null;
 
-    // 1. Update in Firestore doc
+    // 1. Update in Firestore doc (with strict user identity validation)
     try {
       let ref = doc(db, 'support_tickets', ticketId);
       let snap = await getDoc(ref);
@@ -1100,6 +1100,18 @@ export const api = {
 
       if (snap.exists()) {
         const ticket = snap.data() as SupportTicket;
+
+        // Privacy isolation: Non-admin users can ONLY append replies to their own tickets
+        if (
+          sender === 'user' &&
+          currentUser &&
+          ticket.userId !== currentUser.id &&
+          ticket.userEmail?.toLowerCase().trim() !== currentUser.email?.toLowerCase().trim()
+        ) {
+          console.warn('Blocked unauthorized cross-ticket reply attempt');
+          return ticket;
+        }
+
         const currentReplies = ticket.replies || [];
         currentReplies.push(reply);
         ticket.replies = currentReplies;

@@ -119,7 +119,7 @@ export const LiveSupportChatWidget: React.FC = () => {
     () => localStorage.getItem('netbybit_guest_ticket_id') || null
   );
 
-  // Support Ticket Data State
+  // Support Ticket Data State (Strictly isolated per user/guest)
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
   const [userTickets, setUserTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,18 +162,24 @@ export const LiveSupportChatWidget: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Fetch ticket for logged-in user
+  // Fetch ticket for logged-in user with strict user privacy validation
   const fetchUserSupport = async (silent = false) => {
     if (!user) return;
     if (!silent) setLoading(true);
     try {
       const tickets = await api.getSupportTickets();
-      setUserTickets(tickets);
-      if (tickets.length > 0) {
+      // Strict privacy check: tickets MUST belong to the current authenticated user
+      const myTickets = tickets.filter(
+        (t) =>
+          t.userId === user.id ||
+          (user.email && t.userEmail?.toLowerCase().trim() === user.email.toLowerCase().trim())
+      );
+      setUserTickets(myTickets);
+      if (myTickets.length > 0) {
         setActiveTicket((prev) => {
-          if (!prev) return tickets[0];
-          const matched = tickets.find((t) => t.id === prev.id);
-          return matched || tickets[0];
+          if (!prev) return myTickets[0];
+          const matched = myTickets.find((t) => t.id === prev.id);
+          return matched || myTickets[0];
         });
       } else {
         setActiveTicket(null);
@@ -185,13 +191,17 @@ export const LiveSupportChatWidget: React.FC = () => {
     }
   };
 
-  // Fetch active guest ticket
+  // Fetch active guest ticket with strict email validation
   const fetchGuestSupport = async (silent = false) => {
     if (user || !activeGuestTicketId) return;
     if (!silent) setLoading(true);
     try {
       const ticket = await api.getGuestSupportTicket(activeGuestTicketId, guestEmail);
-      if (ticket && ticket.id === activeGuestTicketId) {
+      if (
+        ticket &&
+        ticket.id === activeGuestTicketId &&
+        (!guestEmail || ticket.userEmail.toLowerCase().trim() === guestEmail.toLowerCase().trim())
+      ) {
         setActiveTicket(ticket);
       } else {
         setActiveTicket(null);
@@ -200,7 +210,6 @@ export const LiveSupportChatWidget: React.FC = () => {
       }
     } catch (err) {
       console.error('Error fetching guest ticket:', err);
-      // If ticket not found, reset local state
       setActiveGuestTicketId(null);
       setActiveTicket(null);
       localStorage.removeItem('netbybit_guest_ticket_id');
@@ -209,15 +218,26 @@ export const LiveSupportChatWidget: React.FC = () => {
     }
   };
 
-  // Reset & load on user / guest change
+  // Reset & load on user / guest change - strictly clear guest cache when authenticated
   useEffect(() => {
     setActiveTicket(null);
+    setUserTickets([]);
     if (user) {
+      localStorage.removeItem('netbybit_guest_ticket_id');
+      localStorage.removeItem('netbybit_guest_name');
+      localStorage.removeItem('netbybit_guest_email');
+      setActiveGuestTicketId(null);
       fetchUserSupport();
-    } else if (activeGuestTicketId) {
-      fetchGuestSupport();
+    } else {
+      const storedGuestTicket = localStorage.getItem('netbybit_guest_ticket_id');
+      const storedGuestEmail = localStorage.getItem('netbybit_guest_email');
+      if (storedGuestTicket && storedGuestEmail) {
+        setActiveGuestTicketId(storedGuestTicket);
+        setGuestEmail(storedGuestEmail);
+        fetchGuestSupport();
+      }
     }
-  }, [user?.id, activeGuestTicketId]);
+  }, [user?.id, user?.email]);
 
   // Real-time chat polling every 3 seconds when chat popup is open
   useEffect(() => {
@@ -252,12 +272,11 @@ export const LiveSupportChatWidget: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      // Save info in local storage
       localStorage.setItem('netbybit_guest_name', guestName.trim());
       localStorage.setItem('netbybit_guest_email', guestEmail.trim());
 
       const ticket = await api.createGuestSupportTicket({
-        name: guestName.trim(),
+        name: guestName.trim() || 'Guest Visitor',
         email: guestEmail.trim(),
         subject: `${category} Inquiry`,
         category,
@@ -276,10 +295,10 @@ export const LiveSupportChatWidget: React.FC = () => {
     }
   };
 
-  // Start Logged-In User Support Chat
+  // Start Logged-In User Support Chat (Strictly private for this user)
   const handleStartUserChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guestInitialMessage.trim()) return;
+    if (!guestInitialMessage.trim() || !user) return;
 
     setSending(true);
     setErrorMessage(null);
@@ -290,6 +309,8 @@ export const LiveSupportChatWidget: React.FC = () => {
         category,
         message: guestInitialMessage.trim(),
         userLanguage: userPreferredLang,
+        userEmail: user.email,
+        userName: user.name || user.username || 'User',
       });
 
       setUserTickets((prev) => [ticket, ...prev]);
@@ -302,10 +323,10 @@ export const LiveSupportChatWidget: React.FC = () => {
     }
   };
 
-  // Send Reply in active chat
+  // Send Reply in active chat (Guaranteed 1-on-1 private routing)
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim() || !activeTicket) return;
+    if (!messageText.trim()) return;
 
     setSending(true);
     const content = messageText.trim();
@@ -314,13 +335,41 @@ export const LiveSupportChatWidget: React.FC = () => {
     try {
       if (user) {
         const userName = user.name || user.username || 'User';
-        const updatedTicket = await api.replySupportTicket(activeTicket.id, content, 'user', userName);
+        let targetTicketId = activeTicket?.id;
+
+        // If no active ticket or ticket belongs to someone else, create a private ticket first
+        if (
+          !activeTicket ||
+          (activeTicket.userId !== user.id &&
+            activeTicket.userEmail?.toLowerCase().trim() !== user.email.toLowerCase().trim())
+        ) {
+          const freshTicket = await api.createSupportTicket({
+            subject: 'Support Inquiry',
+            category: 'General Inquiry',
+            message: content,
+            userLanguage: userPreferredLang,
+            userEmail: user.email,
+            userName,
+          });
+          setActiveTicket(freshTicket);
+          setUserTickets((prev) => [freshTicket, ...prev]);
+          setSending(false);
+          setTimeout(scrollToBottom, 100);
+          return;
+        }
+
+        const updatedTicket = await api.replySupportTicket(targetTicketId!, content, 'user', userName);
         setActiveTicket(updatedTicket);
         setUserTickets((prev) =>
           prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
         );
       } else {
-        const guestDisplayName = guestName.trim() || activeTicket.userName || 'Guest User';
+        const guestDisplayName = guestName.trim() || activeTicket?.userName || 'Guest User';
+        if (!activeTicket || !activeGuestTicketId) {
+          setErrorMessage('Please start a support inquiry first.');
+          setSending(false);
+          return;
+        }
         const updatedTicket = await api.replyGuestSupportTicket(activeTicket.id, {
           message: content,
           email: guestEmail,
@@ -349,12 +398,12 @@ export const LiveSupportChatWidget: React.FC = () => {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 font-sans">
-      {/* 1. CLOSED / FLOATING BUBBLE BUTTON */}
+      {/* 1. CLOSED / FLOATING BUBBLE BUTTON (No 24/7 Badge) */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center space-x-2.5 px-4 py-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-neutral-950 font-black rounded-full shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 border border-amber-300/40"
-          title="Open 24/7 Customer Support Live Chat"
+          className="group relative flex items-center space-x-2.5 px-4 py-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-neutral-950 font-black rounded-full shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 border border-amber-300/40 cursor-pointer"
+          title="Open Customer Support Live Chat"
         >
           <div className="relative">
             <Headphones className="w-5 h-5 text-neutral-950" />
@@ -364,7 +413,6 @@ export const LiveSupportChatWidget: React.FC = () => {
             </span>
           </div>
           <span className="text-xs font-black tracking-wide uppercase">Support Chat</span>
-          <span className="text-[10px] bg-neutral-950/20 px-2 py-0.5 rounded-full font-mono font-bold">24/7</span>
         </button>
       )}
 
@@ -416,7 +464,7 @@ export const LiveSupportChatWidget: React.FC = () => {
                     if (user) fetchUserSupport(false);
                     else fetchGuestSupport(false);
                   }}
-                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+                  className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
                   title="Refresh Chat"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
@@ -424,7 +472,7 @@ export const LiveSupportChatWidget: React.FC = () => {
               )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
                 title="Close Support Chat"
               >
                 <X className="w-4 h-4" />
@@ -661,30 +709,30 @@ export const LiveSupportChatWidget: React.FC = () => {
                 </div>
 
                 {/* Original User Inquiry Message (Outgoing - Right Aligned) */}
-                <div className="w-full flex justify-end items-end gap-2 my-1">
-                  <div className="max-w-[80%] flex flex-col items-end">
-                    <div className="flex items-center space-x-1.5 mb-1 px-1">
-                      <span className="text-[10px] font-bold text-amber-300">
-                        {activeTicket.userName || user?.name || user?.username || 'You'}
+                <div className="w-full flex justify-end items-start gap-2 my-1.5">
+                  <div className="max-w-[78%] sm:max-w-[75%] flex flex-col items-end">
+                    <div className="flex items-center space-x-1.5 mb-1 pr-1">
+                      <span className="text-[11px] font-bold text-amber-300">
+                        {user ? 'You' : (activeTicket.userName || 'You')}
                       </span>
                     </div>
-                    <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-br-xs leading-relaxed shadow-md text-xs break-words">
+                    <div className="bg-gradient-to-r from-amber-600/35 via-amber-500/25 to-yellow-600/20 border border-amber-500/40 text-amber-50 px-3.5 py-2.5 rounded-2xl rounded-tr-xs leading-relaxed shadow-md text-xs break-words">
                       <p className="whitespace-pre-wrap">{activeTicket.message}</p>
                     </div>
-                    <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1 mt-1 px-1">
+                    <div className="flex items-center space-x-1.5 mt-1 pr-1 text-[10px] text-neutral-400 font-mono">
                       <span>
                         {new Date(activeTicket.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      <CheckCheck className="w-3 h-3 text-amber-400" />
-                    </span>
+                      <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
+                    </div>
                   </div>
 
                   {/* User Avatar */}
                   <div
-                    className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                    title={activeTicket.userName || user?.name || user?.username || 'User'}
+                    className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40 mt-1"
+                    title={user?.name || user?.username || activeTicket.userName || 'You'}
                   >
-                    {getInitials(activeTicket.userName || user?.name || user?.username || 'User')}
+                    {getInitials(user?.name || user?.username || activeTicket.userName || 'You')}
                   </div>
                 </div>
 
@@ -697,32 +745,26 @@ export const LiveSupportChatWidget: React.FC = () => {
                     (reply.translatedMessage &&
                       reply.translatedMessage.trim().toLowerCase() !== reply.message.trim().toLowerCase());
                   const displayText = isShowingOriginal ? reply.message : (reply.translatedMessage || reply.message);
-                  const userSenderName = isStaff
-                    ? 'Netbybit Support'
-                    : reply.senderName &&
-                      !reply.senderName.toLowerCase().includes('admin') &&
-                      !reply.senderName.toLowerCase().includes('support') &&
-                      reply.senderName !== 'User'
-                    ? reply.senderName
-                    : activeTicket.userName || user?.name || user?.username || 'User';
 
                   if (isStaff) {
                     // Support Message (Incoming - Left Aligned)
                     return (
-                      <div key={reply.id} className="w-full flex justify-start items-end gap-2 my-1">
+                      <div key={reply.id} className="w-full flex justify-start items-start gap-2 my-1.5">
                         {/* Support Profile Avatar */}
-                        <SupportAvatar size="sm" />
+                        <div className="mt-1 shrink-0">
+                          <SupportAvatar size="sm" />
+                        </div>
 
                         {/* Support Bubble */}
-                        <div className="max-w-[80%] flex flex-col items-start">
-                          <div className="flex items-center space-x-1.5 mb-1 px-1">
-                            <span className="text-[10px] font-bold text-amber-400">Netbybit Support</span>
+                        <div className="max-w-[78%] sm:max-w-[75%] flex flex-col items-start">
+                          <div className="flex items-center space-x-1.5 mb-1 pl-1">
+                            <span className="text-[11px] font-bold text-amber-400">Netbybit Support</span>
                             <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold border border-amber-500/30">
                               OFFICIAL
                             </span>
                           </div>
 
-                          <div className="bg-neutral-800 border border-neutral-700/80 text-neutral-100 p-3 rounded-2xl rounded-bl-xs leading-relaxed shadow-md space-y-1 text-xs break-words">
+                          <div className="bg-neutral-800 border border-neutral-700/80 text-neutral-100 px-3.5 py-2.5 rounded-2xl rounded-tl-xs leading-relaxed shadow-md space-y-1.5 text-xs break-words">
                             <p className="whitespace-pre-wrap">{displayText}</p>
 
                             {/* Translation Badge & Toggle */}
@@ -747,7 +789,7 @@ export const LiveSupportChatWidget: React.FC = () => {
                             )}
                           </div>
 
-                          <span className="text-[9px] text-neutral-500 font-mono mt-1 px-1">
+                          <span className="text-[10px] text-neutral-500 font-mono mt-1 pl-1">
                             {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
@@ -757,30 +799,32 @@ export const LiveSupportChatWidget: React.FC = () => {
 
                   // User Reply (Outgoing - Right Aligned)
                   return (
-                    <div key={reply.id} className="w-full flex justify-end items-end gap-2 my-1">
-                      <div className="max-w-[80%] flex flex-col items-end">
-                        <div className="flex items-center space-x-1.5 mb-1 px-1">
-                          <span className="text-[10px] font-bold text-amber-300">{userSenderName}</span>
+                    <div key={reply.id} className="w-full flex justify-end items-start gap-2 my-1.5">
+                      <div className="max-w-[78%] sm:max-w-[75%] flex flex-col items-end">
+                        <div className="flex items-center space-x-1.5 mb-1 pr-1">
+                          <span className="text-[11px] font-bold text-amber-300">
+                            {user ? 'You' : (activeTicket.userName || 'You')}
+                          </span>
                         </div>
 
-                        <div className="bg-gradient-to-r from-amber-600/30 to-amber-500/20 border border-amber-500/40 text-amber-100 p-3 rounded-2xl rounded-br-xs leading-relaxed shadow-md space-y-1 text-xs break-words">
+                        <div className="bg-gradient-to-r from-amber-600/35 via-amber-500/25 to-yellow-600/20 border border-amber-500/40 text-amber-50 px-3.5 py-2.5 rounded-2xl rounded-tr-xs leading-relaxed shadow-md space-y-1 text-xs break-words">
                           <p className="whitespace-pre-wrap">{displayText}</p>
                         </div>
 
-                        <span className="text-[9px] text-neutral-400 font-mono flex items-center space-x-1 mt-1 px-1">
+                        <div className="flex items-center space-x-1.5 mt-1 pr-1 text-[10px] text-neutral-400 font-mono">
                           <span>
                             {new Date(reply.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          <CheckCheck className="w-3 h-3 text-amber-400" />
-                        </span>
+                          <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
+                        </div>
                       </div>
 
                       {/* User Avatar */}
                       <div
-                        className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40"
-                        title={userSenderName}
+                        className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-neutral-950 font-black text-[10px] flex items-center justify-center shrink-0 shadow-md ring-1 ring-amber-400/40 mt-1"
+                        title={user?.name || user?.username || activeTicket.userName || 'You'}
                       >
-                        {getInitials(userSenderName)}
+                        {getInitials(user?.name || user?.username || activeTicket.userName || 'You')}
                       </div>
                     </div>
                   );
@@ -804,14 +848,14 @@ export const LiveSupportChatWidget: React.FC = () => {
                 <button
                   type="submit"
                   disabled={sending || !messageText.trim()}
-                  className="p-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 rounded-xl shadow-md transition-all disabled:opacity-40"
+                  className="p-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 rounded-xl shadow-md transition-all disabled:opacity-40 cursor-pointer"
                   title="Send message"
                 >
                   <Send className="w-4 h-4" />
                 </button>
               </form>
               <div className="flex justify-between items-center text-[9px] text-neutral-400 mt-1.5 font-mono px-1">
-                <span>⚡ Live 24/7 Agent Connected</span>
+                <span>⚡ Live Support Agent Connected</span>
                 <span>netbybitsupport@gmail.com</span>
               </div>
             </div>
