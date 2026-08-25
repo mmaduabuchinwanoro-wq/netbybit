@@ -389,29 +389,63 @@ export const api = {
       currentUser = await getMeWithFirebase();
     } catch {}
 
-    const list: Transaction[] = [];
+    const txMap = new Map<string, Transaction>();
 
-    if (currentUser?.id) {
+    // 1. Fetch from Firestore for current user
+    if (currentUser?.id || currentUser?.email) {
       try {
-        const q = query(collection(db, 'transactions'), where('userId', '==', currentUser.id));
-        const snap = await getDocs(q);
-        snap.forEach((d) => list.push(d.data() as Transaction));
+        const q1 = query(collection(db, 'transactions'), where('userId', '==', currentUser.id));
+        const snap1 = await getDocs(q1);
+        snap1.forEach((d) => {
+          const t = d.data() as Transaction;
+          if (t) txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+        });
       } catch {}
+
+      if (currentUser.email) {
+        try {
+          const q2 = query(collection(db, 'transactions'), where('userEmail', '==', currentUser.email));
+          const snap2 = await getDocs(q2);
+          snap2.forEach((d) => {
+            const t = d.data() as Transaction;
+            if (t) txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+          });
+        } catch {}
+      }
     }
 
-    // Merge with local cache
+    // 2. Fetch from backend API if available
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch('/api/user/transactions', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const serverTxs: Transaction[] = await res.json();
+          if (Array.isArray(serverTxs)) {
+            serverTxs.forEach((t) => {
+              if (!txMap.has(t.id)) txMap.set(t.id, t);
+            });
+          }
+        }
+      }
+    } catch {}
+
+    // 3. Merge with local cache
     const localStr = localStorage.getItem('netbybit_user_transactions');
     if (localStr) {
       try {
         const localTxs = JSON.parse(localStr) as Transaction[];
         localTxs.forEach((ltx) => {
-          if (!list.some((t) => t.id === ltx.id)) {
-            list.push(ltx);
+          if (!txMap.has(ltx.id)) {
+            txMap.set(ltx.id, ltx);
           }
         });
       } catch {}
     }
 
+    const list = Array.from(txMap.values());
     list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return list;
   },
@@ -435,7 +469,7 @@ export const api = {
     const email = currentUser?.email || 'user@example.com';
 
     const mockTx: Transaction = {
-      id: 'tx_' + Date.now(),
+      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       userId: uid,
       userEmail: email,
       type: body.type,
@@ -445,7 +479,7 @@ export const api = {
       txHash: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       status: 'pending',
       date: new Date().toISOString(),
-      destinationAddress: body.destinationAddress,
+      destinationAddress: body.destinationAddress || '',
       fromAsset: body.fromAsset,
       toAsset: body.toAsset,
     };
@@ -474,7 +508,7 @@ export const api = {
       }
     }
 
-    // Store in Firestore doc
+    // 1. Store in Firestore doc
     try {
       await setDoc(doc(db, 'transactions', mockTx.id), mockTx);
       if (body.type === 'swap') {
@@ -489,7 +523,30 @@ export const api = {
       console.warn('Firestore transaction create note:', e);
     }
 
-    // Store in local storage
+    // 2. Sync to Backend API if user token is present
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        await fetch('/api/user/transactions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            type: body.type,
+            asset: body.asset,
+            amount: body.amount,
+            usdtEquivalent: body.usdtEquivalent || body.amount,
+            destinationAddress: body.destinationAddress || '',
+            fromAsset: body.fromAsset,
+            toAsset: body.toAsset,
+          }),
+        });
+      }
+    } catch {}
+
+    // 3. Store in local storage cache
     try {
       const existing = JSON.parse(localStorage.getItem('netbybit_user_transactions') || '[]');
       existing.unshift(mockTx);
