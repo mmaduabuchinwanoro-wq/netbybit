@@ -2389,7 +2389,13 @@ app.get('/api/user/transactions', authMiddleware, async (req: any, res) => {
   try {
     await syncDBFromBlobs();
     const db = loadDB();
-    const userTxs = (db.transactions || []).filter((t) => t.userId === req.user.id);
+    const userId = req.user?.id;
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const userTxs = (db.transactions || []).filter((t) => {
+      if (t.userId && userId && t.userId === userId) return true;
+      if (t.userEmail && userEmail && t.userEmail.toLowerCase().trim() === userEmail) return true;
+      return false;
+    });
     res.json(userTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   } catch (err) {
     console.error('Failed to fetch user transactions:', err);
@@ -3637,10 +3643,10 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
   const user = userIndex !== -1 ? db.users[userIndex] : null;
 
   const isApprove = status === 'completed' || status === 'approved';
-  const isDecline = status === 'failed' || status === 'declined' || status === 'rejected';
+  const isDecline = status === 'failed' || status === 'declined' || status === 'rejected' || status === 'cancelled';
 
   if (!isApprove && !isDecline) {
-    return res.status(400).json({ error: 'Invalid status. Must be completed/approved or failed/declined' });
+    return res.status(400).json({ error: 'Invalid status. Must be completed/approved or failed/declined/cancelled' });
   }
 
   const newStatus = isApprove ? 'completed' : 'failed';

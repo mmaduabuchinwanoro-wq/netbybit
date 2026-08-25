@@ -115,7 +115,7 @@ export const TransactionHistoryPage: React.FC = () => {
                 {filtered.map((tx) => {
                   const isPending = tx.status === 'pending';
                   const isCompleted = tx.status === 'completed';
-                  const isFailed = tx.status === 'failed' || tx.status === 'declined';
+                  const isFailed = tx.status === 'failed' || tx.status === 'declined' || tx.status === 'cancelled' || tx.status === 'rejected';
 
                   return (
                     <tr key={tx.id} className="hover:bg-neutral-950/50 transition-colors">
@@ -153,7 +153,7 @@ export const TransactionHistoryPage: React.FC = () => {
                         ) : (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">
                             <XCircle className="w-3 h-3 text-red-400" />
-                            <span>Declined</span>
+                            <span>Cancelled</span>
                           </span>
                         )}
                       </td>

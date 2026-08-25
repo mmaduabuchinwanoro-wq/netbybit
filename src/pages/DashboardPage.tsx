@@ -883,8 +883,8 @@ export const DashboardPage: React.FC = () => {
                             {tx.status === 'pending'
                               ? 'PROCESSING'
                               : tx.status === 'completed'
-                              ? 'SUCCESSFUL'
-                              : 'DECLINED'}
+                              ? 'COMPLETED'
+                              : 'CANCELLED'}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-neutral-400 text-[11px] font-sans">

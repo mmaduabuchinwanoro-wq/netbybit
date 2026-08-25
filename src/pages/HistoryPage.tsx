@@ -166,7 +166,7 @@ export const HistoryPage: React.FC = () => {
                               : 'bg-red-500/10 text-red-400 border border-red-500/20'
                           }`}
                         >
-                          {tx.status === 'pending' ? 'PROCESSING' : tx.status === 'completed' ? 'SUCCESSFUL' : 'DECLINED'}
+                          {tx.status === 'pending' ? 'PROCESSING' : tx.status === 'completed' ? 'COMPLETED' : 'CANCELLED'}
                         </span>
                       </td>
                     </tr>

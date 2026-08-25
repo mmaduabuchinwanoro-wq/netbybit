@@ -390,32 +390,64 @@ export const api = {
       currentUser = await getMeWithFirebase();
     } catch {}
 
-    const txMap = new Map<string, Transaction>();
-
-    // 1. Fetch from Firestore for current user
-    if (currentUser?.id || currentUser?.email) {
-      try {
-        const q1 = query(collection(db, 'transactions'), where('userId', '==', currentUser.id));
-        const snap1 = await getDocs(q1);
-        snap1.forEach((d) => {
-          const t = d.data() as Transaction;
-          if (t) txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
-        });
-      } catch {}
-
-      if (currentUser.email) {
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
         try {
-          const q2 = query(collection(db, 'transactions'), where('userEmail', '==', currentUser.email));
-          const snap2 = await getDocs(q2);
-          snap2.forEach((d) => {
-            const t = d.data() as Transaction;
-            if (t) txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
-          });
+          currentUser = JSON.parse(cached);
         } catch {}
       }
     }
 
-    // 2. Fetch from backend API if available
+    // Critical Isolation: If unauthenticated, NEVER return any transactions
+    if (!currentUser || (!currentUser.id && !currentUser.email)) {
+      return [];
+    }
+
+    const currentUserId = currentUser.id;
+    const currentUserEmail = currentUser.email?.toLowerCase().trim();
+
+    const isMatch = (t: any): boolean => {
+      if (!t) return false;
+      if (t.userId && currentUserId && t.userId === currentUserId) return true;
+      if (t.userEmail && currentUserEmail && t.userEmail.toLowerCase().trim() === currentUserEmail) return true;
+      return false;
+    };
+
+    const txMap = new Map<string, Transaction>();
+
+    // 1. Fetch from Firestore for current user ONLY
+    if (currentUserId) {
+      try {
+        const q1 = query(collection(db, 'transactions'), where('userId', '==', currentUserId));
+        const snap1 = await getDocs(q1);
+        snap1.forEach((d) => {
+          const t = d.data() as Transaction;
+          if (t && isMatch(t)) {
+            txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+          }
+        });
+      } catch (e) {
+        console.warn('Firestore user tx fetch note:', e);
+      }
+    }
+
+    if (currentUserEmail) {
+      try {
+        const q2 = query(collection(db, 'transactions'), where('userEmail', '==', currentUser.email));
+        const snap2 = await getDocs(q2);
+        snap2.forEach((d) => {
+          const t = d.data() as Transaction;
+          if (t && isMatch(t)) {
+            txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+          }
+        });
+      } catch (e) {
+        console.warn('Firestore userEmail tx fetch note:', e);
+      }
+    }
+
+    // 2. Fetch from backend API if available (server-isolated)
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
       if (token) {
@@ -426,23 +458,27 @@ export const api = {
           const serverTxs: Transaction[] = await res.json();
           if (Array.isArray(serverTxs)) {
             serverTxs.forEach((t) => {
-              if (!txMap.has(t.id)) txMap.set(t.id, t);
+              if (t && isMatch(t) && !txMap.has(t.id)) {
+                txMap.set(t.id, t);
+              }
             });
           }
         }
       }
     } catch {}
 
-    // 3. Merge with local cache
+    // 3. Filter local cache strictly by authenticated user ID and email
     const localStr = localStorage.getItem('netbybit_user_transactions');
     if (localStr) {
       try {
         const localTxs = JSON.parse(localStr) as Transaction[];
-        localTxs.forEach((ltx) => {
-          if (!txMap.has(ltx.id)) {
-            txMap.set(ltx.id, ltx);
-          }
-        });
+        if (Array.isArray(localTxs)) {
+          localTxs.forEach((ltx) => {
+            if (isMatch(ltx) && !txMap.has(ltx.id)) {
+              txMap.set(ltx.id, ltx);
+            }
+          });
+        }
       } catch {}
     }
 
@@ -466,7 +502,16 @@ export const api = {
       currentUser = await getMeWithFirebase();
     } catch {}
 
-    const uid = currentUser?.id || 'usr_local';
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        try {
+          currentUser = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
+    const uid = currentUser?.id || 'usr_' + Date.now();
     const email = currentUser?.email || 'user@example.com';
 
     const mockTx: Transaction = {
@@ -876,18 +921,48 @@ export const api = {
 
   updateUserBalance: async (userId: string, asset: SupportedAsset, amount: number, action: 'add' | 'subtract') => {
     let u: User | null = null;
+    let targetDocId = userId;
+
     try {
       const snap = await getDoc(doc(db, 'users', userId));
-      if (snap.exists()) u = snap.data() as User;
+      if (snap.exists()) {
+        u = snap.data() as User;
+        targetDocId = snap.id;
+      } else {
+        const q = query(collection(db, 'users'), where('id', '==', userId));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          u = qSnap.docs[0].data() as User;
+          targetDocId = qSnap.docs[0].id;
+        } else {
+          const qEmail = query(collection(db, 'users'), where('email', '==', userId));
+          const qEmailSnap = await getDocs(qEmail);
+          if (!qEmailSnap.empty) {
+            u = qEmailSnap.docs[0].data() as User;
+            targetDocId = qEmailSnap.docs[0].id;
+          }
+        }
+      }
     } catch {}
 
     if (!u) u = { ...DEFAULT_ADMIN_USER, id: userId };
+    if (!u.balances) {
+      u.balances = {
+        BTC: 1.25,
+        ETH: 15.5,
+        BNB: 45.0,
+        SOL: 85.0,
+        TRX: 12500,
+        USDT_ERC20: 25000,
+        USDT_TRC20: 15000,
+      };
+    }
 
     const current = u.balances[asset] || 0;
     u.balances[asset] = action === 'add' ? current + amount : Math.max(0, current - amount);
 
     try {
-      await setDoc(doc(db, 'users', userId), { balances: u.balances }, { merge: true });
+      await setDoc(doc(db, 'users', targetDocId), { balances: u.balances }, { merge: true });
     } catch {}
 
     return u;
@@ -940,6 +1015,21 @@ export const api = {
       await setDoc(doc(db, 'swaps', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
     } catch {}
 
+    // Synchronize to backend server API
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        await fetch(`/api/admin/transactions/${txId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        });
+      }
+    } catch {}
+
     // Update local storage cached transactions
     try {
       const cachedTxsStr = localStorage.getItem('netbybit_user_transactions');
@@ -977,7 +1067,7 @@ export const api = {
     if (isDecline && txData.userId && txData.amount > 0) {
       try {
         if (txData.type === 'withdraw' || txData.type === 'send') {
-          // Exact withdrawal amount returned back to user's active crypto balance
+          // Exact withdrawal / send amount returned back to user's active crypto balance
           await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add');
           const cachedStr = localStorage.getItem('netbybit_cached_user');
           if (cachedStr) {
@@ -1005,21 +1095,25 @@ export const api = {
     }
 
     // Create In-App Notification
-    const notifMsg = txData.type === 'withdraw'
+    const notifMsg = (txData.type === 'withdraw' || txData.type === 'send')
       ? (isApprove
-          ? `Your withdrawal request of ${txData.amount} ${txData.asset} has been approved and dispatched successfully.`
-          : `Your withdrawal request of ${txData.amount} ${txData.asset} was declined. The exact amount of ${txData.amount} ${txData.asset} has been automatically refunded to your active balance.`)
+          ? `Your ${txData.type === 'send' ? 'send' : 'withdrawal'} request of ${txData.amount} ${txData.asset} has been approved and dispatched successfully.`
+          : `Your ${txData.type === 'send' ? 'send' : 'withdrawal'} request of ${txData.amount} ${txData.asset} was cancelled/declined. The exact amount of ${txData.amount} ${txData.asset} has been automatically refunded to your active balance.`)
       : txData.type === 'swap'
       ? (isApprove
           ? `Your crypto swap from ${txData.amount} ${txData.fromAsset || txData.asset} to ${txData.toAsset} was approved and credited.`
-          : `Your crypto swap was declined. Your source asset balance has been refunded in full.`)
+          : `Your crypto swap was cancelled/declined. Your source asset balance has been refunded in full.`)
       : `Your transaction #${txId} status has been updated to ${statusLabel}.`;
 
     try {
       const notif: Notification = {
         id: 'notif_' + Date.now(),
         userId: txData.userId,
-        title: txData.type === 'withdraw' ? `Withdrawal ${actionLabel}` : txData.type === 'swap' ? `Swap ${actionLabel}` : `Transaction ${actionLabel}`,
+        title: (txData.type === 'withdraw' || txData.type === 'send')
+          ? `${txData.type === 'send' ? 'Send' : 'Withdrawal'} ${actionLabel}`
+          : txData.type === 'swap'
+          ? `Swap ${actionLabel}`
+          : `Transaction ${actionLabel}`,
         message: notifMsg,
         type: isApprove ? 'security' : 'system',
         isRead: false,
@@ -1037,7 +1131,11 @@ export const api = {
       amount: txData.amount,
       newBalance: 0,
       date: new Date().toISOString(),
-      action: txData.type === 'withdraw' ? `Withdrawal ${actionLabel}` : txData.type === 'swap' ? `Swap ${actionLabel}` : `Transaction ${actionLabel}`,
+      action: (txData.type === 'withdraw' || txData.type === 'send')
+        ? `${txData.type === 'send' ? 'Send' : 'Withdrawal'} ${actionLabel}`
+        : txData.type === 'swap'
+        ? `Swap ${actionLabel}`
+        : `Transaction ${actionLabel}`,
       status: statusLabel,
     };
 
@@ -1047,8 +1145,8 @@ export const api = {
 
     const emailNotification: EmailNotificationPreview = {
       to: txData.userEmail || 'user@example.com',
-      subject: txData.type === 'withdraw'
-        ? `NETBYBIT - Withdrawal Request ${actionLabel} (${txData.amount} ${txData.asset})`
+      subject: (txData.type === 'withdraw' || txData.type === 'send')
+        ? `NETBYBIT - ${txData.type === 'send' ? 'Send' : 'Withdrawal'} Request ${actionLabel} (${txData.amount} ${txData.asset})`
         : `Transaction ${actionLabel}`,
       body: notifMsg,
       sentAt: new Date().toISOString(),
@@ -1059,7 +1157,7 @@ export const api = {
       transaction: txData,
       auditEntry,
       emailNotification,
-      message: `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline && txData.type === 'withdraw' ? ' Funds refunded to user balance.' : ''}`,
+      message: `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'send' ? 'Send' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline && (txData.type === 'withdraw' || txData.type === 'send') ? ' Funds refunded to user balance.' : ''}`,
     };
   },
 
