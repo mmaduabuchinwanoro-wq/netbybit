@@ -49,7 +49,7 @@ export const SUPPORT_LANGUAGES = [
 ];
 
 export const CustomerSupportPage: React.FC = () => {
-  const { user, goBack } = useAuth();
+  const { user, goBack, openSupportChoice } = useAuth();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [adminTickets, setAdminTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -413,11 +413,11 @@ export const CustomerSupportPage: React.FC = () => {
 
           {viewMode === 'user' && (
             <button
-              onClick={() => setNewChatModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center space-x-2 shrink-0"
+              onClick={openSupportChoice}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-yellow-300 transition-all flex items-center space-x-2 shrink-0 cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              <span>New Support Chat</span>
+              <Headphones className="w-4 h-4" />
+              <span>Contact Support</span>
             </button>
           )}
         </div>
