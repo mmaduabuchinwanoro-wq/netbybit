@@ -96,17 +96,23 @@ export const TransactionHistoryPage: React.FC = () => {
 
         {/* Filter Tabs */}
         <div className="flex space-x-1.5 bg-neutral-900/90 p-1.5 border border-neutral-800 rounded-2xl overflow-x-auto w-full sm:w-auto">
-          {['all', 'deposit', 'withdraw', 'send', 'swap'].map((type) => (
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'deposit', label: 'Deposits & Received' },
+            { id: 'withdraw', label: 'Withdrawals' },
+            { id: 'send', label: 'Sent' },
+            { id: 'swap', label: 'Swaps' },
+          ].map((tab) => (
             <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs capitalize font-bold transition-all ${
-                filterType === type
+              key={tab.id}
+              onClick={() => setFilterType(tab.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                filterType === tab.id
                   ? 'bg-amber-500 text-neutral-950 shadow-md'
                   : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
-              {type}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -128,16 +134,16 @@ export const TransactionHistoryPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-neutral-800 bg-neutral-950/80 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider font-mono">
                   <th className="py-3.5 px-4">Type</th>
-                  <th className="py-3.5 px-4">Asset</th>
+                  <th className="py-3.5 px-4">Asset / Pair</th>
                   <th className="py-3.5 px-4">Amount</th>
-                  <th className="py-3.5 px-4">Hash / Destination</th>
+                  <th className="py-3.5 px-4">Destination / Hash</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Date & Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-800/60 text-xs text-neutral-200 font-mono">
                 {filtered.map((tx) => {
-                  const isPending = tx.status === 'pending';
+                  const isPending = tx.status === 'pending' || (tx.status as string) === 'processing';
                   const isCompleted =
                     tx.status === 'completed' ||
                     (tx.status as string) === 'Successful' ||
@@ -150,33 +156,75 @@ export const TransactionHistoryPage: React.FC = () => {
                     tx.status === 'cancelled' ||
                     tx.status === 'rejected';
 
+                  const typeDisplayName =
+                    tx.type === 'deposit' || tx.type === 'receive' || tx.type === 'credit'
+                      ? 'Received'
+                      : tx.type === 'withdraw'
+                      ? 'Withdrawal'
+                      : tx.type === 'send'
+                      ? 'Sent'
+                      : tx.type === 'swap'
+                      ? 'Swap'
+                      : tx.type;
+
                   return (
                     <tr key={tx.id} className="hover:bg-neutral-950/50 transition-colors">
                       <td className="py-4 px-4 font-sans flex items-center space-x-2.5">
                         <div className="p-2 rounded-xl bg-neutral-950 border border-neutral-800 shrink-0">
                           {getIcon(tx.type)}
                         </div>
-                        <span className="capitalize font-bold text-neutral-100">{tx.type}</span>
+                        <span className="font-bold text-neutral-100">{typeDisplayName}</span>
                       </td>
                       <td className="py-4 px-4 font-sans">
-                        <div className="flex items-center space-x-2">
-                          <CryptoIcon asset={tx.asset} size="xs" />
-                          <span className="font-mono font-semibold">{tx.asset}</span>
-                        </div>
+                        {tx.type === 'swap' ? (
+                          <div className="flex items-center space-x-1.5 font-mono text-xs">
+                            <CryptoIcon asset={tx.fromAsset || tx.asset} size="xs" />
+                            <span className="font-bold text-amber-300">{tx.fromAsset || tx.asset}</span>
+                            <span className="text-neutral-500 font-bold">➔</span>
+                            <CryptoIcon asset={tx.toAsset || 'USDT'} size="xs" />
+                            <span className="font-bold text-emerald-400">{tx.toAsset || 'USDT'}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <CryptoIcon asset={tx.asset} size="xs" />
+                            <span className="font-mono font-semibold text-neutral-100">{tx.asset}</span>
+                          </div>
+                        )}
                       </td>
-                      <td className="py-4 px-4 font-bold text-neutral-100 font-mono">
-                        {tx.amount} {tx.asset}
+                      <td className="py-4 px-4 font-bold font-mono">
+                        {tx.type === 'swap' ? (
+                          <span className="text-amber-300">{tx.amount} {tx.fromAsset || tx.asset}</span>
+                        ) : (
+                          <span className={tx.type === 'withdraw' || tx.type === 'send' ? 'text-neutral-200' : 'text-emerald-400'}>
+                            {tx.type === 'withdraw' || tx.type === 'send' ? '-' : '+'}
+                            {tx.amount} {tx.asset}
+                          </span>
+                        )}
                       </td>
                       <td className="py-4 px-4 text-[11px] text-neutral-400">
-                        <div className="truncate max-w-[150px] font-mono select-all" title={tx.destinationAddress || tx.txHash}>
-                          {tx.destinationAddress || tx.txHash}
-                        </div>
+                        {tx.destinationAddress ? (
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="text-[10px] text-amber-400/80 font-sans uppercase font-bold">Destination</span>
+                            <span className="truncate max-w-[160px] font-mono text-neutral-300 select-all" title={tx.destinationAddress}>
+                              {tx.destinationAddress}
+                            </span>
+                          </div>
+                        ) : tx.txHash ? (
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="text-[10px] text-neutral-500 font-sans uppercase">TxHash</span>
+                            <span className="truncate max-w-[140px] font-mono text-neutral-400 select-all" title={tx.txHash}>
+                              {tx.txHash}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-neutral-600">N/A</span>
+                        )}
                       </td>
                       <td className="py-4 px-4 font-sans">
                         {isPending ? (
                           <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 text-amber-300 border border-amber-500/40">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                            <span>Processing</span>
+                            <span>Pending</span>
                           </span>
                         ) : isCompleted ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">

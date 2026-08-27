@@ -132,16 +132,56 @@ export const HistoryPage: React.FC = () => {
                         <div>{dateObj.toLocaleDateString()}</div>
                         <div className="text-[10px] text-neutral-500">{dateObj.toLocaleTimeString()}</div>
                       </td>
-                      <td className="py-3 px-3 font-bold capitalize text-amber-400 font-sans">
-                        {tx.type}
+                      <td className="py-3 px-3 font-bold capitalize font-sans">
+                        {(() => {
+                          const typeDisplayName =
+                            tx.type === 'deposit' || tx.type === 'receive' || tx.type === 'credit'
+                              ? 'Received'
+                              : tx.type === 'withdraw'
+                              ? 'Withdrawal'
+                              : tx.type === 'send'
+                              ? 'Sent'
+                              : tx.type === 'swap'
+                              ? 'Swap'
+                              : tx.type;
+                          return (
+                            <span className={tx.type === 'deposit' || tx.type === 'receive' ? 'text-emerald-400' : 'text-amber-400'}>
+                              {typeDisplayName}
+                            </span>
+                          );
+                        })()}
                       </td>
-                      <td className="py-3 px-3 font-bold">{tx.asset}</td>
+                      <td className="py-3 px-3 font-bold">
+                        {tx.type === 'swap' ? (
+                          <span className="text-amber-300 font-mono text-xs">{tx.fromAsset || tx.asset} ➔ {tx.toAsset || 'USDT'}</span>
+                        ) : (
+                          tx.asset
+                        )}
+                      </td>
                       <td className="py-3 px-3">
-                        {tx.type === 'withdraw' || tx.type === 'send' ? '-' : '+'}
-                        {tx.amount} {tx.asset}
+                        {tx.type === 'swap' ? (
+                          <span className="text-amber-300 font-mono">{tx.amount} {tx.fromAsset || tx.asset}</span>
+                        ) : (
+                          <span className={tx.type === 'withdraw' || tx.type === 'send' ? 'text-neutral-200 font-mono' : 'text-emerald-400 font-mono'}>
+                            {tx.type === 'withdraw' || tx.type === 'send' ? '-' : '+'}
+                            {tx.amount} {tx.asset}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-[11px] text-neutral-400 font-mono">
-                        {tx.txHash ? (
+                        {tx.destinationAddress ? (
+                          <div className="flex items-center space-x-1" title={tx.destinationAddress}>
+                            <span className="text-[10px] text-amber-400/80 uppercase font-sans font-bold">To:</span>
+                            <span className="truncate max-w-[110px] text-neutral-300">{tx.destinationAddress}</span>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(tx.destinationAddress || '')}
+                              className="text-neutral-500 hover:text-amber-400 p-0.5 rounded"
+                              title="Copy Destination"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : tx.txHash ? (
                           <div className="flex items-center space-x-1">
                             <span className="truncate max-w-[120px]" title={tx.txHash}>{tx.txHash}</span>
                             <button
@@ -164,19 +204,20 @@ export const HistoryPage: React.FC = () => {
                             (tx.status as string) === 'successful' ||
                             (tx.status as string) === 'approved' ||
                             (tx.status as string) === 'success';
-                          const isPending = tx.status === 'pending';
+                          const isPending = tx.status === 'pending' || (tx.status as string) === 'processing';
 
                           return (
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 ${
                                 isCompleted
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                                   : isPending
-                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
+                                  : 'bg-red-500/15 text-red-400 border border-red-500/30'
                               }`}
                             >
-                              {isPending ? 'PROCESSING' : isCompleted ? 'SUCCESSFUL' : 'CANCELLED'}
+                              {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
+                              <span>{isPending ? 'Pending' : isCompleted ? 'Successful' : 'Cancelled'}</span>
                             </span>
                           );
                         })()}

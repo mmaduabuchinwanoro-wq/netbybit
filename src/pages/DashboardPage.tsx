@@ -858,17 +858,52 @@ export const DashboardPage: React.FC = () => {
 
                     return (
                       <tr key={tx.id} className="hover:bg-neutral-950/60 transition-colors">
-                        <td className="py-3 px-3 capitalize font-bold text-amber-400">{tx.type}</td>
+                        <td className="py-3 px-3 capitalize font-bold font-sans">
+                          {(() => {
+                            const typeDisplayName =
+                              tx.type === 'deposit' || tx.type === 'receive' || tx.type === 'credit'
+                                ? 'Received'
+                                : tx.type === 'withdraw'
+                                ? 'Withdrawal'
+                                : tx.type === 'send'
+                                ? 'Sent'
+                                : tx.type === 'swap'
+                                ? 'Swap'
+                                : tx.type;
+                            return (
+                              <span className={tx.type === 'deposit' || tx.type === 'receive' ? 'text-emerald-400' : 'text-amber-400'}>
+                                {typeDisplayName}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="py-3 px-3">
-                          <div className="flex items-center space-x-2">
-                            <CryptoIcon asset={tx.asset} size="xs" />
-                            <span>{tx.asset}</span>
-                          </div>
+                          {tx.type === 'swap' ? (
+                            <div className="flex items-center space-x-1.5 font-mono text-xs">
+                              <CryptoIcon asset={tx.fromAsset || tx.asset} size="xs" />
+                              <span className="font-bold text-amber-300">{tx.fromAsset || tx.asset}</span>
+                              <span className="text-neutral-500 font-bold">➔</span>
+                              <CryptoIcon asset={tx.toAsset || 'USDT'} size="xs" />
+                              <span className="font-bold text-emerald-400">{tx.toAsset || 'USDT'}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <CryptoIcon asset={tx.asset} size="xs" />
+                              <span className="font-sans font-bold text-neutral-100">{tx.asset}</span>
+                            </div>
+                          )}
                         </td>
-                        <td className="py-3 px-3 font-bold">
-                          {tx.amount} {tx.asset}
+                        <td className="py-3 px-3 font-bold font-mono">
+                          {tx.type === 'swap' ? (
+                            <span className="text-amber-300">{tx.amount} {tx.fromAsset || tx.asset}</span>
+                          ) : (
+                            <span className={tx.type === 'withdraw' || tx.type === 'send' ? 'text-neutral-200' : 'text-emerald-400'}>
+                              {tx.type === 'withdraw' || tx.type === 'send' ? '-' : '+'}
+                              {tx.amount} {tx.asset}
+                            </span>
+                          )}
                         </td>
-                        <td className="py-3 px-3 text-neutral-300 font-bold">
+                        <td className="py-3 px-3 text-neutral-300 font-bold font-mono">
                           {fiatVal.formatted}
                         </td>
                         <td className="py-3 px-3">
@@ -879,19 +914,20 @@ export const DashboardPage: React.FC = () => {
                               (tx.status as string) === 'successful' ||
                               (tx.status as string) === 'approved' ||
                               (tx.status as string) === 'success';
-                            const isPending = tx.status === 'pending';
+                            const isPending = tx.status === 'pending' || (tx.status as string) === 'processing';
 
                             return (
                               <span
-                                className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border inline-flex items-center space-x-1 ${
                                   isPending
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                                     : isCompleted
                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                                     : 'bg-red-500/10 text-red-400 border-red-500/30'
                                 }`}
                               >
-                                {isPending ? 'PROCESSING' : isCompleted ? 'SUCCESSFUL' : 'CANCELLED'}
+                                {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
+                                <span>{isPending ? 'Pending' : isCompleted ? 'Successful' : 'Cancelled'}</span>
                               </span>
                             );
                           })()}
