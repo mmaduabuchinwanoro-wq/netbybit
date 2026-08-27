@@ -110,6 +110,7 @@ export interface Transaction {
   id: string;
   userId: string;
   userEmail?: string;
+  accountNumber?: string;
   type: TransactionType;
   asset: SupportedAsset;
   amount: number;
@@ -120,6 +121,8 @@ export interface Transaction {
   txHash: string;
   status: TransactionStatus;
   date: string;
+  createdAt?: string;
+  description?: string;
 }
 
 export interface TicketReply {

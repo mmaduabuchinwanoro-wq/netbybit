@@ -406,11 +406,13 @@ export const api = {
 
     const currentUserId = currentUser.id;
     const currentUserEmail = currentUser.email?.toLowerCase().trim();
+    const currentUserAccountNo = ((currentUser as any).accountNumber || (currentUser as any).accountNo || '').toString().trim();
 
     const isMatch = (t: any): boolean => {
       if (!t) return false;
-      if (t.userId && currentUserId && t.userId === currentUserId) return true;
+      if (t.userId && currentUserId && (t.userId === currentUserId || String(t.userId).toLowerCase() === String(currentUserId).toLowerCase())) return true;
       if (t.userEmail && currentUserEmail && t.userEmail.toLowerCase().trim() === currentUserEmail) return true;
+      if (currentUserAccountNo && t.accountNumber && String(t.accountNumber).trim() === currentUserAccountNo) return true;
       return false;
     };
 
@@ -444,6 +446,21 @@ export const api = {
         });
       } catch (e) {
         console.warn('Firestore userEmail tx fetch note:', e);
+      }
+    }
+
+    if (currentUserAccountNo) {
+      try {
+        const q3 = query(collection(db, 'transactions'), where('accountNumber', '==', currentUserAccountNo));
+        const snap3 = await getDocs(q3);
+        snap3.forEach((d) => {
+          const t = d.data() as Transaction;
+          if (t && isMatch(t)) {
+            txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+          }
+        });
+      } catch (e) {
+        console.warn('Firestore accountNumber tx fetch note:', e);
       }
     }
 
@@ -944,6 +961,58 @@ export const api = {
     amount: number;
     reason?: string;
   }) => {
+    // 1. Try backend API endpoint first (with admin auth token)
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch('/api/admin/adjust-user-balance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.success) {
+            // Also sync transaction record to firestore if present
+            const txHash = json.auditEntry?.txHash || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+            const nowISO = new Date().toISOString();
+            const synchedTx: Transaction = {
+              id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+              userId: json.user?.id || json.auditEntry?.userId || '',
+              userEmail: json.user?.email || body.email,
+              accountNumber: json.user?.accountNumber || json.user?.accountNo || '',
+              type: body.action === 'add' ? 'deposit' : 'withdraw',
+              asset: body.asset,
+              amount: body.amount,
+              usdtEquivalent: body.amount,
+              txHash,
+              status: 'completed',
+              date: nowISO,
+              createdAt: nowISO,
+              description: body.reason?.trim() || (body.action === 'add' ? 'Admin Custody Deposit' : 'Admin Balance Deduction'),
+            };
+
+            try {
+              await setDoc(doc(db, 'transactions', synchedTx.id), synchedTx);
+            } catch {}
+
+            try {
+              const localTxs = JSON.parse(localStorage.getItem('netbybit_user_transactions') || '[]');
+              localTxs.unshift(synchedTx);
+              localStorage.setItem('netbybit_user_transactions', JSON.stringify(localTxs));
+            } catch {}
+
+            return json;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Backend adjust user balance endpoint note:', e);
+    }
+
     const normEmail = body.email.trim().toLowerCase();
     let targetUser: User | null = null;
     let targetUid = '';
@@ -998,6 +1067,40 @@ export const api = {
       } catch {}
     }
 
+    const txHash = body.asset === 'BTC' || body.asset === 'TRX' || body.asset === 'USDT_TRC20'
+      ? Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+      : '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const nowISO = new Date().toISOString();
+
+    // Create user-facing transaction in transaction ledger
+    const adminTx: Transaction = {
+      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      userId: targetUid || targetUser.id,
+      userEmail: targetUser.email,
+      accountNumber: (targetUser as any).accountNumber || (targetUser as any).accountNo || '',
+      type: body.action === 'add' ? 'deposit' : 'withdraw',
+      asset: body.asset,
+      amount: body.amount,
+      usdtEquivalent: body.amount,
+      txHash,
+      status: 'completed',
+      date: nowISO,
+      createdAt: nowISO,
+      description: body.reason?.trim() || (body.action === 'add' ? 'Admin Custody Deposit' : 'Admin Balance Deduction'),
+    };
+
+    try {
+      await setDoc(doc(db, 'transactions', adminTx.id), adminTx);
+    } catch (e) {
+      console.warn('Firestore admin transaction record note:', e);
+    }
+
+    try {
+      const localTxs = JSON.parse(localStorage.getItem('netbybit_user_transactions') || '[]');
+      localTxs.unshift(adminTx);
+      localStorage.setItem('netbybit_user_transactions', JSON.stringify(localTxs));
+    } catch {}
+
     const auditEntry: AuditLogEntry = {
       id: 'aud_' + Date.now(),
       adminEmail: 'netbybitsupport@gmail.com',
@@ -1006,7 +1109,7 @@ export const api = {
       asset: body.asset,
       amount: body.amount,
       newBalance,
-      date: new Date().toISOString(),
+      date: nowISO,
       action: body.action === 'add' ? 'credit' : 'deduct',
     };
 
@@ -1017,8 +1120,8 @@ export const api = {
     const emailNotification: EmailNotificationPreview = {
       to: targetUser.email,
       subject: `Balance ${body.action === 'add' ? 'Credited' : 'Deducted'}`,
-      body: `Your ${body.asset} balance has been ${body.action === 'add' ? 'credited with' : 'deducted by'} ${body.amount} ${body.asset}. New balance: ${newBalance} ${body.asset}.`,
-      sentAt: new Date().toISOString(),
+      body: `Your ${body.asset} balance has been ${body.action === 'add' ? 'credited with' : 'deducted by'} ${body.amount} ${body.asset}. New balance: ${newBalance} ${body.asset}. TxHash: ${txHash}`,
+      sentAt: nowISO,
     };
 
     return {
@@ -1074,6 +1177,35 @@ export const api = {
 
     try {
       await setDoc(doc(db, 'users', targetDocId), { balances: u.balances }, { merge: true });
+    } catch {}
+
+    // Record transaction
+    const nowISO = new Date().toISOString();
+    const txHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const txRecord: Transaction = {
+      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      userId: u.id || targetDocId,
+      userEmail: u.email,
+      accountNumber: (u as any).accountNumber || (u as any).accountNo || '',
+      type: action === 'add' ? 'deposit' : 'withdraw',
+      asset,
+      amount,
+      usdtEquivalent: amount,
+      txHash,
+      status: 'completed',
+      date: nowISO,
+      createdAt: nowISO,
+      description: action === 'add' ? 'Admin Balance Credit' : 'Admin Balance Deduction',
+    };
+
+    try {
+      await setDoc(doc(db, 'transactions', txRecord.id), txRecord);
+    } catch {}
+
+    try {
+      const localTxs = JSON.parse(localStorage.getItem('netbybit_user_transactions') || '[]');
+      localTxs.unshift(txRecord);
+      localStorage.setItem('netbybit_user_transactions', JSON.stringify(localTxs));
     } catch {}
 
     return u;

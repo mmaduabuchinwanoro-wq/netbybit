@@ -114,8 +114,17 @@ export const TransactionHistoryPage: React.FC = () => {
               <tbody className="divide-y divide-neutral-800/60 text-xs text-neutral-200 font-mono">
                 {filtered.map((tx) => {
                   const isPending = tx.status === 'pending';
-                  const isCompleted = tx.status === 'completed';
-                  const isFailed = tx.status === 'failed' || tx.status === 'declined' || tx.status === 'cancelled' || tx.status === 'rejected';
+                  const isCompleted =
+                    tx.status === 'completed' ||
+                    (tx.status as string) === 'Successful' ||
+                    (tx.status as string) === 'successful' ||
+                    (tx.status as string) === 'approved' ||
+                    (tx.status as string) === 'success';
+                  const isFailed =
+                    tx.status === 'failed' ||
+                    tx.status === 'declined' ||
+                    tx.status === 'cancelled' ||
+                    tx.status === 'rejected';
 
                   return (
                     <tr key={tx.id} className="hover:bg-neutral-950/50 transition-colors">
@@ -148,7 +157,7 @@ export const TransactionHistoryPage: React.FC = () => {
                         ) : isCompleted ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            <span>Completed</span>
+                            <span>Successful</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">

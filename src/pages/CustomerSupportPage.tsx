@@ -638,6 +638,10 @@ export const CustomerSupportPage: React.FC = () => {
                       (rep.translatedMessage &&
                         rep.translatedMessage.trim().toLowerCase() !== rep.message.trim().toLowerCase());
                     const displayText = isShowingOriginal ? rep.message : (rep.translatedMessage || rep.message);
+                    const isAutoOffline =
+                      rep.message.includes('Kindly hold on, our support is currently unavailable') ||
+                      rep.id?.startsWith('rpl_auto_') ||
+                      (rep as any).isAutoReply === true;
 
                     if (isAdmin) {
                       // Support Reply (Incoming - Left Aligned)
@@ -658,37 +662,39 @@ export const CustomerSupportPage: React.FC = () => {
                             <div className="bg-neutral-850 border border-neutral-700/80 text-neutral-100 px-4 py-3 rounded-2xl rounded-tl-xs space-y-2 shadow-md break-words">
                               <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
 
-                              {/* Structured Live Agent Card */}
-                              <div className="pt-2 mt-1 border-t border-amber-500/20 flex flex-col space-y-2 bg-amber-500/10 -mx-1.5 p-2.5 rounded-xl border border-amber-500/30">
-                                <div className="text-[10px] text-neutral-300 font-mono font-medium">
-                                  Email: <span className="text-amber-300 font-bold">netbybitsupport@gmail.com</span>
+                              {/* Structured Live Agent Card - Only for Automated Offline Responder */}
+                              {isAutoOffline && (
+                                <div className="pt-2 mt-1 border-t border-amber-500/20 flex flex-col space-y-2 bg-amber-500/10 -mx-1.5 p-2.5 rounded-xl border border-amber-500/30">
+                                  <div className="text-[10px] text-neutral-300 font-mono font-medium">
+                                    Email: <span className="text-amber-300 font-bold">netbybitsupport@gmail.com</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <a
+                                      href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
+                                      className="flex-1 inline-flex items-center justify-center space-x-1 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 font-bold px-2.5 py-1.5 rounded-lg text-[10px] shadow transition-all cursor-pointer"
+                                    >
+                                      <Mail className="w-3 h-3" />
+                                      <span>Message Live Agent</span>
+                                    </a>
+                                    <button
+                                      onClick={() => handleCopyEmail(rep.id)}
+                                      className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 hover:text-amber-300 text-[10px] font-medium flex items-center space-x-1 transition-colors cursor-pointer"
+                                    >
+                                      {copiedMap[rep.id] ? (
+                                        <>
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                          <span className="text-emerald-400 font-bold">Copied</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-3 h-3" />
+                                          <span>Copy</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <a
-                                    href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
-                                    className="flex-1 inline-flex items-center justify-center space-x-1 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 font-bold px-2.5 py-1.5 rounded-lg text-[10px] shadow transition-all cursor-pointer"
-                                  >
-                                    <Mail className="w-3 h-3" />
-                                    <span>Message Live Agent</span>
-                                  </a>
-                                  <button
-                                    onClick={() => handleCopyEmail(rep.id)}
-                                    className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 hover:text-amber-300 text-[10px] font-medium flex items-center space-x-1 transition-colors cursor-pointer"
-                                  >
-                                    {copiedMap[rep.id] ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-400" />
-                                        <span className="text-emerald-400 font-bold">Copied</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-3 h-3" />
-                                        <span>Copy</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
+                              )}
 
                               {/* Translation Badge & Toggle */}
                               {hasTranslation && (

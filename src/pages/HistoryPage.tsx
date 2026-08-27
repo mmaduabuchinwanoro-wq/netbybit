@@ -157,17 +157,29 @@ export const HistoryPage: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3 px-3 font-sans">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            tx.status === 'completed'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : tx.status === 'pending'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                              : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                          }`}
-                        >
-                          {tx.status === 'pending' ? 'PROCESSING' : tx.status === 'completed' ? 'COMPLETED' : 'CANCELLED'}
-                        </span>
+                        {(() => {
+                          const isCompleted =
+                            tx.status === 'completed' ||
+                            (tx.status as string) === 'Successful' ||
+                            (tx.status as string) === 'successful' ||
+                            (tx.status as string) === 'approved' ||
+                            (tx.status as string) === 'success';
+                          const isPending = tx.status === 'pending';
+
+                          return (
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                isCompleted
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : isPending
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                              }`}
+                            >
+                              {isPending ? 'PROCESSING' : isCompleted ? 'SUCCESSFUL' : 'CANCELLED'}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

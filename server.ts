@@ -2445,9 +2445,11 @@ app.get('/api/user/transactions', authMiddleware, async (req: any, res) => {
     const db = loadDB();
     const userId = req.user?.id;
     const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const userAccountNumber = (req.user?.accountNumber || req.user?.accountNo || '').toString().trim();
     const userTxs = (db.transactions || []).filter((t) => {
-      if (t.userId && userId && t.userId === userId) return true;
+      if (t.userId && userId && (t.userId === userId || String(t.userId).toLowerCase() === String(userId).toLowerCase())) return true;
       if (t.userEmail && userEmail && t.userEmail.toLowerCase().trim() === userEmail) return true;
+      if (userAccountNumber && t.accountNumber && String(t.accountNumber).trim() === userAccountNumber) return true;
       return false;
     });
     res.json(userTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
@@ -2866,21 +2868,6 @@ app.post('/api/support/tickets/:ticketId/reply', authMiddleware, async (req: any
   }
 
   if (isUserSender) {
-    // Automated Offline Fallback Message
-    const offlineFallbackReply = {
-      id: 'rpl_auto_' + (Date.now() + 50) + '_' + Math.random().toString(36).substring(2, 6),
-      sender: 'admin' as const,
-      senderName: 'Netbybit Support',
-      message: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
-      translatedMessage: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
-      originalLanguage: 'English',
-      targetLanguage: ticket.userLanguage || 'English',
-      isTranslated: false,
-      createdAt: new Date(Date.now() + 100).toISOString(),
-      status: 'Delivered',
-    };
-    ticket.replies.push(offlineFallbackReply);
-
     // Dispatch Email Alert to netbybitsupport@gmail.com
     sendEmailNotification(db, {
       to: 'netbybitsupport@gmail.com',
@@ -3102,21 +3089,6 @@ app.post('/api/support/guest/tickets/:ticketId/reply', async (req, res) => {
     ticket.status = 'Open';
   }
 
-  // Automated Offline Fallback Message
-  const offlineFallbackReply = {
-    id: 'rpl_auto_' + (Date.now() + 50) + '_' + Math.random().toString(36).substring(2, 6),
-    sender: 'admin' as const,
-    senderName: 'Netbybit Support',
-    message: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
-    translatedMessage: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
-    originalLanguage: 'English',
-    targetLanguage: ticket.userLanguage || 'English',
-    isTranslated: false,
-    createdAt: new Date(Date.now() + 100).toISOString(),
-    status: 'Delivered',
-  };
-  ticket.replies.push(offlineFallbackReply);
-
   // Send Admin Alert Email
   sendEmailNotification(db, {
     to: 'netbybitsupport@gmail.com',
@@ -3324,6 +3296,34 @@ app.put('/api/admin/users/:userId/balance', adminMiddleware, async (req, res) =>
   const nowISO = new Date().toISOString();
 
   if (balances) {
+    if (!db.transactions) db.transactions = [];
+    const prevBalances = db.users[userIndex].balances || {};
+    Object.entries(balances).forEach(([bAsset, bVal]) => {
+      const oldAmt = prevBalances[bAsset] || 0;
+      const newAmt = Number(bVal) || 0;
+      const diff = newAmt - oldAmt;
+      if (Math.abs(diff) > 0.000001) {
+        const isDed = diff < 0;
+        const txH = generateTxHash(bAsset);
+        const autoTx = {
+          id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          userId: db.users[userIndex].id,
+          userEmail: db.users[userIndex].email,
+          accountNumber: db.users[userIndex].accountNumber || (db.users[userIndex] as any).accountNo || '',
+          type: isDed ? 'withdraw' : 'deposit',
+          asset: bAsset,
+          amount: Math.abs(diff),
+          usdtEquivalent: Math.abs(diff),
+          txHash: txH,
+          status: 'completed',
+          date: nowISO,
+          createdAt: nowISO,
+          description: isDed ? 'Admin Balance Adjustment (Deduction)' : 'Admin Custody Deposit',
+        };
+        db.transactions.unshift(autoTx);
+      }
+    });
+
     db.users[userIndex].balances = {
       ...db.users[userIndex].balances,
       ...balances,
@@ -3339,6 +3339,8 @@ app.put('/api/admin/users/:userId/balance', adminMiddleware, async (req, res) =>
     const adminTx = {
       id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       userId: db.users[userIndex].id,
+      userEmail: db.users[userIndex].email,
+      accountNumber: db.users[userIndex].accountNumber || (db.users[userIndex] as any).accountNo || '',
       type: isDeduct ? 'withdraw' : 'deposit',
       asset,
       amount: Math.abs(parsedAmt),
@@ -3406,6 +3408,8 @@ app.post('/api/admin/adjust-user-balance', adminMiddleware, async (req: any, res
   const adminTx = {
     id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
     userId: user.id,
+    userEmail: user.email,
+    accountNumber: user.accountNumber || (user as any).accountNo || '',
     type: isDeduct ? 'withdraw' : 'deposit',
     asset,
     amount: parsedAmount,

@@ -872,21 +872,29 @@ export const DashboardPage: React.FC = () => {
                           {fiatVal.formatted}
                         </td>
                         <td className="py-3 px-3">
-                          <span
-                            className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                              tx.status === 'pending'
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
-                                : tx.status === 'completed'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                : 'bg-red-500/10 text-red-400 border-red-500/30'
-                            }`}
-                          >
-                            {tx.status === 'pending'
-                              ? 'PROCESSING'
-                              : tx.status === 'completed'
-                              ? 'COMPLETED'
-                              : 'CANCELLED'}
-                          </span>
+                          {(() => {
+                            const isCompleted =
+                              tx.status === 'completed' ||
+                              (tx.status as string) === 'Successful' ||
+                              (tx.status as string) === 'successful' ||
+                              (tx.status as string) === 'approved' ||
+                              (tx.status as string) === 'success';
+                            const isPending = tx.status === 'pending';
+
+                            return (
+                              <span
+                                className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                  isPending
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+                                    : isCompleted
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/30'
+                                }`}
+                              >
+                                {isPending ? 'PROCESSING' : isCompleted ? 'SUCCESSFUL' : 'CANCELLED'}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="py-3 px-3 text-neutral-400 text-[11px] font-sans">
                           {new Date(tx.date).toLocaleString()}
