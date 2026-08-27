@@ -23,11 +23,35 @@ export const TransactionHistoryPage: React.FC = () => {
   }, [user]);
 
   const filtered = transactions.filter((t) => {
-    const matchesType = filterType === 'all' || t.type === filterType;
+    if (!t) return false;
+    const tType = (t.type || '').toLowerCase();
+    const fType = filterType.toLowerCase();
+
+    let matchesType = fType === 'all';
+    if (!matchesType) {
+      if (fType === 'deposit') {
+        matchesType = tType === 'deposit' || tType === 'credit' || tType === 'add' || tType === 'receive';
+      } else if (fType === 'withdraw') {
+        matchesType = tType === 'withdraw' || tType === 'deduct' || tType === 'subtract';
+      } else if (fType === 'send') {
+        matchesType = tType === 'send' || tType === 'withdraw';
+      } else if (fType === 'swap') {
+        matchesType = tType === 'swap';
+      } else {
+        matchesType = tType === fType;
+      }
+    }
+
+    const s = searchTerm.toLowerCase().trim();
     const matchesSearch =
-      t.asset.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.txHash.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.destinationAddress && t.destinationAddress.toLowerCase().includes(searchTerm.toLowerCase()));
+      !s ||
+      (t.asset && t.asset.toLowerCase().includes(s)) ||
+      (t.txHash && t.txHash.toLowerCase().includes(s)) ||
+      (t.destinationAddress && t.destinationAddress.toLowerCase().includes(s)) ||
+      (t.description && t.description.toLowerCase().includes(s)) ||
+      (t.type && t.type.toLowerCase().includes(s)) ||
+      (t.amount !== undefined && t.amount.toString().includes(s));
+
     return matchesType && matchesSearch;
   });
 

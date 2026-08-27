@@ -2445,11 +2445,29 @@ app.get('/api/user/transactions', authMiddleware, async (req: any, res) => {
     const db = loadDB();
     const userId = req.user?.id;
     const userEmail = (req.user?.email || '').toLowerCase().trim();
-    const userAccountNumber = (req.user?.accountNumber || req.user?.accountNo || '').toString().trim();
+    const matchedDbUser = (db.users || []).find(
+      (u) => (userId && u.id === userId) || (userEmail && u.email?.toLowerCase().trim() === userEmail)
+    );
+    const allUserIds = new Set<string>();
+    if (userId) allUserIds.add(String(userId).toLowerCase().trim());
+    if (matchedDbUser?.id) allUserIds.add(String(matchedDbUser.id).toLowerCase().trim());
+
+    const allEmails = new Set<string>();
+    if (userEmail) allEmails.add(userEmail);
+    if (matchedDbUser?.email) allEmails.add(matchedDbUser.email.toLowerCase().trim());
+
+    const allAccountNos = new Set<string>();
+    if (req.user?.accountNumber) allAccountNos.add(String(req.user.accountNumber).trim());
+    if (matchedDbUser?.accountNumber) allAccountNos.add(String(matchedDbUser.accountNumber).trim());
+    if ((matchedDbUser as any)?.accountNo) allAccountNos.add(String((matchedDbUser as any).accountNo).trim());
+
     const userTxs = (db.transactions || []).filter((t) => {
-      if (t.userId && userId && (t.userId === userId || String(t.userId).toLowerCase() === String(userId).toLowerCase())) return true;
-      if (t.userEmail && userEmail && t.userEmail.toLowerCase().trim() === userEmail) return true;
-      if (userAccountNumber && t.accountNumber && String(t.accountNumber).trim() === userAccountNumber) return true;
+      const tUid = (t.userId || '').toString().toLowerCase().trim();
+      const tEmail = (t.userEmail || '').toString().toLowerCase().trim();
+      const tAcc = (t.accountNumber || (t as any).accountNo || '').toString().trim();
+      if (tUid && allUserIds.has(tUid)) return true;
+      if (tEmail && allEmails.has(tEmail)) return true;
+      if (tAcc && allAccountNos.has(tAcc)) return true;
       return false;
     });
     res.json(userTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));

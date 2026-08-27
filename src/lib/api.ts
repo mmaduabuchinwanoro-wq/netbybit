@@ -404,24 +404,28 @@ export const api = {
       return [];
     }
 
-    const currentUserId = currentUser.id;
-    const currentUserEmail = currentUser.email?.toLowerCase().trim();
-    const currentUserAccountNo = ((currentUser as any).accountNumber || (currentUser as any).accountNo || '').toString().trim();
+    const currentUserId = currentUser.id ? String(currentUser.id).toLowerCase().trim() : '';
+    const currentUserEmail = currentUser.email ? currentUser.email.toLowerCase().trim() : '';
+    const currentUserAccountNo = (((currentUser as any).accountNumber || (currentUser as any).accountNo || '')).toString().trim();
 
     const isMatch = (t: any): boolean => {
       if (!t) return false;
-      if (t.userId && currentUserId && (t.userId === currentUserId || String(t.userId).toLowerCase() === String(currentUserId).toLowerCase())) return true;
-      if (t.userEmail && currentUserEmail && t.userEmail.toLowerCase().trim() === currentUserEmail) return true;
-      if (currentUserAccountNo && t.accountNumber && String(t.accountNumber).trim() === currentUserAccountNo) return true;
+      const tUserId = t.userId ? String(t.userId).toLowerCase().trim() : '';
+      const tUserEmail = t.userEmail ? String(t.userEmail).toLowerCase().trim() : '';
+      const tAccountNo = (t.accountNumber || t.accountNo || '').toString().trim();
+
+      if (currentUserId && tUserId && tUserId === currentUserId) return true;
+      if (currentUserEmail && tUserEmail && tUserEmail === currentUserEmail) return true;
+      if (currentUserAccountNo && tAccountNo && tAccountNo === currentUserAccountNo) return true;
       return false;
     };
 
     const txMap = new Map<string, Transaction>();
 
-    // 1. Fetch from Firestore for current user ONLY
-    if (currentUserId) {
+    // 1. Fetch from Firestore for current user
+    if (currentUser.id) {
       try {
-        const q1 = query(collection(db, 'transactions'), where('userId', '==', currentUserId));
+        const q1 = query(collection(db, 'transactions'), where('userId', '==', currentUser.id));
         const snap1 = await getDocs(q1);
         snap1.forEach((d) => {
           const t = d.data() as Transaction;
@@ -434,7 +438,7 @@ export const api = {
       }
     }
 
-    if (currentUserEmail) {
+    if (currentUser.email) {
       try {
         const q2 = query(collection(db, 'transactions'), where('userEmail', '==', currentUser.email));
         const snap2 = await getDocs(q2);
@@ -462,6 +466,19 @@ export const api = {
       } catch (e) {
         console.warn('Firestore accountNumber tx fetch note:', e);
       }
+    }
+
+    // 1b. Fallback: inspect general transactions collection
+    try {
+      const snapAll = await getDocs(collection(db, 'transactions'));
+      snapAll.forEach((d) => {
+        const t = d.data() as Transaction;
+        if (t && isMatch(t)) {
+          txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+        }
+      });
+    } catch (e) {
+      // Ignored
     }
 
     // 2. Fetch from backend API if available (server-isolated)
