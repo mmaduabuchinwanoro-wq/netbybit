@@ -819,7 +819,8 @@ export const api = {
                 txMap.set(st.id, st);
               } else {
                 // If existing in Firestore is pending, keep pending over stale completed
-                const keepStatus = (existing.status === 'pending' || existing.status === 'processing') ? existing.status : (st.status || existing.status);
+                const isExistingPending = existing.status === 'pending' || (existing.status as string) === 'processing';
+                const keepStatus = isExistingPending ? existing.status : (st.status || existing.status);
                 txMap.set(st.id, {
                   ...st,
                   ...existing,

@@ -67,6 +67,7 @@ export const DashboardPage: React.FC = () => {
     formatFiat,
     hideBalances,
     setHideBalances,
+    openSupportChoice,
   } = useAuth();
 
   const [recentTxs, setRecentTxs] = useState<Transaction[]>([]);
@@ -269,8 +270,8 @@ export const DashboardPage: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setActivePage('support')}
-                className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-amber-500/20 to-neutral-900 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-bold text-xs transition-all space-y-1 col-span-2 sm:col-span-1 shadow-md shadow-amber-500/10"
+                onClick={openSupportChoice}
+                className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-amber-500/20 to-neutral-900 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-bold text-xs transition-all space-y-1 col-span-2 sm:col-span-1 shadow-md shadow-amber-500/10 cursor-pointer"
               >
                 <LifeBuoy className="w-4 h-4 text-amber-400" />
                 <span>Support</span>

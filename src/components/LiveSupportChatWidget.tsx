@@ -108,9 +108,22 @@ export const SupportAvatar: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: st
 };
 
 export const LiveSupportChatWidget: React.FC = () => {
-  const { user, activePage } = useAuth();
+  const { user, activePage, isLiveChatOpen, setIsLiveChatOpen, openSupportChoice } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Sync external open request from AuthContext
+  useEffect(() => {
+    if (isLiveChatOpen) {
+      setIsOpen(true);
+      setIsMinimized(false);
+    }
+  }, [isLiveChatOpen]);
+
+  const handleCloseChat = () => {
+    setIsOpen(false);
+    setIsLiveChatOpen(false);
+  };
 
   // Guest State (when not logged in)
   const [guestName, setGuestName] = useState(() => localStorage.getItem('netbybit_guest_name') || '');
@@ -398,12 +411,12 @@ export const LiveSupportChatWidget: React.FC = () => {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 font-sans">
-      {/* 1. CLOSED / FLOATING BUBBLE BUTTON (No 24/7 Badge) */}
+      {/* 1. CLOSED / FLOATING BUBBLE BUTTON (Opens Support Choice Prompt) */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={openSupportChoice}
           className="group relative flex items-center space-x-2.5 px-4 py-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-neutral-950 font-black rounded-full shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 border border-amber-300/40 cursor-pointer"
-          title="Open Customer Support Live Chat"
+          title="Open Customer Support"
         >
           <div className="relative">
             <Headphones className="w-5 h-5 text-neutral-950" />
@@ -412,7 +425,7 @@ export const LiveSupportChatWidget: React.FC = () => {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border border-neutral-950"></span>
             </span>
           </div>
-          <span className="text-xs font-black tracking-wide uppercase">Support Chat</span>
+          <span className="text-xs font-black tracking-wide uppercase">Support</span>
         </button>
       )}
 
@@ -429,13 +442,13 @@ export const LiveSupportChatWidget: React.FC = () => {
               <div>
                 <div className="flex items-center space-x-1.5">
                   <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                    NETBYBIT Live Support
+                    NETBYBIT Live
                   </h3>
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 </div>
                 <p className="text-[10px] text-emerald-400 font-mono flex items-center space-x-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Online • Instant Help</span>
+                  <span>Online • In-App Chat</span>
                 </p>
               </div>
             </div>
@@ -471,13 +484,28 @@ export const LiveSupportChatWidget: React.FC = () => {
                 </button>
               )}
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleCloseChat}
                 className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
                 title="Close Support Chat"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+
+          {/* Quick Access Direct Email Banner */}
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-3 py-1.5 flex items-center justify-between text-[10px] text-amber-300 shrink-0">
+            <span className="flex items-center space-x-1 font-medium">
+              <Mail className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>Live Agent:</span>
+            </span>
+            <a
+              href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
+              className="font-mono font-bold text-amber-400 hover:text-amber-200 underline transition-colors"
+              title="Message the live agent directly via email"
+            >
+              netbybitsupport@gmail.com
+            </a>
           </div>
 
           {/* CHAT BODY CONTENT AREA */}
@@ -764,8 +792,23 @@ export const LiveSupportChatWidget: React.FC = () => {
                             </span>
                           </div>
 
-                          <div className="bg-neutral-800 border border-neutral-700/80 text-neutral-100 px-3.5 py-2.5 rounded-2xl rounded-tl-xs leading-relaxed shadow-md space-y-1.5 text-xs break-words">
-                            <p className="whitespace-pre-wrap">{displayText}</p>
+                          <div className="bg-neutral-800 border border-neutral-700/80 text-neutral-100 px-3.5 py-2.5 rounded-2xl rounded-tl-xs leading-relaxed shadow-md space-y-2 text-xs break-words">
+                            <p className="whitespace-pre-wrap font-medium">{displayText}</p>
+
+                            {/* Direct Live Agent Email Box inside the chat window when support is offline/unavailable */}
+                            <div className="pt-2 mt-1 border-t border-amber-500/20 flex flex-col space-y-1.5 bg-amber-500/10 -mx-1.5 p-2 rounded-xl border border-amber-500/30">
+                              <div className="text-[10px] text-amber-300 font-semibold flex items-center space-x-1">
+                                <Mail className="w-3 h-3 text-amber-400" />
+                                <span>Live Agent Email:</span>
+                              </div>
+                              <a
+                                href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Support%20Inquiry"
+                                className="inline-flex items-center justify-center space-x-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 font-bold px-3 py-1.5 rounded-xl text-[11px] shadow transition-all hover:scale-[1.02] cursor-pointer"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                                <span>netbybitsupport@gmail.com</span>
+                              </a>
+                            </div>
 
                             {/* Translation Badge & Toggle */}
                             {hasTranslation && (
@@ -855,8 +898,17 @@ export const LiveSupportChatWidget: React.FC = () => {
                 </button>
               </form>
               <div className="flex justify-between items-center text-[9px] text-neutral-400 mt-1.5 font-mono px-1">
-                <span>⚡ Live Support Agent Connected</span>
-                <span>netbybitsupport@gmail.com</span>
+                <span className="flex items-center space-x-1 text-amber-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Support In-App Chat</span>
+                </span>
+                <a
+                  href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Support%20Inquiry"
+                  className="text-amber-400 hover:text-amber-200 underline"
+                  title="Direct Live Agent Email"
+                >
+                  netbybitsupport@gmail.com
+                </a>
               </div>
             </div>
           )}

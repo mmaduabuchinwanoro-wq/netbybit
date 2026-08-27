@@ -16,6 +16,13 @@ interface AuthContextType {
   activePage: string;
   setActivePage: (page: string) => void;
   goBack: (fallback?: string) => void;
+  // Support & Live Chat Modal Controls
+  isSupportChoiceOpen: boolean;
+  openSupportChoice: () => void;
+  closeSupportChoice: () => void;
+  isLiveChatOpen: boolean;
+  setIsLiveChatOpen: (open: boolean) => void;
+  openLiveChat: () => void;
   // Currency Switcher & Value Conversion
   selectedCurrency: string;
   setSelectedCurrency: (curr: string) => Promise<void>;
@@ -80,6 +87,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('netbybit_active_page', target);
       return copy;
     });
+  };
+
+  // Support Choice & Live Chat State
+  const [isSupportChoiceOpen, setIsSupportChoiceOpen] = useState(false);
+  const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
+
+  const openSupportChoice = () => {
+    setIsSupportChoiceOpen(true);
+  };
+
+  const closeSupportChoice = () => {
+    setIsSupportChoiceOpen(false);
+  };
+
+  const openLiveChat = () => {
+    setIsSupportChoiceOpen(false);
+    setIsLiveChatOpen(true);
   };
 
   // Fiat & Privacy State
@@ -341,6 +365,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activePage,
         setActivePage,
         goBack,
+        isSupportChoiceOpen,
+        openSupportChoice,
+        closeSupportChoice,
+        isLiveChatOpen,
+        setIsLiveChatOpen,
+        openLiveChat,
         selectedCurrency,
         setSelectedCurrency,
         fiatRates,

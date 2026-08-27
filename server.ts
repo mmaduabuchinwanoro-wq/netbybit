@@ -687,8 +687,11 @@ async function syncDBFromStore(force = false) {
     cachedDbState = loadDB();
   }
 
-  await syncDBFromFirestore(force);
-  await syncDBFromMongoDB();
+  const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
+  await Promise.race([
+    Promise.allSettled([syncDBFromFirestore(force), syncDBFromMongoDB()]),
+    timeoutPromise
+  ]);
 }
 
 const syncDBFromBlobs = syncDBFromStore;
@@ -725,10 +728,11 @@ async function saveDB(data: DBData) {
     console.error('Error writing to database files:', err);
   }
 
-  await Promise.allSettled([
+  // Non-blocking firestore & mongo save in background
+  Promise.allSettled([
     saveDBToFirestore(data),
     saveDBToMongoDB(data),
-  ]);
+  ]).catch(() => {});
 }
 
 function mergeUserObjects(u1: any, u2: any) {
@@ -2716,6 +2720,19 @@ app.post('/api/support/tickets', authMiddleware, async (req: any, res) => {
   const trans = await translateSupportMessage(message.trim(), 'English');
   const detectedLang = userLanguage || trans.detectedLanguage || 'English';
 
+  const offlineFallbackReply = {
+    id: 'rpl_auto_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    sender: 'admin' as const,
+    senderName: 'Netbybit Support',
+    message: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+    translatedMessage: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+    originalLanguage: 'English',
+    targetLanguage: detectedLang,
+    isTranslated: false,
+    createdAt: new Date().toISOString(),
+    status: 'Delivered',
+  };
+
   const newTicket = {
     id: 'TKT-' + Math.floor(100000 + Math.random() * 900000),
     userId: req.user.id,
@@ -2728,10 +2745,11 @@ app.post('/api/support/tickets', authMiddleware, async (req: any, res) => {
     userLanguage: detectedLang,
     status: 'Open',
     createdAt: new Date().toISOString(),
-    replies: [],
+    replies: [offlineFallbackReply],
   };
 
-  db.supportTickets.push(newTicket);
+  if (!db.supportTickets) db.supportTickets = [];
+  db.supportTickets.unshift(newTicket);
 
   // Send User Ticket Created Email
   const userTicketEmail = sendEmailNotification(db, {
@@ -2848,6 +2866,21 @@ app.post('/api/support/tickets/:ticketId/reply', authMiddleware, async (req: any
   }
 
   if (isUserSender) {
+    // Automated Offline Fallback Message
+    const offlineFallbackReply = {
+      id: 'rpl_auto_' + (Date.now() + 50) + '_' + Math.random().toString(36).substring(2, 6),
+      sender: 'admin' as const,
+      senderName: 'Netbybit Support',
+      message: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+      translatedMessage: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+      originalLanguage: 'English',
+      targetLanguage: ticket.userLanguage || 'English',
+      isTranslated: false,
+      createdAt: new Date(Date.now() + 100).toISOString(),
+      status: 'Delivered',
+    };
+    ticket.replies.push(offlineFallbackReply);
+
     // Dispatch Email Alert to netbybitsupport@gmail.com
     sendEmailNotification(db, {
       to: 'netbybitsupport@gmail.com',
@@ -2923,25 +2956,15 @@ app.post('/api/support/guest/tickets', async (req, res) => {
   const detectedLang = userLanguage || trans.detectedLanguage || 'English';
 
   // Translate Bot Greeting to User's language if non-English
-  const botGreetingEnglish = `Hello ${guestName}! Thank you for contacting NETBYBIT 24/7 Live Support. Your chat inquiry has been assigned ticket #${ticketId}. A live support representative has been notified and will reply shortly.`;
-  let botGreetingTrans = botGreetingEnglish;
-  let botIsTrans = false;
-
-  if (detectedLang.toLowerCase() !== 'english') {
-    const botTransRes = await translateSupportMessage(botGreetingEnglish, detectedLang);
-    botGreetingTrans = botTransRes.translatedText;
-    botIsTrans = botTransRes.isTranslated;
-  }
-
-  const initialAutoReply = {
+  const offlineFallbackReply = {
     id: 'rpl_auto_' + Date.now(),
     sender: 'admin' as const,
     senderName: 'Netbybit Support',
-    message: botGreetingEnglish,
-    translatedMessage: botGreetingTrans,
+    message: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+    translatedMessage: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
     originalLanguage: 'English',
     targetLanguage: detectedLang,
-    isTranslated: botIsTrans,
+    isTranslated: false,
     createdAt: nowISO,
     status: 'Delivered',
   };
@@ -2958,7 +2981,7 @@ app.post('/api/support/guest/tickets', async (req, res) => {
     userLanguage: detectedLang,
     status: 'Open' as const,
     createdAt: nowISO,
-    replies: [initialAutoReply],
+    replies: [offlineFallbackReply],
   };
 
   if (!db.supportTickets) db.supportTickets = [];
@@ -3078,6 +3101,21 @@ app.post('/api/support/guest/tickets/:ticketId/reply', async (req, res) => {
   if (ticket.status === 'Closed') {
     ticket.status = 'Open';
   }
+
+  // Automated Offline Fallback Message
+  const offlineFallbackReply = {
+    id: 'rpl_auto_' + (Date.now() + 50) + '_' + Math.random().toString(36).substring(2, 6),
+    sender: 'admin' as const,
+    senderName: 'Netbybit Support',
+    message: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+    translatedMessage: 'Kindly hold on, our support is currently unavailable. Kindly message the live agent.',
+    originalLanguage: 'English',
+    targetLanguage: ticket.userLanguage || 'English',
+    isTranslated: false,
+    createdAt: new Date(Date.now() + 100).toISOString(),
+    status: 'Delivered',
+  };
+  ticket.replies.push(offlineFallbackReply);
 
   // Send Admin Alert Email
   sendEmailNotification(db, {
@@ -3914,6 +3952,11 @@ NETBYBIT Support Team`;
     emailNotification,
     message: `${tx.type === 'swap' ? 'Swap' : 'Withdrawal'} transaction #${tx.id} was successfully ${actionLabel.toLowerCase()}. User notified.`,
   });
+});
+
+app.patch('/api/admin/transactions/:txId/status', adminMiddleware, (req, res, next) => {
+  req.method = 'PUT';
+  app._router.handle(req, res, next);
 });
 
 // Admin: Get All Support Tickets

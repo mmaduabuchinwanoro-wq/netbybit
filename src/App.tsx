@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ConnectWalletModal } from './components/ConnectWalletModal';
 import { LiveSupportChatWidget } from './components/LiveSupportChatWidget';
+import { SupportChoiceModal } from './components/SupportChoiceModal';
 
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
@@ -22,7 +23,7 @@ import { AdminPanelPage } from './pages/AdminPanelPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 
 const AppContent: React.FC = () => {
-  const { user, activePage } = useAuth();
+  const { user, activePage, isSupportChoiceOpen, closeSupportChoice, openLiveChat } = useAuth();
   const [connectWalletOpen, setConnectWalletOpen] = useState(false);
 
   const renderPage = () => {
@@ -92,6 +93,13 @@ const AppContent: React.FC = () => {
 
       {/* Global Live Customer Support Chat Widget (Available to all visitors logged in or logged out) */}
       <LiveSupportChatWidget />
+
+      {/* Support Choice Routing Modal (Live Agent vs NetbyBit Live) */}
+      <SupportChoiceModal
+        isOpen={isSupportChoiceOpen}
+        onClose={closeSupportChoice}
+        onSelectNetbybitLive={openLiveChat}
+      />
     </div>
   );
 };

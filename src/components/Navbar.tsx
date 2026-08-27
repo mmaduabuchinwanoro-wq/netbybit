@@ -29,7 +29,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenConnectWallet }) => {
-  const { user, activePage, setActivePage, logout, unreadCount, notifications } = useAuth();
+  const { user, activePage, setActivePage, logout, unreadCount, notifications, openSupportChoice } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -48,6 +48,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenConnectWallet }) => {
   ];
 
   const handleNavClick = (pageId: string) => {
+    if (pageId === 'support') {
+      openSupportChoice();
+      setMobileMenuOpen(false);
+      return;
+    }
     setActivePage(pageId);
     setMobileMenuOpen(false);
   };

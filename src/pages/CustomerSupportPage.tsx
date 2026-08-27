@@ -644,8 +644,23 @@ export const CustomerSupportPage: React.FC = () => {
                               </span>
                             </div>
 
-                            <div className="bg-neutral-850 border border-neutral-700/80 text-neutral-100 px-4 py-3 rounded-2xl rounded-tl-xs space-y-1.5 shadow-md break-words">
+                            <div className="bg-neutral-850 border border-neutral-700/80 text-neutral-100 px-4 py-3 rounded-2xl rounded-tl-xs space-y-2 shadow-md break-words">
                               <p className="text-xs text-neutral-200 whitespace-pre-wrap leading-relaxed">{displayText}</p>
+
+                              {/* Direct Live Agent Email Box inside the chat window when support is offline/unavailable */}
+                              <div className="pt-2 mt-1 border-t border-amber-500/20 flex flex-col space-y-1.5 bg-amber-500/10 -mx-1.5 p-2.5 rounded-xl border border-amber-500/30">
+                                <div className="text-[10px] text-amber-300 font-semibold flex items-center space-x-1">
+                                  <Mail className="w-3 h-3 text-amber-400" />
+                                  <span>Live Agent Email:</span>
+                                </div>
+                                <a
+                                  href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Support%20Inquiry"
+                                  className="inline-flex items-center justify-center space-x-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 font-bold px-3 py-1.5 rounded-xl text-[11px] shadow transition-all hover:scale-[1.02] cursor-pointer"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                  <span>netbybitsupport@gmail.com</span>
+                                </a>
+                              </div>
 
                               {/* Translation Badge & Toggle */}
                               {hasTranslation && (

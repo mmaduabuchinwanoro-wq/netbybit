@@ -1,8 +1,10 @@
 import React from 'react';
-import { ShieldCheck, Lock, Globe, Mail } from 'lucide-react';
+import { ShieldCheck, Lock, Globe, Mail, Headphones, MessageSquare } from 'lucide-react';
 import { NetbybitLogo } from './NetbybitLogo';
+import { useAuth } from '../context/AuthContext';
 
 export const Footer: React.FC = () => {
+  const { openSupportChoice } = useAuth();
   return (
     <footer className="bg-neutral-950/90 border-t border-amber-500/20 text-neutral-400 py-12 px-4 sm:px-6 lg:px-8 mt-auto backdrop-blur-md relative overflow-hidden">
       {/* Background ambient glow effect */}
@@ -79,11 +81,20 @@ export const Footer: React.FC = () => {
           <p className="text-xs text-neutral-400 mb-3 leading-relaxed">
             Our global custodial support desk monitors ticket submissions and deposit verifications 24/7.
           </p>
-          <div className="flex items-center space-x-2 text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
-            <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-            <a href="mailto:netbybitsupport@gmail.com" className="font-mono underline hover:text-amber-200 truncate">
-              netbybitsupport@gmail.com
-            </a>
+          <div className="space-y-2">
+            <button
+              onClick={openSupportChoice}
+              className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-neutral-950 font-bold px-3 py-2 rounded-xl text-xs transition-all shadow-md cursor-pointer"
+            >
+              <Headphones className="w-4 h-4" />
+              <span>Contact Support</span>
+            </button>
+            <div className="flex items-center space-x-2 text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+              <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+              <a href="mailto:netbybitsupport@gmail.com" className="font-mono underline hover:text-amber-200 truncate">
+                netbybitsupport@gmail.com
+              </a>
+            </div>
           </div>
         </div>
       </div>
