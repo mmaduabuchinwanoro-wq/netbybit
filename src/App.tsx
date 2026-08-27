@@ -23,7 +23,7 @@ import { AdminPanelPage } from './pages/AdminPanelPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 
 const AppContent: React.FC = () => {
-  const { user, activePage, isSupportChoiceOpen, closeSupportChoice } = useAuth();
+  const { user, activePage, isSupportChoiceOpen, closeSupportChoice, openLiveChat } = useAuth();
   const [connectWalletOpen, setConnectWalletOpen] = useState(false);
 
   const renderPage = () => {
@@ -98,6 +98,7 @@ const AppContent: React.FC = () => {
       <SupportChoiceModal
         isOpen={isSupportChoiceOpen}
         onClose={closeSupportChoice}
+        onSelectNetbybitLive={openLiveChat}
       />
     </div>
   );

@@ -23,6 +23,7 @@ interface SupportChoiceModalProps {
 export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
   isOpen,
   onClose,
+  onSelectNetbybitLive,
 }) => {
   const [selectedOption, setSelectedOption] = useState<'main' | 'netbybit_live'>('main');
   const [copied, setCopied] = useState(false);
@@ -242,6 +243,21 @@ export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
                 )}
               </button>
             </div>
+
+            {/* Open In-App Chat Widget Shortcut */}
+            {onSelectNetbybitLive && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  onSelectNetbybitLive();
+                }}
+                className="w-full flex items-center justify-center space-x-2 p-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-amber-500/40 text-neutral-300 hover:text-amber-300 font-semibold text-xs transition-all cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4 text-amber-400" />
+                <span>Open In-App Chat Widget</span>
+              </button>
+            )}
 
             {/* Back Button */}
             <div className="pt-1 flex items-center justify-between">
