@@ -1150,7 +1150,13 @@ export const api = {
     };
   },
 
-  updateUserBalance: async (userId: string, asset: SupportedAsset, amount: number, action: 'add' | 'subtract') => {
+  updateUserBalance: async (
+    userId: string,
+    asset: SupportedAsset,
+    amount: number,
+    action: 'add' | 'subtract',
+    recordTransaction = false
+  ) => {
     let u: User | null = null;
     let targetDocId = userId;
 
@@ -1196,34 +1202,36 @@ export const api = {
       await setDoc(doc(db, 'users', targetDocId), { balances: u.balances }, { merge: true });
     } catch {}
 
-    // Record transaction
-    const nowISO = new Date().toISOString();
-    const txHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    const txRecord: Transaction = {
-      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-      userId: u.id || targetDocId,
-      userEmail: u.email,
-      accountNumber: (u as any).accountNumber || (u as any).accountNo || '',
-      type: action === 'add' ? 'deposit' : 'withdraw',
-      asset,
-      amount,
-      usdtEquivalent: amount,
-      txHash,
-      status: 'completed',
-      date: nowISO,
-      createdAt: nowISO,
-      description: action === 'add' ? 'Admin Balance Credit' : 'Admin Balance Deduction',
-    };
+    // Only record a separate transaction if explicitly instructed (e.g. direct manual adjustments)
+    if (recordTransaction) {
+      const nowISO = new Date().toISOString();
+      const txHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const txRecord: Transaction = {
+        id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        userId: u.id || targetDocId,
+        userEmail: u.email,
+        accountNumber: (u as any).accountNumber || (u as any).accountNo || '',
+        type: action === 'add' ? 'deposit' : 'withdraw',
+        asset,
+        amount,
+        usdtEquivalent: amount,
+        txHash,
+        status: 'completed',
+        date: nowISO,
+        createdAt: nowISO,
+        description: action === 'add' ? 'Admin Balance Credit' : 'Admin Balance Deduction',
+      };
 
-    try {
-      await setDoc(doc(db, 'transactions', txRecord.id), txRecord);
-    } catch {}
+      try {
+        await setDoc(doc(db, 'transactions', txRecord.id), txRecord);
+      } catch {}
 
-    try {
-      const localTxs = JSON.parse(localStorage.getItem('netbybit_user_transactions') || '[]');
-      localTxs.unshift(txRecord);
-      localStorage.setItem('netbybit_user_transactions', JSON.stringify(localTxs));
-    } catch {}
+      try {
+        const localTxs = JSON.parse(localStorage.getItem('netbybit_user_transactions') || '[]');
+        localTxs.unshift(txRecord);
+        localStorage.setItem('netbybit_user_transactions', JSON.stringify(localTxs));
+      } catch {}
+    }
 
     return u;
   },
@@ -1245,13 +1253,19 @@ export const api = {
     return u;
   },
 
-  updateTransactionStatus: async (txId: string, status: 'completed' | 'pending' | 'failed') => {
+  updateTransactionStatus: async (txId: string, status: 'completed' | 'pending' | 'failed' | 'cancelled' | 'approved' | 'declined') => {
     let txData: Transaction | null = null;
 
     try {
       const snap = await getDoc(doc(db, 'transactions', txId));
       if (snap.exists()) txData = snap.data() as Transaction;
     } catch {}
+
+    const isApprove = status === 'completed' || status === 'approved';
+    const isDecline = status === 'failed' || status === 'cancelled' || status === 'declined';
+    const canonicalStatus = isApprove ? 'completed' : isDecline ? 'cancelled' : 'pending';
+    const actionLabel = isApprove ? 'Approved' : 'Declined';
+    const statusLabel = isApprove ? 'Successful' : 'Cancelled';
 
     if (!txData) {
       txData = {
@@ -1263,19 +1277,25 @@ export const api = {
         amount: 0.5,
         usdtEquivalent: 1340,
         txHash: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-        status,
+        status: canonicalStatus,
         date: new Date().toISOString(),
       };
     } else {
-      txData.status = status;
+      txData.status = canonicalStatus;
     }
 
-    try {
-      await setDoc(doc(db, 'transactions', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
-      await setDoc(doc(db, 'swaps', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
-    } catch {}
+    const nowISO = new Date().toISOString();
 
-    // Synchronize to backend server API
+    // 1. In-place update of existing single Firestore documents
+    try {
+      await setDoc(doc(db, 'transactions', txId), { status: canonicalStatus, updatedAt: nowISO }, { merge: true });
+      await setDoc(doc(db, 'swaps', txId), { status: canonicalStatus, updatedAt: nowISO }, { merge: true });
+      await setDoc(doc(db, 'withdrawals', txId), { status: canonicalStatus, updatedAt: nowISO }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore single-record status update note:', e);
+    }
+
+    // 2. Synchronize in-place update to backend server API
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
       if (token) {
@@ -1285,50 +1305,46 @@ export const api = {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status: canonicalStatus }),
         });
       }
     } catch {}
 
-    // Update local storage cached transactions
+    // 3. Mutate local storage cached transactions in place (no duplicates)
     try {
       const cachedTxsStr = localStorage.getItem('netbybit_user_transactions');
       if (cachedTxsStr) {
         const cachedTxs = JSON.parse(cachedTxsStr) as Transaction[];
         const idx = cachedTxs.findIndex((t) => t.id === txId);
         if (idx !== -1) {
-          cachedTxs[idx].status = status;
+          cachedTxs[idx].status = canonicalStatus;
           localStorage.setItem('netbybit_user_transactions', JSON.stringify(cachedTxs));
         }
       }
     } catch {}
 
-    const isApprove = status === 'completed';
-    const isDecline = status === 'failed';
-    const actionLabel = isApprove ? 'Approved' : 'Declined';
-    const statusLabel = isApprove ? 'Successful' : 'Declined';
-
-    // 1. If Approved (completed)
+    // 4. Handle balance updates for approvals and automatic refunds on cancellation
     if (isApprove && txData.userId && txData.amount > 0) {
       try {
         if (txData.type === 'deposit' || txData.type === 'receive') {
-          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add');
+          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add', false);
         } else if (txData.type === 'swap') {
-          const targetAsset = txData.toAsset || 'USDT_TRC20';
+          // Credit converted target crypto
+          const targetAsset = (txData.toAsset || 'USDT_TRC20') as SupportedAsset;
           const creditAmt = (txData as any).usdtEquivalent || txData.amount;
-          await api.updateUserBalance(txData.userId, targetAsset, creditAmt, 'add');
+          await api.updateUserBalance(txData.userId, targetAsset, creditAmt, 'add', false);
         }
       } catch (e) {
         console.warn('Balance update on approval warning:', e);
       }
     }
 
-    // 2. If Declined (failed/cancelled) -> Automatically refund deducted amount back to user's active crypto balance!
+    // Cancellation / Decline: Automatically refund full held funds back to user's crypto balance
     if (isDecline && txData.userId && txData.amount > 0) {
       try {
         if (txData.type === 'withdraw' || txData.type === 'send') {
-          // Exact withdrawal / send amount returned back to user's active crypto balance
-          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add');
+          // Exact withdrawal / send amount refunded to user's active crypto balance
+          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add', false);
           const cachedStr = localStorage.getItem('netbybit_cached_user');
           if (cachedStr) {
             const cUser = JSON.parse(cachedStr);
@@ -1338,8 +1354,9 @@ export const api = {
             }
           }
         } else if (txData.type === 'swap') {
+          // Full original source asset returned to user's crypto balance
           const sourceAsset = (txData.fromAsset || txData.asset) as SupportedAsset;
-          await api.updateUserBalance(txData.userId, sourceAsset, txData.amount, 'add');
+          await api.updateUserBalance(txData.userId, sourceAsset, txData.amount, 'add', false);
           const cachedStr = localStorage.getItem('netbybit_cached_user');
           if (cachedStr) {
             const cUser = JSON.parse(cachedStr);

@@ -33,13 +33,32 @@ export const HistoryPage: React.FC = () => {
 
   // Filtering
   const filtered = transactions.filter((t) => {
-    const matchesSearch =
-      t.asset.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.txHash.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.destinationAddress && t.destinationAddress.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      t.type.toLowerCase().includes(searchQuery.toLowerCase());
+    const tType = (t.type || '').toLowerCase();
+    const fType = typeFilter.toLowerCase();
 
-    const matchesType = typeFilter === 'all' || t.type === typeFilter;
+    let matchesType = fType === 'all';
+    if (!matchesType) {
+      if (fType === 'deposit') {
+        matchesType = tType === 'deposit' || tType === 'credit' || tType === 'receive' || tType === 'add';
+      } else if (fType === 'withdraw') {
+        matchesType = tType === 'withdraw' || tType === 'deduct';
+      } else if (fType === 'send') {
+        matchesType = tType === 'send' || tType === 'withdraw';
+      } else if (fType === 'swap') {
+        matchesType = tType === 'swap';
+      } else {
+        matchesType = tType === fType;
+      }
+    }
+
+    const s = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !s ||
+      (t.asset && t.asset.toLowerCase().includes(s)) ||
+      (t.txHash && t.txHash.toLowerCase().includes(s)) ||
+      (t.destinationAddress && t.destinationAddress.toLowerCase().includes(s)) ||
+      (t.description && t.description.toLowerCase().includes(s)) ||
+      (t.type && t.type.toLowerCase().includes(s));
 
     return matchesSearch && matchesType;
   });
@@ -94,10 +113,9 @@ export const HistoryPage: React.FC = () => {
               className="bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-amber-500/50 capitalize"
             >
               <option value="all">All Types</option>
-              <option value="deposit">Deposits</option>
+              <option value="deposit">Deposits & Received</option>
               <option value="withdraw">Withdrawals</option>
-              <option value="send">Sends</option>
-              <option value="receive">Receives</option>
+              <option value="send">Sent</option>
               <option value="swap">Swaps</option>
             </select>
           </div>
@@ -117,9 +135,9 @@ export const HistoryPage: React.FC = () => {
                 <tr className="border-b border-neutral-800 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
                   <th className="py-3 px-3">Date & Time</th>
                   <th className="py-3 px-3">Type</th>
-                  <th className="py-3 px-3">Asset</th>
+                  <th className="py-3 px-3">Asset / Pair</th>
                   <th className="py-3 px-3">Amount</th>
-                  <th className="py-3 px-3">Tx Hash</th>
+                  <th className="py-3 px-3">Destination / Hash</th>
                   <th className="py-3 px-3">Status</th>
                 </tr>
               </thead>

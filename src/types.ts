@@ -104,7 +104,7 @@ export interface User {
 export type DepositAddresses = Record<SupportedAsset, string>;
 
 export type TransactionType = 'deposit' | 'withdraw' | 'send' | 'receive' | 'swap';
-export type TransactionStatus = 'completed' | 'pending' | 'failed';
+export type TransactionStatus = 'completed' | 'pending' | 'failed' | 'cancelled' | 'approved' | 'declined';
 
 export interface Transaction {
   id: string;

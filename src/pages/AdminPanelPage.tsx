@@ -506,26 +506,28 @@ export const AdminPanelPage: React.FC = () => {
     }
   };
 
-  const handleWithdrawalStatus = async (txId: string, status: 'completed' | 'failed') => {
+  const handleWithdrawalStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled') => {
     try {
+      const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
+
       // 1. Instantly update Firestore documents
       try {
-        await updateDoc(doc(db, 'transactions', txId), { status, updatedAt: new Date().toISOString() });
+        await updateDoc(doc(db, 'transactions', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() });
       } catch {
-        await setDoc(doc(db, 'transactions', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'transactions', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() }, { merge: true });
       }
       try {
-        await updateDoc(doc(db, 'withdrawals', txId), { status, updatedAt: new Date().toISOString() });
+        await updateDoc(doc(db, 'withdrawals', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() });
       } catch {
-        await setDoc(doc(db, 'withdrawals', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'withdrawals', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() }, { merge: true });
       }
 
-      // 2. Optimistic UI update
-      setAllTxs((prev) => prev.map((t) => (t.id === txId ? { ...t, status } : t)));
+      // 2. Optimistic UI update in place (no duplicate rows)
+      setAllTxs((prev) => prev.map((t) => (t.id === txId ? { ...t, status: canonicalStatus } : t)));
 
-      const res = await api.updateTransactionStatus(txId, status);
+      const res = await api.updateTransactionStatus(txId, canonicalStatus);
       setWithdrawalModal({
-        message: res.message || `Withdrawal request successfully ${status === 'completed' ? 'approved' : 'declined'}`,
+        message: res.message || `Withdrawal request successfully ${canonicalStatus === 'completed' ? 'approved' : 'declined / cancelled'}`,
         auditEntry: (res as any).auditEntry,
         emailNotification: (res as any).emailNotification,
       });
@@ -581,21 +583,26 @@ export const AdminPanelPage: React.FC = () => {
     return list;
   }, [allTxs, firestoreSwaps]);
 
-  const handleSwapStatus = async (txId: string, status: 'completed' | 'failed') => {
+  const handleSwapStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled') => {
     try {
+      const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
+
       // Instantly update Firestore document status in Firebase
       try {
         await updateDoc(doc(db, 'swaps', txId), {
-          status,
+          status: canonicalStatus,
           updatedAt: new Date().toISOString(),
         });
       } catch (fsErr) {
-        await setDoc(doc(db, 'swaps', txId), { status, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'swaps', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() }, { merge: true });
       }
 
-      const res = await api.updateTransactionStatus(txId, status);
+      // Optimistic in place update
+      setAllTxs((prev) => prev.map((t) => (t.id === txId ? { ...t, status: canonicalStatus } : t)));
+
+      const res = await api.updateTransactionStatus(txId, canonicalStatus);
       setSwapModal({
-        message: res.message || `Swap request successfully ${status === 'completed' ? 'approved' : 'cancelled/declined'}`,
+        message: res.message || `Swap request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled/declined'}`,
         auditEntry: (res as any).auditEntry,
         emailNotification: (res as any).emailNotification,
       });

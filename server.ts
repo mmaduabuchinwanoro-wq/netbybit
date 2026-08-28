@@ -3811,19 +3811,19 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
   const userIndex = (db.users || []).findIndex((u) => u.id === tx.userId);
   const user = userIndex !== -1 ? db.users[userIndex] : null;
 
-  const isApprove = status === 'completed' || status === 'approved';
-  const isDecline = status === 'failed' || status === 'declined' || status === 'rejected' || status === 'cancelled';
+  const isApprove = status === 'completed' || status === 'approved' || status === 'Successful' || status === 'successful' || status === 'success';
+  const isDecline = status === 'failed' || status === 'declined' || status === 'rejected' || status === 'cancelled' || status === 'Cancelled';
 
   if (!isApprove && !isDecline) {
     return res.status(400).json({ error: 'Invalid status. Must be completed/approved or failed/declined/cancelled' });
   }
 
-  const newStatus = isApprove ? 'completed' : 'failed';
+  const newStatus = isApprove ? 'completed' : 'cancelled';
   const actionLabel = isApprove ? 'Approved' : 'Declined';
-  const statusLabel = isApprove ? 'Successful' : 'Declined';
+  const statusLabel = isApprove ? 'Successful' : 'Cancelled';
 
   // Handle balance updates for approvals and rejections
-  if (user && tx.status === 'pending') {
+  if (user && (tx.status === 'pending' || tx.status === 'processing')) {
     if (isApprove && tx.type === 'deposit') {
       user.balances[tx.asset] = (user.balances[tx.asset] || 0) + tx.amount;
     } else if (isApprove && tx.type === 'swap') {
