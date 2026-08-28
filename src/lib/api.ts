@@ -1495,6 +1495,9 @@ export const api = {
         await setDoc(doc(db, 'support_tickets', ticketId), ticket, { merge: true });
         await setDoc(doc(db, 'supportTickets', ticketId), ticket, { merge: true });
         updatedTicket = ticket;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: ticket }));
+        }
       }
     } catch (e) {
       console.warn('Firestore reply support ticket error:', e);
@@ -1520,6 +1523,13 @@ export const api = {
         if (res.ok) {
           const json = await res.json();
           if (json?.ticket) {
+            try {
+              await setDoc(doc(db, 'support_tickets', ticketId), json.ticket, { merge: true });
+              await setDoc(doc(db, 'supportTickets', ticketId), json.ticket, { merge: true });
+            } catch {}
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: json.ticket }));
+            }
             return json.ticket as SupportTicket;
           }
         }
@@ -1528,7 +1538,7 @@ export const api = {
 
     if (updatedTicket) return updatedTicket;
 
-    return {
+    const fallbackTicket: SupportTicket = {
       id: ticketId,
       userId: currentUser?.id || 'usr_current',
       userEmail: currentUser?.email || 'user@example.com',
@@ -1540,6 +1550,12 @@ export const api = {
       createdAt: new Date().toISOString(),
       replies: [reply],
     };
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: fallbackTicket }));
+    }
+
+    return fallbackTicket;
   },
 
   replyGuestSupportTicket: async (
@@ -1564,12 +1580,19 @@ export const api = {
             await setDoc(doc(db, 'support_tickets', ticketId), json.ticket, { merge: true });
             await setDoc(doc(db, 'supportTickets', ticketId), json.ticket, { merge: true });
           } catch {}
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: json.ticket }));
+          }
           return json.ticket as SupportTicket;
         }
       }
     } catch {}
 
-    return await api.replySupportTicket(ticketId, body.message, 'user', body.name || 'Guest User');
+    const res = await api.replySupportTicket(ticketId, body.message, 'user', body.name || 'Guest User');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: res }));
+    }
+    return res;
   },
 
   getGuestSupportTicket: async (ticketId: string, email?: string): Promise<SupportTicket> => {
@@ -1796,12 +1819,22 @@ export const api = {
         if (res.ok) {
           const json = await res.json();
           if (json?.ticket) {
+            try {
+              await setDoc(doc(db, 'support_tickets', json.ticket.id), json.ticket);
+              await setDoc(doc(db, 'supportTickets', json.ticket.id), json.ticket);
+            } catch {}
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: json.ticket }));
+            }
             return json.ticket as SupportTicket;
           }
         }
       }
     } catch {}
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: ticket }));
+    }
     return ticket;
   },
 
@@ -1835,6 +1868,9 @@ export const api = {
             await setDoc(doc(db, 'support_tickets', json.ticket.id), json.ticket);
             await setDoc(doc(db, 'supportTickets', json.ticket.id), json.ticket);
           } catch {}
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: json.ticket }));
+          }
           return json.ticket as SupportTicket;
         }
       }
@@ -1870,6 +1906,9 @@ export const api = {
       await setDoc(doc(db, 'supportTickets', newTicket.id), newTicket);
     } catch {}
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: newTicket }));
+    }
     return newTicket;
   },
 
@@ -1905,20 +1944,26 @@ export const api = {
       }
     } catch {}
 
+    const resolvedTicket = updatedTicket || {
+      id: ticketId,
+      userId: 'usr_current',
+      userEmail: 'user@example.com',
+      userName: 'User',
+      subject: 'Ticket',
+      category: 'General Inquiry',
+      message: 'Inquiry',
+      status,
+      createdAt: new Date().toISOString(),
+      replies: [],
+    };
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:ticket_updated', { detail: resolvedTicket }));
+    }
+
     return {
       success: true,
-      ticket: updatedTicket || {
-        id: ticketId,
-        userId: 'usr_current',
-        userEmail: 'user@example.com',
-        userName: 'User',
-        subject: 'Ticket',
-        category: 'General Inquiry',
-        message: 'Inquiry',
-        status,
-        createdAt: new Date().toISOString(),
-        replies: [],
-      },
+      ticket: resolvedTicket,
     };
   },
 

@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { SupportTicket, TicketReply } from '../types';
 import { api } from '../lib/api';
+import { db } from '../lib/firebase';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import {
   ArrowLeft,
   LifeBuoy,
@@ -189,14 +191,96 @@ export const CustomerSupportPage: React.FC = () => {
     }
   }, [user]);
 
-  // Real-time polling every 4 seconds to fetch new support replies dynamically
+  // Real-Time Firestore Listener for User Tickets & Admin Tickets
+  useEffect(() => {
+    let unsubUser: (() => void) | null = null;
+    let unsubAdmin: (() => void) | null = null;
+
+    if (user?.id) {
+      const qUser = query(collection(db, 'support_tickets'), where('userId', '==', user.id));
+      unsubUser = onSnapshot(
+        qUser,
+        (snap) => {
+          if (!snap.empty) {
+            const list: SupportTicket[] = [];
+            snap.forEach((d) => {
+              list.push({ ...(d.data() as SupportTicket), id: d.id });
+            });
+            list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            setTickets(list);
+            if (!selectedTicketId && list.length > 0) {
+              setSelectedTicketId(list[0].id);
+            }
+          }
+        },
+        (err) => console.warn('Firestore tickets onSnapshot error:', err)
+      );
+    }
+
+    if (user?.role === 'admin') {
+      const qAdmin = collection(db, 'support_tickets');
+      unsubAdmin = onSnapshot(
+        qAdmin,
+        (snap) => {
+          const list: SupportTicket[] = [];
+          snap.forEach((d) => {
+            list.push({ ...(d.data() as SupportTicket), id: d.id });
+          });
+          list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          setAdminTickets(list);
+          if (!staffSelectedTicketId && list.length > 0) {
+            setStaffSelectedTicketId(list[0].id);
+          }
+        },
+        (err) => console.warn('Firestore admin tickets onSnapshot error:', err)
+      );
+    }
+
+    return () => {
+      if (unsubUser) unsubUser();
+      if (unsubAdmin) unsubAdmin();
+    };
+  }, [user]);
+
+  // Cross-Component Event Sync Listener
+  useEffect(() => {
+    const handleTicketUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<SupportTicket>;
+      if (customEvent.detail) {
+        const updated = customEvent.detail;
+        setTickets((prev) => {
+          const idx = prev.findIndex((t) => t.id === updated.id);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = updated;
+            return copy;
+          }
+          return [updated, ...prev];
+        });
+        setAdminTickets((prev) => {
+          const idx = prev.findIndex((t) => t.id === updated.id);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = updated;
+            return copy;
+          }
+          return [updated, ...prev];
+        });
+      }
+    };
+
+    window.addEventListener('netbybit:ticket_updated', handleTicketUpdated);
+    return () => window.removeEventListener('netbybit:ticket_updated', handleTicketUpdated);
+  }, []);
+
+  // Real-time polling every 2.5 seconds as infallible fallback
   useEffect(() => {
     const interval = setInterval(() => {
       fetchUserTickets(true);
       if (user?.role === 'admin') {
         fetchAdminTickets(true);
       }
-    }, 4000);
+    }, 2500);
     return () => clearInterval(interval);
   }, [user, selectedTicketId, staffSelectedTicketId]);
 

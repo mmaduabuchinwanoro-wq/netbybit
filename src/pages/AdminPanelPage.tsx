@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ASSET_METADATA, SupportedAsset, User, SupportTicket, DepositAddresses, AuditLogEntry, EmailNotificationPreview, Transaction, EmailLogRecord, SmsLogRecord, WalletRequest } from '../types';
+import { ASSET_METADATA, SupportedAsset, User, SupportTicket, TicketReply, DepositAddresses, AuditLogEntry, EmailNotificationPreview, Transaction, EmailLogRecord, SmsLogRecord, WalletRequest } from '../types';
 import { CryptoIcon } from '../components/CryptoIcon';
 import { SupportAvatar, isStaffSender, getInitials } from '../components/LiveSupportChatWidget';
 import { api } from '../lib/api';
@@ -303,16 +303,41 @@ export const AdminPanelPage: React.FC = () => {
         }
       );
 
+      // Real-Time Firestore Listener for Support Tickets Collection
+      const pathForTickets = 'support_tickets';
+      const unsubscribeTickets = onSnapshot(
+        collection(db, pathForTickets),
+        (snapshot) => {
+          const docsMap = new Map<string, SupportTicket>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as SupportTicket;
+            if (data) {
+              const tId = docSnap.id || data.id;
+              docsMap.set(tId, { ...data, id: tId });
+            }
+          });
+          const sortedList = Array.from(docsMap.values()).sort(
+            (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+          );
+          setTickets(sortedList);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, pathForTickets);
+        }
+      );
+
       const interval = setInterval(() => {
         loadAdminTransactions();
         loadWalletRequests();
-      }, 10000);
+        loadTickets();
+      }, 5000);
 
       return () => {
         unsubscribeSwaps();
         unsubscribeTxs();
         unsubscribeWithdrawals();
         unsubscribeWallets();
+        unsubscribeTickets();
         clearInterval(interval);
       };
     }
@@ -895,12 +920,39 @@ export const AdminPanelPage: React.FC = () => {
     const text = ticketReplyText[ticketId];
     if (!text || !text.trim()) return;
 
+    const trimmed = text.trim();
+    setTicketReplyText((prev) => ({ ...prev, [ticketId]: '' }));
+
+    // Instant optimistic reply update
+    const optimisticReply: TicketReply = {
+      id: 'rpl_admin_' + Date.now(),
+      sender: 'admin',
+      senderName: 'Netbybit Support',
+      message: trimmed,
+      createdAt: new Date().toISOString(),
+      status: 'Delivered',
+    };
+
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id === ticketId
+          ? {
+              ...t,
+              status: 'In Progress',
+              replies: [...(t.replies || []), optimisticReply],
+            }
+          : t
+      )
+    );
+
     try {
-      await api.replySupportTicket(ticketId, text.trim());
-      setTicketReplyText({ ...ticketReplyText, [ticketId]: '' });
-      await loadTickets();
+      const updated = await api.replySupportTicket(ticketId, trimmed, 'admin', 'Netbybit Support');
+      if (updated) {
+        setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to send reply');
+      await loadTickets();
     }
   };
 

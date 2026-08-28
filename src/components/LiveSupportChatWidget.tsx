@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { SupportTicket } from '../types';
+import { db } from '../lib/firebase';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import {
   MessageSquare,
   X,
@@ -144,12 +146,17 @@ export const LiveSupportChatWidget: React.FC = () => {
 
   // Load existing ticket on startup or when user changes
   useEffect(() => {
+    let isMounted = true;
     const loadChat = async () => {
       if (user) {
         try {
           const tickets = await api.getSupportTickets();
-          if (tickets && tickets.length > 0) {
-            setActiveTicket(tickets[0]);
+          if (isMounted && tickets && tickets.length > 0) {
+            setActiveTicket((prev) => {
+              if (!prev) return tickets[0];
+              const match = tickets.find((t) => t.id === prev.id);
+              return match || tickets[0];
+            });
           }
         } catch {}
       } else {
@@ -158,7 +165,7 @@ export const LiveSupportChatWidget: React.FC = () => {
         if (storedTicketId) {
           try {
             const ticket = await api.getGuestSupportTicket(storedTicketId, storedEmail || undefined);
-            if (ticket) {
+            if (isMounted && ticket) {
               setActiveTicket(ticket);
               setIsGuestStarted(true);
             }
@@ -167,7 +174,156 @@ export const LiveSupportChatWidget: React.FC = () => {
       }
     };
     loadChat();
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
+
+  // 1. Real-Time Firestore Document Listeners on Active Ticket
+  useEffect(() => {
+    if (!activeTicket?.id) return;
+    const ticketId = activeTicket.id;
+
+    // Listen to changes in support_tickets collection
+    const unsub1 = onSnapshot(
+      doc(db, 'support_tickets', ticketId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = { ...docSnap.data(), id: docSnap.id } as SupportTicket;
+          setActiveTicket((prev) => {
+            if (!prev) return data;
+            // Prevent discarding un-synced optimistic local replies
+            const incomingIds = new Set((data.replies || []).map((r) => r.id));
+            const pendingLocal = (prev.replies || []).filter(
+              (r) => r.id?.startsWith('rpl_user_') && !incomingIds.has(r.id)
+            );
+            return {
+              ...data,
+              replies: [...(data.replies || []), ...pendingLocal],
+            };
+          });
+        }
+      },
+      (err) => {
+        console.warn('Real-time ticket listener (support_tickets):', err);
+      }
+    );
+
+    // Fallback collection listener supportTickets
+    const unsub2 = onSnapshot(
+      doc(db, 'supportTickets', ticketId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = { ...docSnap.data(), id: docSnap.id } as SupportTicket;
+          setActiveTicket((prev) => {
+            if (!prev) return data;
+            const incomingIds = new Set((data.replies || []).map((r) => r.id));
+            const pendingLocal = (prev.replies || []).filter(
+              (r) => r.id?.startsWith('rpl_user_') && !incomingIds.has(r.id)
+            );
+            return {
+              ...data,
+              replies: [...(data.replies || []), ...pendingLocal],
+            };
+          });
+        }
+      },
+      (err) => {
+        console.warn('Real-time ticket listener (supportTickets):', err);
+      }
+    );
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
+  }, [activeTicket?.id]);
+
+  // 2. Real-Time Firestore User Collection Query Listener
+  useEffect(() => {
+    if (!user?.id) return;
+    const currentUserId = user.id;
+
+    const q = query(collection(db, 'support_tickets'), where('userId', '==', currentUserId));
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const docs: SupportTicket[] = [];
+          snapshot.forEach((d) => {
+            docs.push({ ...(d.data() as SupportTicket), id: d.id });
+          });
+          docs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          if (docs.length > 0) {
+            setActiveTicket((prev) => {
+              if (!prev) return docs[0];
+              const match = docs.find((d) => d.id === prev.id);
+              return match || docs[0];
+            });
+          }
+        }
+      },
+      (err) => {
+        console.warn('Real-time user tickets listener:', err);
+      }
+    );
+
+    return () => unsub();
+  }, [user?.id]);
+
+  // 3. Fast Revalidation Polling (every 2.5s) when chat is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const poll = async () => {
+      try {
+        if (user) {
+          const tickets = await api.getSupportTickets();
+          if (tickets && tickets.length > 0) {
+            setActiveTicket((prev) => {
+              if (!prev) return tickets[0];
+              const match = tickets.find((t) => t.id === prev.id);
+              return match || tickets[0];
+            });
+          }
+        } else {
+          const storedTicketId = localStorage.getItem('netbybit_guest_ticket_id');
+          const storedEmail = localStorage.getItem('netbybit_guest_email');
+          if (storedTicketId) {
+            const ticket = await api.getGuestSupportTicket(storedTicketId, storedEmail || undefined);
+            if (ticket) {
+              setActiveTicket(ticket);
+              setIsGuestStarted(true);
+            }
+          }
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(poll, 2500);
+    return () => clearInterval(interval);
+  }, [isOpen, user]);
+
+  // 4. Instant Broadcast Event & Storage Sync across Tabs and Components
+  useEffect(() => {
+    const handleTicketUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<SupportTicket>;
+      if (customEvent.detail) {
+        const updated = customEvent.detail;
+        setActiveTicket((prev) => {
+          if (!prev || prev.id === updated.id) {
+            return updated;
+          }
+          return prev;
+        });
+      }
+    };
+
+    window.addEventListener('netbybit:ticket_updated', handleTicketUpdated);
+    return () => {
+      window.removeEventListener('netbybit:ticket_updated', handleTicketUpdated);
+    };
+  }, []);
 
   const handleCopyEmail = (key: string = 'banner') => {
     navigator.clipboard.writeText('netbybitsupport@gmail.com');
