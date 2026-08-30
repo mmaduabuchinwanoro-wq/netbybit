@@ -955,45 +955,6 @@ function loadDB(): DBData {
     }
   }
 
-  // Ensure default demo trader account exists for quick testing
-  let demoUser = db.users.find(
-    (u) => u?.email?.toLowerCase() === 'trader@netbybit.com' || u?.username?.toLowerCase() === 'trader'
-  );
-  if (!demoUser) {
-    const demoSalt = bcrypt.genSaltSync(10);
-    demoUser = {
-      id: 'usr_demo_trader_1',
-      email: 'trader@netbybit.com',
-      passwordHash: bcrypt.hashSync('password123', demoSalt),
-      name: 'Demo Trader',
-      username: 'trader',
-      role: 'user',
-      avatar: '',
-      balances: {
-        BTC: 0.5,
-        ETH: 2.0,
-        BNB: 5.0,
-        SOL: 10.0,
-        TRX: 1000,
-        USDT_ERC20: 2500,
-        USDT_TRC20: 2500,
-      },
-      withdrawalAddresses: {
-        BTC: '',
-        ETH: '',
-        BNB: '',
-        SOL: '',
-        TRX: '',
-        USDT_ERC20: '',
-        USDT_TRC20: '',
-      },
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    };
-    db.users.push(demoUser);
-    dbChanged = true;
-  }
-
   cachedDbState = db;
   (globalThis as any).__NETBYBIT_GLOBAL_DB__ = db;
 
@@ -1308,20 +1269,40 @@ function authMiddleware(req: any, res: any, next: any) {
   }
 
   // 2. Support Firebase User Tokens
-  if (token.startsWith('fb_user_token_') || token.startsWith('fb_fallback_token_')) {
+  if (token.startsWith('fb_user_token_') || token.startsWith('fb_fallback_token_') || token.startsWith('fb_token_')) {
+    const payloadPart = token.replace(/^fb_(user|fallback|token)_/, '').replace(/^token_/, '');
+    let parsedUser: any = null;
+    try {
+      parsedUser = JSON.parse(Buffer.from(payloadPart, 'base64').toString('utf8'));
+    } catch {}
+
+    if (parsedUser && (parsedUser.id || parsedUser.email)) {
+      req.user = {
+        id: parsedUser.id || ('usr_' + Date.now()),
+        email: parsedUser.email || 'user@example.com',
+        role: parsedUser.role || 'user',
+        name: parsedUser.name || (parsedUser.email ? parsedUser.email.split('@')[0] : 'Valued Trader'),
+      };
+      return next();
+    }
+
     const db = loadDB();
-    const fallbackUser = db.users[0] || {
-      id: 'usr_default',
-      email: 'user@example.com',
-      role: 'user',
-      name: 'Valued Trader',
-    };
-    req.user = {
-      id: fallbackUser.id,
-      email: fallbackUser.email,
-      role: fallbackUser.role || 'user',
-      name: fallbackUser.name,
-    };
+    const matchedUser = db.users.find((u) => u.role !== 'admin');
+    if (matchedUser) {
+      req.user = {
+        id: matchedUser.id,
+        email: matchedUser.email,
+        role: matchedUser.role || 'user',
+        name: matchedUser.name,
+      };
+    } else {
+      req.user = {
+        id: 'usr_' + Date.now(),
+        email: 'user@example.com',
+        role: 'user',
+        name: 'Valued Trader',
+      };
+    }
     return next();
   }
 
@@ -2499,13 +2480,13 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
       username: req.user.email ? req.user.email.split('@')[0] : 'trader',
       role: 'user',
       balances: {
-        BTC: 1.25,
-        ETH: 15.5,
-        BNB: 45.0,
-        SOL: 85.0,
-        TRX: 12500,
-        USDT_ERC20: 25000,
-        USDT_TRC20: 15000,
+        BTC: 0,
+        ETH: 0,
+        BNB: 0,
+        SOL: 0,
+        TRX: 0,
+        USDT_ERC20: 0,
+        USDT_TRC20: 0,
       },
       withdrawalAddresses: {
         BTC: '',
@@ -3411,6 +3392,12 @@ app.post('/api/admin/adjust-user-balance', adminMiddleware, async (req: any, res
   }
 
   const newBalance = isDeduct ? Math.max(0, currentBalance - parsedAmount) : currentBalance + parsedAmount;
+  
+  const matchingUsers = db.users.filter((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+  for (const u of matchingUsers) {
+    u.balances[asset] = newBalance;
+    u.updatedAt = new Date().toISOString();
+  }
   user.balances[asset] = newBalance;
   user.updatedAt = new Date().toISOString();
 

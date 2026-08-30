@@ -635,13 +635,13 @@ export const api = {
     } catch {}
 
     const balances = currentUser?.balances || {
-      BTC: 1.25,
-      ETH: 15.5,
-      BNB: 45.0,
-      SOL: 85.0,
-      TRX: 12500,
-      USDT_ERC20: 25000,
-      USDT_TRC20: 15000,
+      BTC: 0,
+      ETH: 0,
+      BNB: 0,
+      SOL: 0,
+      TRX: 0,
+      USDT_ERC20: 0,
+      USDT_TRC20: 0,
     };
 
     return {
@@ -721,9 +721,50 @@ export const api = {
       snap.forEach((d) => {
         const u = d.data() as User;
         if (u && u.email) {
-          usersMap.set(u.email.toLowerCase(), u);
+          const key = u.email.toLowerCase();
+          const existing = usersMap.get(key);
+          if (existing && existing.balances) {
+            const mergedBalances = { ...existing.balances, ...(u.balances || {}) };
+            for (const k of Object.keys(u.balances || {})) {
+              const uBal = (u.balances as any)[k] || 0;
+              const exBal = (existing.balances as any)[k] || 0;
+              (mergedBalances as any)[k] = Math.max(uBal, exBal);
+            }
+            usersMap.set(key, { ...existing, ...u, balances: mergedBalances });
+          } else {
+            usersMap.set(key, u);
+          }
         }
       });
+    } catch {}
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      if (token) {
+        const res = await fetch('/api/admin/users', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const sUsers = await res.json();
+          if (Array.isArray(sUsers)) {
+            sUsers.forEach((su: User) => {
+              if (su && su.email) {
+                const key = su.email.toLowerCase();
+                const existing = usersMap.get(key);
+                if (existing && existing.balances && su.balances) {
+                  const mergedBalances = { ...existing.balances, ...su.balances };
+                  for (const k of Object.keys(su.balances)) {
+                    (mergedBalances as any)[k] = Math.max((su.balances as any)[k] || 0, (existing.balances as any)[k] || 0);
+                  }
+                  usersMap.set(key, { ...existing, ...su, balances: mergedBalances });
+                } else if (!existing) {
+                  usersMap.set(key, su);
+                }
+              }
+            });
+          }
+        }
+      }
     } catch {}
 
     const cachedUsersStr = localStorage.getItem('netbybit_registered_users');
@@ -1067,6 +1108,11 @@ export const api = {
 
     if (targetUid) {
       try {
+        const q = query(collection(db, 'users'), where('email', '==', normEmail));
+        const snap = await getDocs(q);
+        for (const docSnap of snap.docs) {
+          await setDoc(doc(db, 'users', docSnap.id), { balances: targetUser.balances }, { merge: true });
+        }
         await setDoc(doc(db, 'users', targetUid), { balances: targetUser.balances }, { merge: true });
       } catch (e) {
         console.warn('Firestore user balance update note:', e);
@@ -1185,13 +1231,13 @@ export const api = {
     if (!u) u = { ...DEFAULT_ADMIN_USER, id: userId };
     if (!u.balances) {
       u.balances = {
-        BTC: 1.25,
-        ETH: 15.5,
-        BNB: 45.0,
-        SOL: 85.0,
-        TRX: 12500,
-        USDT_ERC20: 25000,
-        USDT_TRC20: 15000,
+        BTC: 0,
+        ETH: 0,
+        BNB: 0,
+        SOL: 0,
+        TRX: 0,
+        USDT_ERC20: 0,
+        USDT_TRC20: 0,
       };
     }
 

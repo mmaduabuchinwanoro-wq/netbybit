@@ -172,13 +172,14 @@ export async function loginWithFirebase(
 
   // D. If user account is found in cache or database
   if (userData) {
-    const token = 'fb_user_token_' + Date.now();
+    const tokenPayload = btoa(JSON.stringify({ id: userData.id, email: userData.email, name: userData.name, role: userData.role }));
+    const token = 'fb_user_token_' + tokenPayload;
     localStorage.setItem('netbybit_token', token);
     localStorage.setItem('netbybit_cached_user', JSON.stringify(userData));
     return { token, user: userData };
   }
 
-  // E. Fallback User Auto-Creation for Valid Input (guarantees seamless sign-in without breaking)
+  // E. Fallback User Auto-Creation for Valid Input (guarantees seamless sign-in with clean zero balances)
   if (normEmail.length >= 2) {
     const fallbackUser: User = {
       id: 'usr_' + Date.now(),
@@ -187,7 +188,7 @@ export async function loginWithFirebase(
       username: normEmail.split('@')[0],
       role: 'user',
       status: 'active',
-      balances: { BTC: 0.12, ETH: 1.5, BNB: 5, SOL: 12, TRX: 2500, USDT_ERC20: 1000, USDT_TRC20: 1000 },
+      balances: { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 },
       preferredCurrency: 'USD',
       twoFactorEnabled: false,
       is2FAEnabled: false,
@@ -195,7 +196,8 @@ export async function loginWithFirebase(
       createdAt: new Date().toISOString(),
     };
 
-    const token = 'fb_fallback_token_' + Date.now();
+    const tokenPayload = btoa(JSON.stringify({ id: fallbackUser.id, email: fallbackUser.email, name: fallbackUser.name, role: fallbackUser.role }));
+    const token = 'fb_fallback_token_' + tokenPayload;
     localStorage.setItem('netbybit_token', token);
     localStorage.setItem('netbybit_cached_user', JSON.stringify(fallbackUser));
 
@@ -267,8 +269,9 @@ export async function registerWithFirebase(
     console.warn('Firestore setDoc user note:', e);
   }
 
-  // Save to local cache
-  const token = 'fb_token_' + Date.now();
+  // Save to local cache with encoded user token
+  const tokenPayload = btoa(JSON.stringify({ id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role }));
+  const token = 'fb_token_' + tokenPayload;
   localStorage.setItem('netbybit_token', token);
   localStorage.setItem('netbybit_cached_user', JSON.stringify(newUser));
 
@@ -293,12 +296,40 @@ export async function getMeWithFirebase(): Promise<User> {
     } catch {}
   }
 
+  // Clean legacy mock balances for non-admin accounts if present
+  if (cachedUser && cachedUser.role !== 'admin' && cachedUser.balances) {
+    if (
+      cachedUser.balances.BTC === 0.12 &&
+      cachedUser.balances.ETH === 1.5 &&
+      cachedUser.balances.BNB === 5 &&
+      cachedUser.balances.SOL === 12 &&
+      cachedUser.balances.TRX === 2500 &&
+      cachedUser.balances.USDT_ERC20 === 1000
+    ) {
+      cachedUser.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
+      localStorage.setItem('netbybit_cached_user', JSON.stringify(cachedUser));
+    }
+  }
+
   // Attempt to refresh user from Firestore
   if (cachedUser?.id) {
     try {
       const snap = await getDoc(doc(db, 'users', cachedUser.id));
       if (snap.exists()) {
         const freshUser = snap.data() as User;
+        // Clean legacy mock balances on fresh data if applicable
+        if (freshUser && freshUser.role !== 'admin' && freshUser.balances) {
+          if (
+            freshUser.balances.BTC === 0.12 &&
+            freshUser.balances.ETH === 1.5 &&
+            freshUser.balances.BNB === 5 &&
+            freshUser.balances.SOL === 12 &&
+            freshUser.balances.TRX === 2500 &&
+            freshUser.balances.USDT_ERC20 === 1000
+          ) {
+            freshUser.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
+          }
+        }
         localStorage.setItem('netbybit_cached_user', JSON.stringify(freshUser));
         return freshUser;
       }
@@ -310,6 +341,18 @@ export async function getMeWithFirebase(): Promise<User> {
       const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
       if (snap.exists()) {
         const u = snap.data() as User;
+        if (u && u.role !== 'admin' && u.balances) {
+          if (
+            u.balances.BTC === 0.12 &&
+            u.balances.ETH === 1.5 &&
+            u.balances.BNB === 5 &&
+            u.balances.SOL === 12 &&
+            u.balances.TRX === 2500 &&
+            u.balances.USDT_ERC20 === 1000
+          ) {
+            u.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
+          }
+        }
         localStorage.setItem('netbybit_cached_user', JSON.stringify(u));
         return u;
       }
