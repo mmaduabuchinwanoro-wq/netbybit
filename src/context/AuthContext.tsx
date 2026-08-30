@@ -3,7 +3,7 @@ import { api, getAuthToken, removeAuthToken, setAuthToken } from '../lib/api';
 import { CryptoPrice, DepositAddresses, Notification, User } from '../types';
 import { fetchLiveFiatRates, formatFiatValue, convertUsdToFiat, SUPPORTED_FIAT_CURRENCIES } from '../lib/currencies';
 import { db } from '../lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -224,13 +224,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Real-time Firestore account balance & profile listener
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id && !user?.email) return;
 
-    let unsubscribe: (() => void) | null = null;
+    let unsubDoc: (() => void) | null = null;
+    let unsubEmail: (() => void) | null = null;
+
     try {
-      if (db) {
+      if (db && user.id) {
         const userRef = doc(db, 'users', user.id);
-        unsubscribe = onSnapshot(
+        unsubDoc = onSnapshot(
           userRef,
           (docSnap) => {
             if (docSnap.exists()) {
@@ -257,10 +259,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Failed to bind real-time user listener:', e);
     }
 
-    return () => {
-      if (unsubscribe) unsubscribe();
+    try {
+      if (db && user.email) {
+        const qEmail = query(collection(db, 'users'), where('email', '==', user.email.toLowerCase()));
+        unsubEmail = onSnapshot(
+          qEmail,
+          (snap) => {
+            if (!snap.empty) {
+              const matchingDocs = snap.docs.map((d) => d.data() as User);
+              const mergedBalances: Record<string, number> = {};
+              for (const u of matchingDocs) {
+                if (u.balances) {
+                  for (const [k, v] of Object.entries(u.balances)) {
+                    mergedBalances[k] = Math.max(Number(v) || 0, mergedBalances[k] || 0);
+                  }
+                }
+              }
+              if (Object.keys(mergedBalances).length > 0) {
+                setUser((prev) => {
+                  if (!prev) return prev;
+                  const updated = {
+                    ...prev,
+                    balances: {
+                      ...prev.balances,
+                      ...mergedBalances,
+                    },
+                  };
+                  localStorage.setItem('netbybit_cached_user', JSON.stringify(updated));
+                  return updated;
+                });
+              }
+            }
+          },
+          (err) => {
+            console.warn('Real-time email query listener note:', err);
+          }
+        );
+      }
+    } catch (e) {
+      console.warn('Failed to bind real-time email listener:', e);
+    }
+
+    // Instant local custom event listener
+    const handleBalanceEvent = (e: any) => {
+      const detail = e.detail;
+      if (detail && detail.balances) {
+        if (!detail.email || detail.email.toLowerCase() === user.email?.toLowerCase()) {
+          setUser((prev) => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              balances: {
+                ...prev.balances,
+                ...detail.balances,
+              },
+            };
+            localStorage.setItem('netbybit_cached_user', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      }
     };
-  }, [user?.id]);
+
+    window.addEventListener('netbybit_balance_updated', handleBalanceEvent);
+
+    return () => {
+      if (unsubDoc) unsubDoc();
+      if (unsubEmail) unsubEmail();
+      window.removeEventListener('netbybit_balance_updated', handleBalanceEvent);
+    };
+  }, [user?.id, user?.email]);
 
   const setSelectedCurrency = async (curr: string) => {
     const cleanCurr = curr.toUpperCase();

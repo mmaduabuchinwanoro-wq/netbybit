@@ -1034,6 +1034,34 @@ export const api = {
         if (res.ok) {
           const json = await res.json();
           if (json?.success) {
+            const updatedBalances = json.user?.balances;
+            if (updatedBalances) {
+              try {
+                const q = query(collection(db, 'users'), where('email', '==', body.email.trim().toLowerCase()));
+                const snap = await getDocs(q);
+                for (const docSnap of snap.docs) {
+                  await setDoc(doc(db, 'users', docSnap.id), { balances: updatedBalances }, { merge: true });
+                }
+              } catch (e) {
+                console.warn('Firestore multi-doc balance sync note:', e);
+              }
+
+              try {
+                const cachedStr = localStorage.getItem('netbybit_cached_user');
+                if (cachedStr) {
+                  const curUser = JSON.parse(cachedStr);
+                  if (curUser.email?.toLowerCase() === body.email.trim().toLowerCase() || curUser.id === json.user?.id) {
+                    curUser.balances = updatedBalances;
+                    localStorage.setItem('netbybit_cached_user', JSON.stringify(curUser));
+                  }
+                }
+              } catch {}
+
+              try {
+                window.dispatchEvent(new CustomEvent('netbybit_balance_updated', { detail: { email: body.email, balances: updatedBalances } }));
+              } catch {}
+            }
+
             // Also sync transaction record to firestore if present
             const txHash = json.auditEntry?.txHash || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
             const nowISO = new Date().toISOString();
