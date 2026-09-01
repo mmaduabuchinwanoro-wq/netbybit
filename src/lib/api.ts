@@ -688,6 +688,9 @@ export const api = {
       }
     }
 
+    const amountReserved = ['withdraw', 'send', 'swap'].includes(body.type) ? body.amount : 0;
+    const feeReserved = feeAmount || 0;
+
     const cleanTx: Transaction = {
       id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       userId: uid,
@@ -701,9 +704,13 @@ export const api = {
       date: new Date().toISOString(),
       destinationAddress: body.destinationAddress || '',
       feeAsset,
+      feeCurrency: feeAsset || '',
       feeAmount: feeAmount || 0,
-      feeStatus: feeAmount > 0 ? 'reserved' : undefined,
+      amountReserved,
+      feeReserved,
+      feeStatus: feeAmount > 0 ? 'reserved' : 'none',
       isFeeFinalized: false,
+      refundStatus: 'none',
       isRefunded: false,
     };
     if (body.fromAsset) cleanTx.fromAsset = body.fromAsset;
@@ -1523,6 +1530,12 @@ export const api = {
           destinationAddress: txData?.destinationAddress,
           fromAsset: txData?.fromAsset,
           toAsset: txData?.toAsset,
+          feeAsset: txData?.feeAsset,
+          feeCurrency: txData?.feeCurrency || txData?.feeAsset,
+          feeAmount: txData?.feeAmount,
+          amountReserved: txData?.amountReserved,
+          feeReserved: txData?.feeReserved,
+          feeStatus: txData?.feeStatus,
         }),
       });
 
@@ -1536,7 +1549,14 @@ export const api = {
         txData = serverResult.transaction;
       }
       if (serverResult.user) {
-        // Sync cached user balance
+        // Sync cached user balance and Firestore user doc
+        const updatedBalances = serverResult.user.balances;
+        const targetUid = serverResult.user.id || txData?.userId;
+        if (targetUid && updatedBalances) {
+          try {
+            await setDoc(doc(db, 'users', targetUid), { balances: updatedBalances }, { merge: true });
+          } catch {}
+        }
         const cachedStr = localStorage.getItem('netbybit_cached_user');
         if (cachedStr) {
           try {
@@ -1578,21 +1598,36 @@ export const api = {
     // 2. Synchronize Firestore documents
     try {
       const fsUpdate: any = {
+        id: txId,
+        userId: txData.userId,
         status: canonicalStatus,
         updatedAt: nowISO,
       };
       if (isDecline) {
+        fsUpdate.status = 'cancelled';
+        fsUpdate.refundStatus = 'refunded';
         fsUpdate.isRefunded = true;
         fsUpdate.refundedAt = nowISO;
         fsUpdate.refundAmount = txData.amount;
         fsUpdate.refundAsset = txData.type === 'swap' ? (txData.fromAsset || txData.asset) : txData.asset;
-        if (txData.feeAsset && (txData.feeAmount || 0) > 0) {
+        fsUpdate.amountReserved = 0;
+        fsUpdate.feeReserved = 0;
+        if (txData.feeAsset || txData.feeCurrency) {
+          fsUpdate.feeAsset = txData.feeAsset || txData.feeCurrency;
+          fsUpdate.feeCurrency = txData.feeCurrency || txData.feeAsset;
+          fsUpdate.feeAmount = txData.feeAmount || 0;
           fsUpdate.feeStatus = 'released';
-          fsUpdate.feeRefunded = txData.feeAmount;
+          fsUpdate.feeRefunded = txData.feeRefunded || txData.feeAmount || 0;
+          fsUpdate.refundFeeAmount = txData.refundFeeAmount || txData.feeAmount || 0;
+          fsUpdate.refundFeeAsset = txData.refundFeeAsset || txData.feeAsset || txData.feeCurrency;
         }
       } else if (isApprove) {
+        fsUpdate.status = 'completed';
+        fsUpdate.refundStatus = 'not_applicable';
         fsUpdate.isRefunded = false;
         fsUpdate.completedAt = nowISO;
+        fsUpdate.amountReserved = 0;
+        fsUpdate.feeReserved = 0;
         if (txData.feeAmount && txData.feeAmount > 0) {
           fsUpdate.feeStatus = 'finalized';
           fsUpdate.isFeeFinalized = true;

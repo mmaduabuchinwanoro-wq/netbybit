@@ -135,9 +135,15 @@ export interface Transaction {
   previousStatus?: string;
   feeAsset?: SupportedAsset;
   feeAmount?: number;
+  feeCurrency?: string;
+  amountReserved?: number;
+  feeReserved?: number;
   feeStatus?: 'reserved' | 'finalized' | 'released';
   isFeeFinalized?: boolean;
   feeRefunded?: number;
+  refundStatus?: 'none' | 'refunded' | 'not_applicable';
+  refundFeeAmount?: number;
+  refundFeeAsset?: SupportedAsset | string;
 }
 
 export interface NetworkFeeRequirement {

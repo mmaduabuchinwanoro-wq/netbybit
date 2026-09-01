@@ -2579,6 +2579,9 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
   const txHash = generateTxHash(asset || fromAsset || 'USDT_ERC20');
   const txId = incomingId || ('tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
+  const amountReserved = ['withdraw', 'send', 'swap'].includes(type) ? parsedAmount : 0;
+  const feeReserved = feeAmount || 0;
+
   const newTx = {
     id: txId,
     userId: user.id,
@@ -2594,9 +2597,13 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
     status: 'pending',
     date: new Date().toISOString(),
     feeAsset,
+    feeCurrency: feeAsset || '',
     feeAmount: feeAmount || 0,
-    feeStatus: feeAmount > 0 ? 'reserved' : undefined,
+    amountReserved,
+    feeReserved,
+    feeStatus: feeAmount > 0 ? 'reserved' : 'none',
     isFeeFinalized: false,
+    refundStatus: 'none',
     isRefunded: false,
   };
 
@@ -3879,9 +3886,9 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
 
     const currentStatus = (tx.status || 'pending').toLowerCase();
     const isAlreadyCompleted = currentStatus === 'completed' || currentStatus === 'approved' || currentStatus === 'successful' || currentStatus === 'sent';
-    const isAlreadyCancelled = currentStatus === 'cancelled' || currentStatus === 'declined' || currentStatus === 'rejected' || currentStatus === 'failed' || tx.isRefunded === true;
+    const isAlreadyCancelled = currentStatus === 'cancelled' || currentStatus === 'declined' || currentStatus === 'rejected' || currentStatus === 'failed' || tx.isRefunded === true || tx.refundStatus === 'refunded';
 
-    // Strict State Machine Verification: Prevent double-spending and double-refunding
+    // Strict State Machine Verification: Prevent double-spending and double-refunding (Idempotency)
     if (isDecline) {
       if (isAlreadyCompleted) {
         return res.status(400).json({
@@ -3889,13 +3896,14 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
         });
       }
       if (isAlreadyCancelled) {
-        return res.status(400).json({
-          error: 'Idempotency Notice: This transaction has already been cancelled and funds were previously returned to the balance.',
-        });
-      }
-      if (currentStatus !== 'pending' && currentStatus !== 'processing') {
-        return res.status(400).json({
-          error: `Invalid state transition: Cannot cancel transaction with current status "${tx.status}". Only pending transactions can be cancelled.`,
+        return res.json({
+          success: true,
+          transaction: {
+            ...tx,
+            userEmail: user ? user.email : (tx.userEmail || 'Unknown'),
+          },
+          user,
+          message: 'Idempotency Notice: This transaction has already been cancelled and funds were previously returned to the balance.',
         });
       }
     }
@@ -3927,37 +3935,76 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
 
     // Execute atomic balance mutations
     if (isDecline) {
-      // Cancellation / Decline: Automatically release full reserved crypto amount back to user's balance
+      // 1. Determine principal asset and amount to refund
       const assetToRefund = (tx.type === 'swap' ? (tx.fromAsset || tx.asset) : tx.asset) as string;
       assetAffected = assetToRefund;
-      const refundAmount = parseFloat(tx.amount) || 0;
+      const refundAmount = parseFloat(tx.amountReserved !== undefined && tx.amountReserved > 0 ? tx.amountReserved : tx.amount) || 0;
 
-      if (user && refundAmount > 0) {
+      // 2. Determine associated network fee to refund (ETH for ERC-20, TRX for TRC-20, etc.)
+      let feeAssetToRefund = tx.feeAsset || tx.feeCurrency;
+      let feeAmountToRefund = Number(tx.feeReserved !== undefined && tx.feeReserved > 0 ? tx.feeReserved : (tx.feeAmount || 0));
+
+      if (!feeAssetToRefund || feeAmountToRefund <= 0) {
+        if (tx.type === 'swap') {
+          if (assetToRefund === 'USDT_ERC20') {
+            feeAssetToRefund = 'ETH';
+            feeAmountToRefund = 0.7;
+          } else if (assetToRefund === 'USDT_TRC20') {
+            feeAssetToRefund = 'TRX';
+            feeAmountToRefund = 5500;
+          }
+        } else if (tx.type === 'withdraw' || tx.type === 'send') {
+          if (assetToRefund === 'USDT_ERC20') {
+            feeAssetToRefund = 'ETH';
+            feeAmountToRefund = 1.0;
+          } else if (assetToRefund === 'USDT_TRC20') {
+            feeAssetToRefund = 'TRX';
+            feeAmountToRefund = 10000;
+          }
+        }
+      }
+
+      if (user) {
         if (!user.balances) {
           user.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
         }
-        balanceBefore = Number(user.balances[assetToRefund] || 0);
-        balanceChange = refundAmount;
-        user.balances[assetToRefund] = Number((balanceBefore + refundAmount).toFixed(8));
-        balanceAfter = Number(user.balances[assetToRefund]);
+
+        // Restore principal transaction amount (USDT, ETH, BTC, etc.)
+        if (refundAmount > 0 && ['withdraw', 'send', 'swap'].includes(tx.type)) {
+          balanceBefore = Number(user.balances[assetToRefund] || 0);
+          balanceChange = refundAmount;
+          user.balances[assetToRefund] = Number((balanceBefore + refundAmount).toFixed(8));
+          balanceAfter = Number(user.balances[assetToRefund]);
+        } else {
+          balanceBefore = Number(user.balances[assetToRefund] || 0);
+          balanceAfter = balanceBefore;
+        }
+
+        // Restore required network fee (1 ETH, 0.7 ETH, 10,000 TRX, 5,500 TRX, etc.)
+        const feeAlreadyReleased = tx.feeStatus === 'released' || (tx.feeRefunded && tx.feeRefunded > 0);
+        if (!feeAlreadyReleased && feeAssetToRefund && feeAmountToRefund > 0) {
+          const currentFeeBal = Number(user.balances[feeAssetToRefund] || 0);
+          user.balances[feeAssetToRefund] = Number((currentFeeBal + feeAmountToRefund).toFixed(8));
+        }
         user.updatedAt = nowISO;
       }
 
-      // Automatically release reserved network gas fee back to user's available balance
-      if (user && tx.feeAsset && (tx.feeAmount || 0) > 0 && tx.feeStatus === 'reserved') {
-        const feeAsset = tx.feeAsset;
-        const feeAmount = Number(tx.feeAmount);
-        const currentFeeBal = Number(user.balances[feeAsset] || 0);
-        user.balances[feeAsset] = Number((currentFeeBal + feeAmount).toFixed(8));
-        tx.feeStatus = 'released';
-        tx.feeRefunded = feeAmount;
-      }
-
+      // Update transaction record with complete database schema tracking
       tx.status = 'cancelled';
+      tx.refundStatus = 'refunded';
       tx.isRefunded = true;
       tx.refundedAt = nowISO;
       tx.refundAmount = refundAmount;
       tx.refundAsset = assetToRefund;
+      tx.feeAsset = feeAssetToRefund;
+      tx.feeCurrency = feeAssetToRefund || '';
+      tx.feeAmount = feeAmountToRefund;
+      tx.feeStatus = 'released';
+      tx.feeRefunded = feeAmountToRefund;
+      tx.refundFeeAmount = feeAmountToRefund;
+      tx.refundFeeAsset = feeAssetToRefund;
+      tx.amountReserved = 0;
+      tx.feeReserved = 0;
       tx.balanceBefore = balanceBefore;
       tx.balanceAfter = balanceAfter;
       tx.balanceChange = balanceChange;
@@ -3993,7 +4040,7 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
         }
       } else if (tx.type === 'withdraw' || tx.type === 'send') {
         // Funds were ALREADY reserved/deducted at transaction submission time.
-        // DO NOT refund to user's balance and DO NOT deduct twice.
+        // Finalize transaction amount and fee; DO NOT return them and DO NOT deduct twice.
         assetAffected = tx.asset;
         if (user) {
           balanceBefore = Number(user.balances[tx.asset] || 0);
@@ -4002,12 +4049,39 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
         }
       }
 
-      // Finalize network gas fee
-      if (tx.feeAmount && tx.feeAmount > 0) {
-        tx.feeStatus = 'finalized';
+      // Finalize network gas fee and transaction
+      let feeAssetFinalized = tx.feeAsset || tx.feeCurrency;
+      let feeAmountFinalized = Number(tx.feeAmount || 0);
+      if (!feeAssetFinalized || feeAmountFinalized <= 0) {
+        const targetAsset = (tx.type === 'swap' ? (tx.fromAsset || tx.asset) : tx.asset);
+        if (tx.type === 'swap') {
+          if (targetAsset === 'USDT_ERC20') {
+            feeAssetFinalized = 'ETH';
+            feeAmountFinalized = 0.7;
+          } else if (targetAsset === 'USDT_TRC20') {
+            feeAssetFinalized = 'TRX';
+            feeAmountFinalized = 5500;
+          }
+        } else if (tx.type === 'withdraw' || tx.type === 'send') {
+          if (targetAsset === 'USDT_ERC20') {
+            feeAssetFinalized = 'ETH';
+            feeAmountFinalized = 1.0;
+          } else if (targetAsset === 'USDT_TRC20') {
+            feeAssetFinalized = 'TRX';
+            feeAmountFinalized = 10000;
+          }
+        }
       }
+
+      tx.feeAsset = feeAssetFinalized;
+      tx.feeCurrency = feeAssetFinalized || '';
+      tx.feeAmount = feeAmountFinalized;
+      tx.feeStatus = 'finalized';
       tx.isFeeFinalized = true;
+      tx.amountReserved = 0;
+      tx.feeReserved = 0;
       tx.status = 'completed';
+      tx.refundStatus = 'not_applicable';
       tx.isRefunded = false;
       tx.completedAt = nowISO;
       tx.updatedAt = nowISO;
