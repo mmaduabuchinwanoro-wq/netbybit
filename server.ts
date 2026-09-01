@@ -8,7 +8,7 @@ import nodemailer from 'nodemailer';
 import { GoogleGenAI } from '@google/genai';
 import { MongoClient, Db } from 'mongodb';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, getDocs, collection } from 'firebase/firestore';
 import {
   startPriceFeedService,
   getLiveCryptoPrices,
@@ -3771,205 +3771,366 @@ app.get('/api/admin/transactions', adminMiddleware, async (req, res) => {
   }
 });
 
+// In-memory concurrency lock for transaction status mutations
+const activeTxStatusLocks = new Set<string>();
+
 // Admin: Update Transaction Status (Approve / Reject Withdrawal or Swap)
 app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any, res) => {
   const { txId } = req.params;
-  const { status } = req.body; // 'completed' | 'approved' | 'failed' | 'declined'
+  const { status } = req.body; // 'completed' | 'approved' | 'failed' | 'declined' | 'cancelled'
 
   if (!status) {
     return res.status(400).json({ error: 'Status is required' });
   }
 
-  await syncDBFromBlobs(true);
-  const db = loadDB();
-  let txIndex = (db.transactions || []).findIndex((t) => t.id === txId);
-
-  if (txIndex === -1) {
-    // If not in local array, check req.body for transaction metadata to upsert
-    const incomingTx = {
-      id: txId,
-      userId: req.body.userId || 'usr_unknown',
-      userEmail: req.body.userEmail || 'user@example.com',
-      type: req.body.type || 'withdraw',
-      asset: req.body.asset || 'USDT_TRC20',
-      amount: parseFloat(req.body.amount) || 0,
-      usdtEquivalent: parseFloat(req.body.usdtEquivalent) || 0,
-      destinationAddress: req.body.destinationAddress || '',
-      status: 'pending',
-      date: req.body.date || new Date().toISOString(),
-    };
-    if (!db.transactions) db.transactions = [];
-    db.transactions.unshift(incomingTx);
-    txIndex = 0;
+  if (activeTxStatusLocks.has(txId)) {
+    return res.status(409).json({ error: 'Transaction is currently being processed. Please wait a moment.' });
   }
+  activeTxStatusLocks.add(txId);
 
-  const tx = db.transactions[txIndex];
-  const userIndex = (db.users || []).findIndex((u) => u.id === tx.userId);
-  const user = userIndex !== -1 ? db.users[userIndex] : null;
+  try {
+    await syncDBFromStore(true);
+    const db = loadDB();
+    let txIndex = (db.transactions || []).findIndex((t) => t.id === txId);
 
-  const isApprove = status === 'completed' || status === 'approved' || status === 'Successful' || status === 'successful' || status === 'success';
-  const isDecline = status === 'failed' || status === 'declined' || status === 'rejected' || status === 'cancelled' || status === 'Cancelled';
-
-  if (!isApprove && !isDecline) {
-    return res.status(400).json({ error: 'Invalid status. Must be completed/approved or failed/declined/cancelled' });
-  }
-
-  const newStatus = isApprove ? 'completed' : 'cancelled';
-  const actionLabel = isApprove ? 'Approved' : 'Declined';
-  const statusLabel = isApprove ? 'Successful' : 'Cancelled';
-
-  // Handle balance updates for approvals and rejections
-  if (user && (tx.status === 'pending' || tx.status === 'processing')) {
-    if (isApprove && tx.type === 'deposit') {
-      user.balances[tx.asset] = (user.balances[tx.asset] || 0) + tx.amount;
-    } else if (isApprove && tx.type === 'swap') {
-      const targetAsset = tx.toAsset || tx.asset;
-      const creditAmt = parseFloat(tx.usdtEquivalent) || tx.amount;
-      user.balances[targetAsset] = (user.balances[targetAsset] || 0) + creditAmt;
-    } else if (isDecline && (tx.type === 'withdraw' || tx.type === 'send')) {
-      user.balances[tx.asset] = (user.balances[tx.asset] || 0) + tx.amount;
-    } else if (isDecline && tx.type === 'swap') {
-      const sourceAsset = tx.fromAsset || tx.asset;
-      user.balances[sourceAsset] = (user.balances[sourceAsset] || 0) + tx.amount;
+    if (txIndex === -1) {
+      // Check Firestore directly for doc if not in memory
+      const dbInstance = getFirestoreDb();
+      if (dbInstance) {
+        try {
+          const snap = await getDoc(doc(dbInstance, 'transactions', txId));
+          if (snap.exists()) {
+            const fsTx = snap.data();
+            if (!db.transactions) db.transactions = [];
+            db.transactions.unshift(fsTx);
+            txIndex = 0;
+          }
+        } catch (e) {
+          console.warn('Firestore fallback fetch note:', e);
+        }
+      }
     }
-  }
 
-  tx.status = newStatus;
-  const nowISO = new Date().toISOString();
+    if (txIndex === -1) {
+      // If still not found, check req.body for transaction metadata to upsert safely
+      if (req.body.userId && req.body.amount) {
+        const incomingTx = {
+          id: txId,
+          userId: req.body.userId || 'usr_unknown',
+          userEmail: req.body.userEmail || 'user@example.com',
+          type: req.body.type || 'withdraw',
+          asset: req.body.asset || 'USDT_TRC20',
+          amount: parseFloat(req.body.amount) || 0,
+          usdtEquivalent: parseFloat(req.body.usdtEquivalent) || 0,
+          destinationAddress: req.body.destinationAddress || '',
+          status: 'pending',
+          date: req.body.date || new Date().toISOString(),
+          isRefunded: false,
+        };
+        if (!db.transactions) db.transactions = [];
+        db.transactions.unshift(incomingTx);
+        txIndex = 0;
+      } else {
+        return res.status(404).json({ error: `Transaction #${txId} not found` });
+      }
+    }
 
-  // Audit Log Record
-  const auditEntry = {
-    id: 'audit_' + Date.now(),
-    adminEmail: req.user.email,
-    userEmail: user ? user.email : 'Unknown',
-    userId: tx.userId,
-    asset: tx.asset,
-    amount: tx.amount,
-    newBalance: user ? (user.balances[tx.asset] || 0) : 0,
-    date: nowISO,
-    action: tx.type === 'swap' ? `Swap ${actionLabel}` : `Withdrawal ${actionLabel}`,
-    status: statusLabel,
-  };
+    const tx = db.transactions[txIndex];
+    let userIndex = (db.users || []).findIndex((u) => u.id === tx.userId);
+    if (userIndex === -1 && tx.userEmail) {
+      userIndex = (db.users || []).findIndex((u) => u.email && u.email.toLowerCase() === tx.userEmail.toLowerCase());
+    }
+    const user = userIndex !== -1 ? db.users[userIndex] : null;
 
-  if (!db.auditLogs) db.auditLogs = [];
-  db.auditLogs.push(auditEntry);
+    const isApprove = status === 'completed' || status === 'approved' || status === 'Successful' || status === 'successful' || status === 'success' || status === 'sent';
+    const isDecline = status === 'failed' || status === 'declined' || status === 'rejected' || status === 'cancelled' || status === 'Cancelled';
 
-  // Email Notification Record & Dispatch
-  const assetLabel = tx.asset === 'USDT_ERC20' ? 'USDT (ERC-20)' : tx.asset === 'USDT_TRC20' ? 'USDT (TRC-20)' : tx.asset;
-  let declineBody = '';
-  let approveBody = '';
+    if (!isApprove && !isDecline) {
+      return res.status(400).json({ error: 'Invalid status. Must be completed/approved or cancelled/declined' });
+    }
 
-  if (tx.type === 'swap') {
-    declineBody = `Hello,
+    const currentStatus = (tx.status || 'pending').toLowerCase();
+    const isAlreadyCompleted = currentStatus === 'completed' || currentStatus === 'approved' || currentStatus === 'successful' || currentStatus === 'sent';
+    const isAlreadyCancelled = currentStatus === 'cancelled' || currentStatus === 'declined' || currentStatus === 'rejected' || currentStatus === 'failed' || tx.isRefunded === true;
 
-Your crypto swap request from ${tx.amount} ${tx.fromAsset || tx.asset} to ${tx.toAsset} was not completed.
+    // Strict State Machine Verification: Prevent double-spending and double-refunding
+    if (isDecline) {
+      if (isAlreadyCompleted) {
+        return res.status(400).json({
+          error: 'Security Violation: Cannot cancel or refund a transaction that has already been approved, completed, or dispatched.',
+        });
+      }
+      if (isAlreadyCancelled) {
+        return res.status(400).json({
+          error: 'Idempotency Notice: This transaction has already been cancelled and funds were previously returned to the balance.',
+        });
+      }
+      if (currentStatus !== 'pending' && currentStatus !== 'processing') {
+        return res.status(400).json({
+          error: `Invalid state transition: Cannot cancel transaction with current status "${tx.status}". Only pending transactions can be cancelled.`,
+        });
+      }
+    }
+
+    if (isApprove) {
+      if (isAlreadyCancelled) {
+        return res.status(400).json({
+          error: 'Security Violation: Cannot approve a transaction that has already been cancelled and refunded.',
+        });
+      }
+      if (isAlreadyCompleted) {
+        return res.json({
+          success: true,
+          transaction: {
+            ...tx,
+            userEmail: user ? user.email : (tx.userEmail || 'Unknown'),
+          },
+          user,
+          message: `Transaction #${tx.id} is already approved and completed.`,
+        });
+      }
+    }
+
+    const nowISO = new Date().toISOString();
+    let balanceBefore = 0;
+    let balanceChange = 0;
+    let balanceAfter = 0;
+    let assetAffected = tx.asset;
+
+    // Execute atomic balance mutations
+    if (isDecline) {
+      // Cancellation / Decline: Automatically release full reserved crypto amount back to user's balance
+      const assetToRefund = (tx.type === 'swap' ? (tx.fromAsset || tx.asset) : tx.asset) as string;
+      assetAffected = assetToRefund;
+      const refundAmount = parseFloat(tx.amount) || 0;
+
+      if (user && refundAmount > 0) {
+        if (!user.balances) {
+          user.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
+        }
+        balanceBefore = Number(user.balances[assetToRefund] || 0);
+        balanceChange = refundAmount;
+        user.balances[assetToRefund] = Number((balanceBefore + refundAmount).toFixed(8));
+        balanceAfter = Number(user.balances[assetToRefund]);
+        user.updatedAt = nowISO;
+      }
+
+      tx.status = 'cancelled';
+      tx.isRefunded = true;
+      tx.refundedAt = nowISO;
+      tx.refundAmount = refundAmount;
+      tx.refundAsset = assetToRefund;
+      tx.balanceBefore = balanceBefore;
+      tx.balanceAfter = balanceAfter;
+      tx.balanceChange = balanceChange;
+      tx.previousStatus = currentStatus;
+      tx.updatedAt = nowISO;
+    } else if (isApprove) {
+      if (tx.type === 'deposit' || tx.type === 'receive') {
+        assetAffected = tx.asset;
+        const depositAmt = parseFloat(tx.amount) || 0;
+        if (user && depositAmt > 0) {
+          if (!user.balances) {
+            user.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
+          }
+          balanceBefore = Number(user.balances[tx.asset] || 0);
+          balanceChange = depositAmt;
+          user.balances[tx.asset] = Number((balanceBefore + depositAmt).toFixed(8));
+          balanceAfter = Number(user.balances[tx.asset]);
+          user.updatedAt = nowISO;
+        }
+      } else if (tx.type === 'swap') {
+        const targetAsset = tx.toAsset || 'USDT_TRC20';
+        assetAffected = targetAsset;
+        const creditAmt = parseFloat(tx.usdtEquivalent) || parseFloat(tx.amount) || 0;
+        if (user && creditAmt > 0) {
+          if (!user.balances) {
+            user.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
+          }
+          balanceBefore = Number(user.balances[targetAsset] || 0);
+          balanceChange = creditAmt;
+          user.balances[targetAsset] = Number((balanceBefore + creditAmt).toFixed(8));
+          balanceAfter = Number(user.balances[targetAsset]);
+          user.updatedAt = nowISO;
+        }
+      } else if (tx.type === 'withdraw' || tx.type === 'send') {
+        // Funds were ALREADY reserved/deducted at transaction submission time.
+        // DO NOT refund to user's balance and DO NOT deduct twice.
+        assetAffected = tx.asset;
+        if (user) {
+          balanceBefore = Number(user.balances[tx.asset] || 0);
+          balanceChange = 0;
+          balanceAfter = balanceBefore;
+        }
+      }
+
+      tx.status = 'completed';
+      tx.isRefunded = false;
+      tx.completedAt = nowISO;
+      tx.updatedAt = nowISO;
+      tx.previousStatus = currentStatus;
+      tx.balanceBefore = balanceBefore;
+      tx.balanceAfter = balanceAfter;
+      tx.balanceChange = balanceChange;
+      if (!tx.txHash) {
+        tx.txHash = generateTxHash(tx.asset || 'USDT_TRC20');
+      }
+    }
+
+    const actionLabel = isApprove ? 'Approved' : 'Declined / Cancelled';
+    const statusLabel = isApprove ? 'Successful' : 'Cancelled';
+
+    // Comprehensive Audit Log Record
+    const auditAction = tx.type === 'swap'
+      ? (isApprove ? 'Crypto Swap Approval & Credit' : 'Crypto Swap Cancellation & Full Refund')
+      : tx.type === 'deposit'
+      ? (isApprove ? 'Deposit Confirmation & Credit' : 'Deposit Rejection')
+      : (isApprove ? 'Withdrawal Approval & Dispatch' : 'Withdrawal Cancellation & Balance Refund');
+
+    const auditEntry = {
+      id: 'audit_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      adminEmail: req.user.email || 'help.netbybit@hotmail.com',
+      userEmail: user ? user.email : (tx.userEmail || 'Unknown'),
+      userId: tx.userId,
+      txId: tx.id,
+      asset: assetAffected,
+      amount: parseFloat(tx.amount) || 0,
+      previousStatus: currentStatus,
+      newStatus: isApprove ? 'completed' : 'cancelled',
+      balanceBefore,
+      balanceChange,
+      newBalance: balanceAfter,
+      date: nowISO,
+      action: auditAction,
+      status: isApprove ? 'Approved / Successful' : 'Cancelled / Refunded',
+      txHash: tx.txHash || '',
+    };
+
+    if (!db.auditLogs) db.auditLogs = [];
+    db.auditLogs.unshift(auditEntry);
+
+    // Email Notification Record & Dispatch
+    const assetLabel = tx.asset === 'USDT_ERC20' ? 'USDT (ERC-20)' : tx.asset === 'USDT_TRC20' ? 'USDT (TRC-20)' : tx.asset;
+    let declineBody = '';
+    let approveBody = '';
+
+    if (tx.type === 'swap') {
+      declineBody = `Hello,
+
+Your crypto swap request from ${tx.amount} ${tx.fromAsset || tx.asset} to ${tx.toAsset} has been cancelled/declined.
 
 Transaction ID: ${tx.id}
 Date & Time: ${new Date(nowISO).toLocaleString()}
-Status: Declined / Cancelled
+Status: Cancelled & Refunded
 
-The full source asset amount has been returned to your account balance.
+The exact reserved amount of ${tx.amount} ${tx.fromAsset || tx.asset} has been automatically released back to your active account balance.
+New ${tx.fromAsset || tx.asset} Balance: ${balanceAfter}
 
-If you have any questions or need assistance, please contact our support team at help.netbybit@hotmail.com.
+If you have any questions, please contact our support team at help.netbybit@hotmail.com.
 
 Thank you,
-
 NETBYBIT Support Team`;
 
-    approveBody = `Hello,
+      approveBody = `Hello,
 
-Your crypto swap request from ${tx.amount} ${tx.fromAsset || tx.asset} to ${tx.toAsset} has been approved.
+Your crypto swap request from ${tx.amount} ${tx.fromAsset || tx.asset} to ${tx.toAsset} has been approved and completed.
 
 Transaction ID: ${tx.id}
 Date & Time: ${new Date(nowISO).toLocaleString()}
 Final Status: Successful
-
-If you have questions, please contact customer support at help.netbybit@hotmail.com.
+Credited: ${tx.usdtEquivalent || tx.amount} ${tx.toAsset}
 
 Thank you,
 NETBYBIT Support Team`;
-  } else {
-    declineBody = `Hello,
+    } else {
+      declineBody = `Hello,
 
-Your withdrawal request for ${tx.amount.toLocaleString()} ${assetLabel} to the destination address:
-
+Your withdrawal request for ${tx.amount} ${assetLabel} to destination address:
 ${tx.destinationAddress || 'N/A'}
 
-was not completed.
+has been cancelled.
 
 Transaction ID: ${tx.id}
 Date & Time: ${new Date(nowISO).toLocaleString()}
-Status: Declined
+Status: Cancelled & Refunded
 
-The full requested amount has been returned to your account balance.
+The full reserved crypto amount of ${tx.amount} ${assetLabel} has been automatically released back to your available balance.
+New ${assetLabel} Balance: ${balanceAfter}
 
-If you have any questions or need assistance, please contact our support team at help.netbybit@hotmail.com.
+If you have any questions or require assistance, please reach out to customer support at help.netbybit@hotmail.com.
 
 Thank you,
-
 NETBYBIT Support Team`;
 
-    approveBody = `Hello,
+      approveBody = `Hello,
 
-Your withdrawal request for ${tx.amount} ${tx.asset} to destination address "${tx.destinationAddress || 'N/A'}" has been approved.
+Your withdrawal request for ${tx.amount} ${assetLabel} to destination address "${tx.destinationAddress || 'N/A'}" has been approved and dispatched.
 
 Transaction ID: ${tx.id}
 Date & Time: ${new Date(nowISO).toLocaleString()}
+Blockchain TxHash: ${tx.txHash || 'Verified on-chain'}
 Final Status: Successful
 
-If you have questions, please contact customer support at help.netbybit@hotmail.com.
-
 Thank you,
 NETBYBIT Support Team`;
-  }
+    }
 
-  const subjectText = tx.type === 'swap'
-    ? (isDecline ? 'Crypto Swap Request Declined' : 'Crypto Swap Request Approved')
-    : (isDecline ? 'Withdrawal Update' : `Withdrawal Request ${actionLabel}`);
+    const subjectText = tx.type === 'swap'
+      ? (isDecline ? 'Crypto Swap Cancelled - Funds Refunded' : 'Crypto Swap Approved & Settled')
+      : (isDecline ? `Withdrawal Cancelled - ${tx.amount} ${assetLabel} Refunded` : `Withdrawal Approved (${tx.amount} ${assetLabel})`);
 
-  const emailNotificationRecord = sendEmailNotification(db, {
-    to: user ? user.email : 'User',
-    subject: subjectText,
-    category: tx.type === 'swap' ? 'Swap Approval/Rejection' : 'Withdrawal Approval/Rejection',
-    body: isDecline ? declineBody : approveBody,
-  });
-
-  const emailNotification = {
-    to: emailNotificationRecord.to,
-    subject: emailNotificationRecord.subject,
-    body: emailNotificationRecord.body,
-    sentAt: emailNotificationRecord.sentAt,
-  };
-
-  // In-app notification
-  if (user) {
-    const notifTitle = tx.type === 'swap' ? `Swap ${actionLabel}` : `Withdrawal ${actionLabel}`;
-    const notifMsg = tx.type === 'swap'
-      ? `Your swap of ${tx.amount} ${tx.fromAsset || tx.asset} to ${tx.toAsset} was ${actionLabel.toLowerCase()}.${isDecline ? ' Source asset balance has been refunded.' : ''}`
-      : `Your withdrawal of ${tx.amount} ${tx.asset} was ${actionLabel.toLowerCase()}.${isDecline ? ' Funds have been returned to your balance.' : ''}`;
-
-    db.notifications.push({
-      id: 'notif_' + Date.now(),
-      userId: user.id,
-      title: notifTitle,
-      message: notifMsg,
-      isRead: false,
-      createdAt: nowISO,
+    const emailNotificationRecord = sendEmailNotification(db, {
+      to: user ? user.email : 'User',
+      subject: subjectText,
+      category: tx.type === 'swap' ? 'Swap Approval/Rejection' : 'Withdrawal Approval/Rejection',
+      body: isDecline ? declineBody : approveBody,
     });
+
+    const emailNotification = {
+      to: emailNotificationRecord.to,
+      subject: emailNotificationRecord.subject,
+      body: emailNotificationRecord.body,
+      sentAt: emailNotificationRecord.sentAt,
+    };
+
+    // In-app notification for user
+    if (user) {
+      const notifTitle = tx.type === 'swap' ? `Swap ${actionLabel}` : `Withdrawal ${actionLabel}`;
+      const notifMsg = tx.type === 'swap'
+        ? (isDecline
+            ? `Your swap of ${tx.amount} ${tx.fromAsset || tx.asset} was cancelled. Exact ${tx.amount} ${tx.fromAsset || tx.asset} has been automatically refunded to your balance.`
+            : `Your swap of ${tx.amount} ${tx.fromAsset || tx.asset} to ${tx.toAsset} was approved and credited.`)
+        : (isDecline
+            ? `Your withdrawal of ${tx.amount} ${tx.asset} was cancelled. The exact ${tx.amount} ${tx.asset} has been returned to your available balance.`
+            : `Your withdrawal of ${tx.amount} ${tx.asset} was approved and dispatched on-chain.`);
+
+      db.notifications.push({
+        id: 'notif_' + Date.now(),
+        userId: user.id,
+        title: notifTitle,
+        message: notifMsg,
+        type: isApprove ? 'security' : 'system',
+        isRead: false,
+        createdAt: nowISO,
+      });
+    }
+
+    await saveDB(db);
+
+    res.json({
+      success: true,
+      transaction: {
+        ...tx,
+        userEmail: user ? user.email : (tx.userEmail || 'Unknown'),
+      },
+      user,
+      auditEntry,
+      emailNotification,
+      message: `${tx.type === 'swap' ? 'Swap' : 'Withdrawal'} transaction #${tx.id} was successfully ${isApprove ? 'approved' : 'cancelled and refunded'}. Available balance updated.`,
+    });
+  } finally {
+    activeTxStatusLocks.delete(txId);
   }
-
-  await saveDB(db);
-
-  res.json({
-    success: true,
-    transaction: {
-      ...tx,
-      userEmail: user ? user.email : 'Unknown',
-    },
-    auditEntry,
-    emailNotification,
-    message: `${tx.type === 'swap' ? 'Swap' : 'Withdrawal'} transaction #${tx.id} was successfully ${actionLabel.toLowerCase()}. User notified.`,
-  });
 });
 
 app.patch('/api/admin/transactions/:txId/status', adminMiddleware, (req, res, next) => {

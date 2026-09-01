@@ -122,7 +122,17 @@ export interface Transaction {
   status: TransactionStatus;
   date: string;
   createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
   description?: string;
+  isRefunded?: boolean;
+  refundedAt?: string;
+  refundAmount?: number;
+  refundAsset?: SupportedAsset;
+  balanceBefore?: number;
+  balanceAfter?: number;
+  balanceChange?: number;
+  previousStatus?: string;
 }
 
 export interface TicketReply {
@@ -197,12 +207,18 @@ export interface AuditLogEntry {
   adminEmail: string;
   userEmail: string;
   userId: string;
+  txId?: string;
   asset: SupportedAsset;
   amount: number;
+  previousStatus?: string;
+  newStatus?: string;
+  balanceBefore?: number;
+  balanceChange?: number;
   newBalance: number;
   date: string;
   action?: string;
   status?: string;
+  txHash?: string;
 }
 
 export interface EmailNotificationPreview {

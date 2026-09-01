@@ -1459,8 +1459,61 @@ export const api = {
     const isApprove = status === 'completed' || status === 'approved';
     const isDecline = status === 'failed' || status === 'cancelled' || status === 'declined';
     const canonicalStatus = isApprove ? 'completed' : isDecline ? 'cancelled' : 'pending';
-    const actionLabel = isApprove ? 'Approved' : 'Declined';
-    const statusLabel = isApprove ? 'Successful' : 'Cancelled';
+
+    let serverResult: any = null;
+
+    // 1. Call Backend Server API as Primary Authoritative Engine
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token') || 'adm_default_token';
+      const res = await fetch(`/api/admin/transactions/${txId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status: canonicalStatus,
+          userId: txData?.userId,
+          userEmail: txData?.userEmail,
+          type: txData?.type,
+          asset: txData?.asset,
+          amount: txData?.amount,
+          usdtEquivalent: txData?.usdtEquivalent,
+          destinationAddress: txData?.destinationAddress,
+          fromAsset: txData?.fromAsset,
+          toAsset: txData?.toAsset,
+        }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Server responded with status ${res.status}`);
+      }
+
+      serverResult = await res.json();
+      if (serverResult.transaction) {
+        txData = serverResult.transaction;
+      }
+      if (serverResult.user) {
+        // Sync cached user balance
+        const cachedStr = localStorage.getItem('netbybit_cached_user');
+        if (cachedStr) {
+          try {
+            const cUser = JSON.parse(cachedStr);
+            if (cUser.id === serverResult.user.id || cUser.email === serverResult.user.email) {
+              cUser.balances = serverResult.user.balances;
+              localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
+            }
+          } catch {}
+        }
+      }
+    } catch (apiErr: any) {
+      // If the backend threw a business logic / security error, rethrow it to prevent corrupt frontend state
+      if (apiErr.message && (apiErr.message.includes('Cannot') || apiErr.message.includes('Security') || apiErr.message.includes('already'))) {
+        throw apiErr;
+      }
+      console.warn('Backend API update warning:', apiErr);
+    }
 
     if (!txData) {
       txData = {
@@ -1481,29 +1534,27 @@ export const api = {
 
     const nowISO = new Date().toISOString();
 
-    // 1. In-place update of existing single Firestore documents
+    // 2. Synchronize Firestore documents
     try {
-      await setDoc(doc(db, 'transactions', txId), { status: canonicalStatus, updatedAt: nowISO }, { merge: true });
-      await setDoc(doc(db, 'swaps', txId), { status: canonicalStatus, updatedAt: nowISO }, { merge: true });
-      await setDoc(doc(db, 'withdrawals', txId), { status: canonicalStatus, updatedAt: nowISO }, { merge: true });
-    } catch (e) {
-      console.warn('Firestore single-record status update note:', e);
-    }
-
-    // 2. Synchronize in-place update to backend server API
-    try {
-      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
-      if (token) {
-        await fetch(`/api/admin/transactions/${txId}/status`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: canonicalStatus }),
-        });
+      const fsUpdate: any = {
+        status: canonicalStatus,
+        updatedAt: nowISO,
+      };
+      if (isDecline) {
+        fsUpdate.isRefunded = true;
+        fsUpdate.refundedAt = nowISO;
+        fsUpdate.refundAmount = txData.amount;
+        fsUpdate.refundAsset = txData.type === 'swap' ? (txData.fromAsset || txData.asset) : txData.asset;
+      } else if (isApprove) {
+        fsUpdate.isRefunded = false;
+        fsUpdate.completedAt = nowISO;
       }
-    } catch {}
+      await setDoc(doc(db, 'transactions', txId), fsUpdate, { merge: true });
+      await setDoc(doc(db, 'swaps', txId), fsUpdate, { merge: true });
+      await setDoc(doc(db, 'withdrawals', txId), fsUpdate, { merge: true });
+    } catch (e) {
+      console.warn('Firestore status update note:', e);
+    }
 
     // 3. Mutate local storage cached transactions in place (no duplicates)
     try {
@@ -1513,88 +1564,19 @@ export const api = {
         const idx = cachedTxs.findIndex((t) => t.id === txId);
         if (idx !== -1) {
           cachedTxs[idx].status = canonicalStatus;
+          if (isDecline) {
+            cachedTxs[idx].isRefunded = true;
+            cachedTxs[idx].refundedAt = nowISO;
+          }
           localStorage.setItem('netbybit_user_transactions', JSON.stringify(cachedTxs));
         }
       }
     } catch {}
 
-    // 4. Handle balance updates for approvals and automatic refunds on cancellation
-    if (isApprove && txData.userId && txData.amount > 0) {
-      try {
-        if (txData.type === 'deposit' || txData.type === 'receive') {
-          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add', false);
-        } else if (txData.type === 'swap') {
-          // Credit converted target crypto
-          const targetAsset = (txData.toAsset || 'USDT_TRC20') as SupportedAsset;
-          const creditAmt = (txData as any).usdtEquivalent || txData.amount;
-          await api.updateUserBalance(txData.userId, targetAsset, creditAmt, 'add', false);
-        }
-      } catch (e) {
-        console.warn('Balance update on approval warning:', e);
-      }
-    }
+    const actionLabel = isApprove ? 'Approved' : 'Declined / Cancelled';
+    const statusLabel = isApprove ? 'Successful' : 'Cancelled';
 
-    // Cancellation / Decline: Automatically refund full held funds back to user's crypto balance
-    if (isDecline && txData.userId && txData.amount > 0) {
-      try {
-        if (txData.type === 'withdraw' || txData.type === 'send') {
-          // Exact withdrawal / send amount refunded to user's active crypto balance
-          await api.updateUserBalance(txData.userId, txData.asset, txData.amount, 'add', false);
-          const cachedStr = localStorage.getItem('netbybit_cached_user');
-          if (cachedStr) {
-            const cUser = JSON.parse(cachedStr);
-            if (cUser.id === txData.userId || cUser.email === txData.userEmail) {
-              cUser.balances[txData.asset] = (cUser.balances[txData.asset] || 0) + txData.amount;
-              localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
-            }
-          }
-        } else if (txData.type === 'swap') {
-          // Full original source asset returned to user's crypto balance
-          const sourceAsset = (txData.fromAsset || txData.asset) as SupportedAsset;
-          await api.updateUserBalance(txData.userId, sourceAsset, txData.amount, 'add', false);
-          const cachedStr = localStorage.getItem('netbybit_cached_user');
-          if (cachedStr) {
-            const cUser = JSON.parse(cachedStr);
-            if (cUser.id === txData.userId || cUser.email === txData.userEmail) {
-              cUser.balances[sourceAsset] = (cUser.balances[sourceAsset] || 0) + txData.amount;
-              localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Refund on decline warning:', e);
-      }
-    }
-
-    // Create In-App Notification
-    const notifMsg = (txData.type === 'withdraw' || txData.type === 'send')
-      ? (isApprove
-          ? `Your ${txData.type === 'send' ? 'send' : 'withdrawal'} request of ${txData.amount} ${txData.asset} has been approved and dispatched successfully.`
-          : `Your ${txData.type === 'send' ? 'send' : 'withdrawal'} request of ${txData.amount} ${txData.asset} was cancelled/declined. The exact amount of ${txData.amount} ${txData.asset} has been automatically refunded to your active balance.`)
-      : txData.type === 'swap'
-      ? (isApprove
-          ? `Your crypto swap from ${txData.amount} ${txData.fromAsset || txData.asset} to ${txData.toAsset} was approved and credited.`
-          : `Your crypto swap was cancelled/declined. Your source asset balance has been refunded in full.`)
-      : `Your transaction #${txId} status has been updated to ${statusLabel}.`;
-
-    try {
-      const notif: Notification = {
-        id: 'notif_' + Date.now(),
-        userId: txData.userId,
-        title: (txData.type === 'withdraw' || txData.type === 'send')
-          ? `${txData.type === 'send' ? 'Send' : 'Withdrawal'} ${actionLabel}`
-          : txData.type === 'swap'
-          ? `Swap ${actionLabel}`
-          : `Transaction ${actionLabel}`,
-        message: notifMsg,
-        type: isApprove ? 'security' : 'system',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-      };
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch {}
-
-    const auditEntry: AuditLogEntry = {
+    const auditEntry: AuditLogEntry = serverResult?.auditEntry || {
       id: 'aud_' + Date.now(),
       adminEmail: 'help.netbybit@hotmail.com',
       userEmail: txData.userEmail || txData.userId,
@@ -1602,7 +1584,7 @@ export const api = {
       asset: txData.asset,
       amount: txData.amount,
       newBalance: 0,
-      date: new Date().toISOString(),
+      date: nowISO,
       action: (txData.type === 'withdraw' || txData.type === 'send')
         ? `${txData.type === 'send' ? 'Send' : 'Withdrawal'} ${actionLabel}`
         : txData.type === 'swap'
@@ -1615,13 +1597,15 @@ export const api = {
       await setDoc(doc(db, 'audit_logs', auditEntry.id), auditEntry);
     } catch {}
 
-    const emailNotification: EmailNotificationPreview = {
+    const emailNotification: EmailNotificationPreview = serverResult?.emailNotification || {
       to: txData.userEmail || 'user@example.com',
       subject: (txData.type === 'withdraw' || txData.type === 'send')
         ? `NETBYBIT - ${txData.type === 'send' ? 'Send' : 'Withdrawal'} Request ${actionLabel} (${txData.amount} ${txData.asset})`
         : `Transaction ${actionLabel}`,
-      body: notifMsg,
-      sentAt: new Date().toISOString(),
+      body: isDecline
+        ? `Your transaction #${txId} was cancelled. Exact ${txData.amount} ${txData.asset} was returned to your balance.`
+        : `Your transaction #${txId} was approved and processed successfully.`,
+      sentAt: nowISO,
     };
 
     return {
@@ -1629,7 +1613,7 @@ export const api = {
       transaction: txData,
       auditEntry,
       emailNotification,
-      message: `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'send' ? 'Send' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline && (txData.type === 'withdraw' || txData.type === 'send') ? ' Funds refunded to user balance.' : ''}`,
+      message: serverResult?.message || `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'send' ? 'Send' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline ? ' Reserved crypto was returned to user balance.' : ''}`,
     };
   },
 

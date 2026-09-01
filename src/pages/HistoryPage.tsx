@@ -225,18 +225,25 @@ export const HistoryPage: React.FC = () => {
                           const isPending = tx.status === 'pending' || (tx.status as string) === 'processing';
 
                           return (
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 ${
-                                isCompleted
-                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                  : isPending
-                                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
-                                  : 'bg-red-500/15 text-red-400 border border-red-500/30'
-                              }`}
-                            >
-                              {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
-                              <span>{isPending ? 'Pending' : isCompleted ? 'Successful' : 'Cancelled'}</span>
-                            </span>
+                            <div className="flex flex-col space-y-1 items-start">
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 ${
+                                  isCompleted
+                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                    : isPending
+                                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
+                                    : 'bg-red-500/15 text-red-400 border border-red-500/30'
+                                }`}
+                              >
+                                {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
+                                <span>{isPending ? 'Pending' : isCompleted ? 'Successful' : 'Cancelled'}</span>
+                              </span>
+                              {!isPending && !isCompleted && (
+                                <span className="inline-flex items-center space-x-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                  <span>✓ Refunded</span>
+                                </span>
+                              )}
+                            </div>
                           );
                         })()}
                       </td>

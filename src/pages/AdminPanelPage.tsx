@@ -73,6 +73,15 @@ export const AdminPanelPage: React.FC = () => {
     emailNotification?: EmailNotificationPreview;
   } | null>(null);
 
+  // --- Strict Action Confirmation Modal ---
+  const [confirmActionModal, setConfirmActionModal] = useState<{
+    isOpen: boolean;
+    type: 'approve' | 'cancel';
+    txType: 'withdrawal' | 'swap';
+    tx: any;
+    loading: boolean;
+  } | null>(null);
+
   // --- Swap Approvals State ---
   const [firestoreSwaps, setFirestoreSwaps] = useState<any[]>([]);
   const [swapFilter, setSwapFilter] = useState<'pending' | 'completed' | 'failed' | 'all'>('pending');
@@ -531,28 +540,80 @@ export const AdminPanelPage: React.FC = () => {
     }
   };
 
+  const openConfirmModal = (tx: any, type: 'approve' | 'cancel', txType: 'withdrawal' | 'swap') => {
+    setConfirmActionModal({
+      isOpen: true,
+      type,
+      txType,
+      tx,
+      loading: false,
+    });
+  };
+
+  const executeConfirmedStatusChange = async () => {
+    if (!confirmActionModal || !confirmActionModal.tx) return;
+    const { tx, type, txType } = confirmActionModal;
+    const canonicalStatus = type === 'approve' ? 'completed' : 'cancelled';
+
+    setConfirmActionModal((prev) => (prev ? { ...prev, loading: true } : null));
+
+    try {
+      if (txType === 'withdrawal') {
+        await handleWithdrawalStatus(tx.id, canonicalStatus);
+      } else {
+        await handleSwapStatus(tx.id, canonicalStatus);
+      }
+      setConfirmActionModal(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update transaction status');
+      setConfirmActionModal((prev) => (prev ? { ...prev, loading: false } : null));
+    }
+  };
+
   const handleWithdrawalStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled') => {
     try {
       const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
 
       // 1. Instantly update Firestore documents
       try {
-        await updateDoc(doc(db, 'transactions', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() });
+        await updateDoc(doc(db, 'transactions', txId), {
+          status: canonicalStatus,
+          isRefunded: canonicalStatus === 'cancelled',
+          updatedAt: new Date().toISOString(),
+        });
       } catch {
-        await setDoc(doc(db, 'transactions', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'transactions', txId), {
+          status: canonicalStatus,
+          isRefunded: canonicalStatus === 'cancelled',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
       }
       try {
-        await updateDoc(doc(db, 'withdrawals', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() });
+        await updateDoc(doc(db, 'withdrawals', txId), {
+          status: canonicalStatus,
+          isRefunded: canonicalStatus === 'cancelled',
+          updatedAt: new Date().toISOString(),
+        });
       } catch {
-        await setDoc(doc(db, 'withdrawals', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'withdrawals', txId), {
+          status: canonicalStatus,
+          isRefunded: canonicalStatus === 'cancelled',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
       }
 
-      // 2. Optimistic UI update in place (no duplicate rows)
-      setAllTxs((prev) => prev.map((t) => (t.id === txId ? { ...t, status: canonicalStatus } : t)));
+      // 2. Optimistic UI update in place
+      setAllTxs((prev) =>
+        prev.map((t) =>
+          t.id === txId
+            ? { ...t, status: canonicalStatus, isRefunded: canonicalStatus === 'cancelled' }
+            : t
+        )
+      );
 
       const res = await api.updateTransactionStatus(txId, canonicalStatus);
       setWithdrawalModal({
-        message: res.message || `Withdrawal request successfully ${canonicalStatus === 'completed' ? 'approved' : 'declined / cancelled'}`,
+        message: res.message || `Withdrawal request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled & refunded'}`,
         auditEntry: (res as any).auditEntry,
         emailNotification: (res as any).emailNotification,
       });
@@ -561,6 +622,7 @@ export const AdminPanelPage: React.FC = () => {
       await loadAllUsers();
     } catch (err: any) {
       alert(err.message || 'Failed to update withdrawal status');
+      throw err;
     }
   };
 
@@ -581,6 +643,7 @@ export const AdminPanelPage: React.FC = () => {
         status: tx.status,
         date: tx.date,
         type: 'swap',
+        isRefunded: tx.isRefunded,
       });
     });
 
@@ -599,6 +662,7 @@ export const AdminPanelPage: React.FC = () => {
           usdtEquivalent: fsSwap.usdtEquivalent ?? existing.usdtEquivalent ?? 0,
           status: fsSwap.status || existing.status || 'pending',
           date: fsSwap.timestamp || fsSwap.date || existing.date || new Date().toISOString(),
+          isRefunded: fsSwap.isRefunded ?? existing.isRefunded,
         });
       }
     });
@@ -616,18 +680,29 @@ export const AdminPanelPage: React.FC = () => {
       try {
         await updateDoc(doc(db, 'swaps', txId), {
           status: canonicalStatus,
+          isRefunded: canonicalStatus === 'cancelled',
           updatedAt: new Date().toISOString(),
         });
       } catch (fsErr) {
-        await setDoc(doc(db, 'swaps', txId), { status: canonicalStatus, updatedAt: new Date().toISOString() }, { merge: true });
+        await setDoc(doc(db, 'swaps', txId), {
+          status: canonicalStatus,
+          isRefunded: canonicalStatus === 'cancelled',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
       }
 
       // Optimistic in place update
-      setAllTxs((prev) => prev.map((t) => (t.id === txId ? { ...t, status: canonicalStatus } : t)));
+      setAllTxs((prev) =>
+        prev.map((t) =>
+          t.id === txId
+            ? { ...t, status: canonicalStatus, isRefunded: canonicalStatus === 'cancelled' }
+            : t
+        )
+      );
 
       const res = await api.updateTransactionStatus(txId, canonicalStatus);
       setSwapModal({
-        message: res.message || `Swap request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled/declined'}`,
+        message: res.message || `Swap request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled & refunded'}`,
         auditEntry: (res as any).auditEntry,
         emailNotification: (res as any).emailNotification,
       });
@@ -636,6 +711,7 @@ export const AdminPanelPage: React.FC = () => {
       await loadAllUsers();
     } catch (err: any) {
       alert(err.message || 'Failed to update swap status');
+      throw err;
     }
   };
 
@@ -1644,6 +1720,118 @@ export const AdminPanelPage: React.FC = () => {
             </div>
           )}
 
+          {/* Action Confirmation Modal */}
+          {confirmActionModal && confirmActionModal.isOpen && (
+            <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-fadeIn">
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                      confirmActionModal.type === 'approve'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    }`}
+                  >
+                    {confirmActionModal.type === 'approve' ? (
+                      <Check className="w-5 h-5 stroke-[2.5]" />
+                    ) : (
+                      <X className="w-5 h-5 stroke-[2.5]" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-100">
+                      {confirmActionModal.type === 'approve'
+                        ? `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Swap'} Approval`
+                        : `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Swap'} Cancellation`}
+                    </h3>
+                    <p className="text-xs text-neutral-400 font-mono">
+                      Transaction #{confirmActionModal.tx.id}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">User:</span>
+                    <span className="text-neutral-200 font-semibold">{confirmActionModal.tx.userEmail || confirmActionModal.tx.userId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Amount & Asset:</span>
+                    <span className="text-amber-400 font-mono font-bold">
+                      {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
+                    </span>
+                  </div>
+                  {confirmActionModal.tx.destinationAddress && (
+                    <div className="flex justify-between">
+                      <span className="text-neutral-500">Destination:</span>
+                      <span className="text-neutral-300 font-mono truncate max-w-[180px]" title={confirmActionModal.tx.destinationAddress}>
+                        {confirmActionModal.tx.destinationAddress}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                    confirmActionModal.type === 'approve'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : 'bg-red-500/10 border-red-500/30 text-red-300'
+                  }`}
+                >
+                  {confirmActionModal.type === 'approve' ? (
+                    <p>
+                      <strong>Financial Effect:</strong> This will mark the transaction as <strong>Successful</strong> and finalize dispatch. The reserved crypto will not be refunded.
+                    </p>
+                  ) : (
+                    <p>
+                      <strong>Financial Effect:</strong> The exact reserved amount of{' '}
+                      <strong>
+                        {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
+                      </strong>{' '}
+                      will be <strong>automatically released and returned</strong> to the user's available balance immediately.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    disabled={confirmActionModal.loading}
+                    onClick={() => setConfirmActionModal(null)}
+                    className="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all disabled:opacity-50"
+                  >
+                    Keep Pending
+                  </button>
+                  <button
+                    disabled={confirmActionModal.loading}
+                    onClick={executeConfirmedStatusChange}
+                    className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-lg ${
+                      confirmActionModal.type === 'approve'
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-emerald-500/20'
+                        : 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/20'
+                    } disabled:opacity-50`}
+                  >
+                    {confirmActionModal.loading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : confirmActionModal.type === 'approve' ? (
+                      <>
+                        <Check className="w-4 h-4 stroke-[3]" />
+                        <span>Approve Payout</span>
+                      </>
+                    ) : (
+                      <>
+                        <X className="w-4 h-4 stroke-[3]" />
+                        <span>Cancel & Refund</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Filter Bar */}
           <div className="flex flex-wrap gap-2 justify-between items-center bg-neutral-900 p-4 border border-neutral-800 rounded-2xl">
             <div className="flex space-x-2 overflow-x-auto">
@@ -1760,7 +1948,7 @@ export const AdminPanelPage: React.FC = () => {
                           </td>
                           <td className="py-3.5 px-4 font-sans">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 border ${
                                 isPendingTx
                                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
                                   : isCompletedTx
@@ -1768,29 +1956,38 @@ export const AdminPanelPage: React.FC = () => {
                                   : 'bg-red-500/10 text-red-400 border-red-500/30'
                               }`}
                             >
-                              {isPendingTx ? 'Pending Approval' : isCompletedTx ? 'Successful' : 'Declined'}
+                              {isPendingTx && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
+                              <span>
+                                {isPendingTx
+                                  ? 'Pending Approval'
+                                  : isCompletedTx
+                                  ? 'Successful'
+                                  : 'Cancelled & Refunded'}
+                              </span>
                             </span>
                           </td>
                           <td className="py-3.5 px-4 font-sans">
                             {isPendingTx ? (
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => handleWithdrawalStatus(tx.id, 'completed')}
+                                  onClick={() => openConfirmModal(tx, 'approve', 'withdrawal')}
                                   className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1"
                                 >
                                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                                   <span>Approve</span>
                                 </button>
                                 <button
-                                  onClick={() => handleWithdrawalStatus(tx.id, 'failed')}
+                                  onClick={() => openConfirmModal(tx, 'cancel', 'withdrawal')}
                                   className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs transition-all flex items-center space-x-1"
                                 >
                                   <X className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>Decline</span>
+                                  <span>Cancel / Decline</span>
                                 </button>
                               </div>
                             ) : (
-                              <span className="text-[11px] text-neutral-500 font-mono">Reviewed</span>
+                              <span className="text-[11px] text-neutral-500 font-mono">
+                                {isCompletedTx ? 'Processed & Sent' : 'Refunded to Balance'}
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -1947,7 +2144,7 @@ export const AdminPanelPage: React.FC = () => {
                           </td>
                           <td className="py-3.5 px-4 font-sans">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 border ${
                                 tx.status === 'pending'
                                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
                                   : tx.status === 'completed'
@@ -1955,29 +2152,38 @@ export const AdminPanelPage: React.FC = () => {
                                   : 'bg-red-500/10 text-red-400 border-red-500/30'
                               }`}
                             >
-                              {tx.status === 'pending' ? 'Pending Approval' : tx.status === 'completed' ? 'Successful' : 'Cancelled'}
+                              {tx.status === 'pending' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
+                              <span>
+                                {tx.status === 'pending'
+                                  ? 'Pending Approval'
+                                  : tx.status === 'completed'
+                                  ? 'Successful'
+                                  : 'Cancelled & Refunded'}
+                              </span>
                             </span>
                           </td>
                           <td className="py-3.5 px-4 font-sans">
                             {tx.status === 'pending' ? (
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => handleSwapStatus(tx.id, 'completed')}
+                                  onClick={() => openConfirmModal(tx, 'approve', 'swap')}
                                   className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1"
                                 >
                                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                                   <span>Approve</span>
                                 </button>
                                 <button
-                                  onClick={() => handleSwapStatus(tx.id, 'failed')}
+                                  onClick={() => openConfirmModal(tx, 'cancel', 'swap')}
                                   className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs transition-all flex items-center space-x-1"
                                 >
                                   <X className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>Cancel</span>
+                                  <span>Cancel / Refund</span>
                                 </button>
                               </div>
                             ) : (
-                              <span className="text-[11px] text-neutral-500 font-mono">Reviewed</span>
+                              <span className="text-[11px] text-neutral-500 font-mono">
+                                {tx.status === 'completed' ? 'Swapped & Credited' : 'Refunded to Balance'}
+                              </span>
                             )}
                           </td>
                         </tr>

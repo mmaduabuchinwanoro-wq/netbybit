@@ -232,10 +232,15 @@ export const TransactionHistoryPage: React.FC = () => {
                             <span>Successful</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">
-                            <XCircle className="w-3 h-3 text-red-400" />
-                            <span>Cancelled</span>
-                          </span>
+                          <div className="flex flex-col space-y-1 items-start">
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">
+                              <XCircle className="w-3 h-3 text-red-400" />
+                              <span>Cancelled</span>
+                            </span>
+                            <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                              <span>✓ Refunded</span>
+                            </span>
+                          </div>
                         )}
                       </td>
                       <td className="py-4 px-4 text-neutral-400 text-[11px] font-mono">
