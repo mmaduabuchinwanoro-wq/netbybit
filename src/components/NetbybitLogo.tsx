@@ -42,45 +42,19 @@ export const NetbybitLogo: React.FC<NetbybitLogoProps> = ({
 
   return (
     <div className={`inline-flex items-center space-x-3 select-none ${className}`}>
-      {/* 3D Geometric Hexagon Gold Vault Logo Icon */}
+      {/* Netbybit Official Logo Image */}
       <div className={`relative ${iconDimensions} shrink-0`}>
-        <div className="absolute inset-0 bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-300 rounded-xl blur-sm opacity-60 animate-pulse" />
-        <div className="relative w-full h-full rounded-xl bg-gradient-to-tr from-neutral-950 via-neutral-900 to-neutral-950 p-[1.5px] border border-amber-500/40 shadow-xl">
-          <div className="w-full h-full rounded-[10.5px] bg-neutral-950 flex items-center justify-center overflow-hidden">
-            <svg viewBox="0 0 100 100" className="w-4/5 h-4/5">
-              <defs>
-                <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#F59E0B" />
-                  <stop offset="50%" stopColor="#FBBF24" />
-                  <stop offset="100%" stopColor="#D97706" />
-                </linearGradient>
-                <linearGradient id="darkGoldGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#78350F" />
-                  <stop offset="100%" stopColor="#F59E0B" />
-                </linearGradient>
-              </defs>
-
-              {/* Hexagonal Outer Frame */}
-              <polygon
-                points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5"
-                fill="none"
-                stroke="url(#goldGrad)"
-                strokeWidth="7"
-                strokeLinejoin="round"
-              />
-
-              {/* Styled N & Vault Geometric Struts */}
-              <path
-                d="M 30 70 L 30 30 L 70 70 L 70 30"
-                fill="none"
-                stroke="url(#goldGrad)"
-                strokeWidth="10"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="50" cy="50" r="6" fill="#FEF3C7" />
-            </svg>
-          </div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-300 rounded-xl blur-sm opacity-50" />
+        <div className="relative w-full h-full rounded-xl bg-neutral-950 p-[1px] border border-amber-500/40 shadow-xl overflow-hidden flex items-center justify-center">
+          <img
+            src="/logo.png"
+            alt="NETBYBIT"
+            className="w-full h-full object-cover rounded-xl"
+            onError={(e) => {
+              // Fallback to SVG if image loading encounters an issue
+              e.currentTarget.style.display = 'none';
+            }}
+          />
         </div>
       </div>
 

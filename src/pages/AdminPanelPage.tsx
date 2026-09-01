@@ -507,7 +507,7 @@ export const AdminPanelPage: React.FC = () => {
     } else if (presetKey === 'security') {
       setComposeSubject('NETBYBIT Security Alert - Password Changed Successfully');
       setComposeCategory('Security Alert');
-      setComposeBody(`Your NETBYBIT account password was updated successfully.\n\nDate: ${new Date().toLocaleString()}\nSender: netbybitsupport@gmail.com\n\nIf you did not make this change, please contact customer support immediately at netbybitsupport@gmail.com.`);
+      setComposeBody(`Your NETBYBIT account password was updated successfully.\n\nDate: ${new Date().toLocaleString()}\nSender: help.netbybit@hotmail.com\n\nIf you did not make this change, please contact customer support immediately at help.netbybit@hotmail.com.`);
       setComposeActionText('Security Settings');
       setComposeActionUrl(`${origin}/settings`);
     } else if (presetKey === 'announcement') {
@@ -2794,7 +2794,7 @@ export const AdminPanelPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-neutral-400 mt-1">
-                Dispatches automated notifications & custom emails. Sender: <span className="text-amber-300 font-mono">netbybitsupport@gmail.com</span>
+                Dispatches automated notifications & custom emails. Sender: <span className="text-amber-300 font-mono">help.netbybit@hotmail.com</span>
               </p>
             </div>
 

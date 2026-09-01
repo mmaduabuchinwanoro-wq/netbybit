@@ -1119,7 +1119,11 @@ export const api = {
     }
 
     if (!targetUser) {
-      if (normEmail === 'netbybitsupport@gmail.com' || normEmail === DEFAULT_ADMIN_USER.email.toLowerCase()) {
+      if (
+        normEmail === 'help.netbybit@hotmail.com' ||
+        normEmail === 'netbybitsupport@gmail.com' ||
+        normEmail === DEFAULT_ADMIN_USER.email.toLowerCase()
+      ) {
         targetUser = { ...DEFAULT_ADMIN_USER };
         targetUid = targetUser.id;
       }
@@ -1194,7 +1198,7 @@ export const api = {
 
     const auditEntry: AuditLogEntry = {
       id: 'aud_' + Date.now(),
-      adminEmail: 'netbybitsupport@gmail.com',
+      adminEmail: 'help.netbybit@hotmail.com',
       userEmail: targetUser.email,
       userId: targetUid || targetUser.id,
       asset: body.asset,
@@ -1475,7 +1479,7 @@ export const api = {
 
     const auditEntry: AuditLogEntry = {
       id: 'aud_' + Date.now(),
-      adminEmail: 'netbybitsupport@gmail.com',
+      adminEmail: 'help.netbybit@hotmail.com',
       userEmail: txData.userEmail || txData.userId,
       userId: txData.userId,
       asset: txData.asset,

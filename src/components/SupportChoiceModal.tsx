@@ -31,14 +31,14 @@ export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
   if (!isOpen) return null;
 
   const handleCopyEmail = () => {
-    navigator.clipboard.writeText('netbybitsupport@gmail.com');
+    navigator.clipboard.writeText('help.netbybit@hotmail.com');
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
   const handleOpenLiveAgent = () => {
     window.location.href =
-      'mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry';
+      'mailto:help.netbybit@hotmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry';
     handleClose();
   };
 
@@ -129,7 +129,7 @@ export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
                       Open your native email client to message our dedicated live support desk directly from your inbox.
                     </p>
                     <div className="pt-1.5 flex items-center space-x-1.5 text-[11px] font-mono text-amber-400 font-bold">
-                      <span>netbybitsupport@gmail.com</span>
+                      <span>help.netbybit@hotmail.com</span>
                       <ExternalLink className="w-3 h-3 opacity-75" />
                     </div>
                   </div>
@@ -199,7 +199,7 @@ export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
               </p>
 
               <a
-                href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
+                href="mailto:help.netbybit@hotmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
                 onClick={handleClose}
                 className="w-full flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-neutral-950 font-bold transition-all shadow-lg hover:shadow-amber-500/25 group cursor-pointer"
               >
@@ -209,7 +209,7 @@ export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
                   </div>
                   <div className="text-left">
                     <div className="text-xs text-neutral-900 font-semibold">Message Live Agent</div>
-                    <div className="text-sm font-black font-mono">netbybitsupport@gmail.com</div>
+                    <div className="text-sm font-black font-mono">help.netbybit@hotmail.com</div>
                   </div>
                 </div>
 
@@ -224,7 +224,7 @@ export const SupportChoiceModal: React.FC<SupportChoiceModalProps> = ({
             <div className="flex items-center justify-between p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs">
               <div className="flex items-center space-x-2 font-mono text-neutral-300 truncate">
                 <span className="text-neutral-500">Email:</span>
-                <span className="text-amber-400 font-semibold select-all">netbybitsupport@gmail.com</span>
+                <span className="text-amber-400 font-semibold select-all">help.netbybit@hotmail.com</span>
               </div>
               <button
                 onClick={handleCopyEmail}

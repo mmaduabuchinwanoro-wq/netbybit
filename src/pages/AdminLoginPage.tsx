@@ -81,7 +81,7 @@ export const AdminLoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="netbybitsupport@gmail.com"
+                placeholder="help.netbybit@hotmail.com"
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-500"
               />
             </div>

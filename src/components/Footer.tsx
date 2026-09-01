@@ -20,7 +20,7 @@ export const Footer: React.FC = () => {
           <div className="pt-2">
             <span className="text-[11px] font-mono text-amber-300 bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 inline-flex items-center space-x-1.5 shadow-sm">
               <Globe className="w-3.5 h-3.5 text-amber-400" />
-              <span>NETBYBIT Vault Official</span>
+              <span>netbybit-crypto-wallet.vercel.app</span>
             </span>
           </div>
         </div>
@@ -91,15 +91,26 @@ export const Footer: React.FC = () => {
             </button>
             <div className="flex items-center space-x-2 text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
               <Mail className="w-4 h-4 text-amber-400 shrink-0" />
-              <a href="mailto:netbybitsupport@gmail.com" className="font-mono underline hover:text-amber-200 truncate">
-                netbybitsupport@gmail.com
+              <a href="mailto:help.netbybit@hotmail.com" className="font-mono underline hover:text-amber-200 truncate">
+                help.netbybit@hotmail.com
               </a>
+            </div>
+            <div className="text-[10px] text-neutral-500 leading-normal pt-1 font-sans">
+              <p className="font-semibold text-neutral-400">NETBYBIT SUPPORT TEAM</p>
+              <p>Institutional Crypto Custody & Client Services</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto border-t border-neutral-900 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 relative z-10">
+      {/* Confidentiality Notice & Copyright */}
+      <div className="max-w-7xl mx-auto border-t border-neutral-900/80 pt-4 pb-2 text-[10px] text-neutral-600 space-y-2 relative z-10">
+        <p>
+          <span className="font-semibold text-neutral-500">Confidentiality Notice:</span> This email and any files transmitted with it are confidential and intended solely for the use of the individual or entity to whom they are addressed.
+        </p>
+      </div>
+
+      <div className="max-w-7xl mx-auto border-t border-neutral-900 pt-4 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 relative z-10">
         <p>© 2026 NETBYBIT Custodial Technologies Inc. All rights reserved.</p>
         <div className="flex items-center space-x-4 mt-2 sm:mt-0 font-mono text-[11px]">
           <span className="text-neutral-400 font-semibold">NETBYBIT Vault v2.4</span>

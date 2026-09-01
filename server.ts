@@ -260,8 +260,8 @@ const DEFAULT_DEPOSIT_ADDRESSES = {
   USDT_TRC20: 'TYKh3ktyqwNMUYoo89UrMbdqjV3CUKWQ8M',
 };
 
-const SENDER_EMAIL = process.env.SENDER_EMAIL || 'netbybitsupport@gmail.com';
-const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'netbybitsupport@gmail.com';
+const SENDER_EMAIL = process.env.SENDER_EMAIL || 'help.netbybit@hotmail.com';
+const ADMIN_NOTIFICATION_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'help.netbybit@hotmail.com';
 
 const DEFAULT_ADMIN_PASSWORD = '51366414';
 const DEFAULT_ADMIN_HASH = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
@@ -893,9 +893,10 @@ function loadDB(): DBData {
     db.users = mergedUsers;
   }
 
-  // Ensure netbybitsupport@gmail.com is the sole administrator account
+  // Ensure help.netbybit@hotmail.com is the sole administrator account
   let adminUser = db.users.find(
     (u) =>
+      u?.email?.toLowerCase() === 'help.netbybit@hotmail.com' ||
       u?.email?.toLowerCase() === 'netbybitsupport@gmail.com' ||
       u?.username?.toLowerCase() === 'netbybit_admin'
   );
@@ -903,7 +904,7 @@ function loadDB(): DBData {
   if (!adminUser) {
     adminUser = {
       id: 'usr_admin_primary',
-      email: 'netbybitsupport@gmail.com',
+      email: 'help.netbybit@hotmail.com',
       passwordHash: DEFAULT_ADMIN_HASH,
       name: 'Netbybit Support',
       username: 'netbybit_admin',
@@ -941,8 +942,8 @@ function loadDB(): DBData {
       adminUser.status = 'active';
       dbChanged = true;
     }
-    if (adminUser.email.toLowerCase() !== 'netbybitsupport@gmail.com') {
-      adminUser.email = 'netbybitsupport@gmail.com';
+    if (adminUser.email.toLowerCase() !== 'help.netbybit@hotmail.com' && adminUser.email.toLowerCase() !== 'netbybitsupport@gmail.com') {
+      adminUser.email = 'help.netbybit@hotmail.com';
       dbChanged = true;
     }
     if (!adminUser.username) {
@@ -1080,15 +1081,20 @@ function generateHtmlEmail(options: {
       ${actionBtnHtml}
 
       <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #27272a; font-size: 12px; color: #9ca3af; line-height: 1.5;">
-        <p style="margin: 0;">If you have any questions or require support regarding your account, please contact customer support at <a href="mailto:netbybitsupport@gmail.com" style="color: #f59e0b; text-decoration: none;">netbybitsupport@gmail.com</a>.</p>
+        <p style="margin: 0;">If you have any questions or require support regarding your account, please contact customer support at <a href="mailto:help.netbybit@hotmail.com" style="color: #f59e0b; text-decoration: none;">help.netbybit@hotmail.com</a>.</p>
       </div>
     </div>
 
     <!-- Footer -->
-    <div style="background-color: #09090b; padding: 24px 32px; border-top: 1px solid #27272a; text-align: center; font-size: 11px; color: #6b7280; line-height: 1.6;">
-      <p style="margin: 0 0 6px 0; font-weight: 600; color: #9ca3af;">NETBYBIT Digital Asset Management Platform</p>
-      <p style="margin: 0 0 10px 0;">Official Site Contact & Admin Inbox: <span style="color: #d1d5db;">netbybitsupport@gmail.com</span></p>
-      <p style="margin: 0; font-size: 10px; color: #4b5563;">© 2026 NETBYBIT. All rights reserved. Encrypted SSL 256-bit Security Transport.</p>
+    <div style="background-color: #09090b; padding: 24px 32px; border-top: 1px solid #27272a; text-align: left; font-size: 11px; color: #9ca3af; line-height: 1.6;">
+      <p style="margin: 0 0 4px 0; font-weight: 700; color: #f59e0b; letter-spacing: 0.5px;">NETBYBIT SUPPORT TEAM</p>
+      <p style="margin: 0 0 6px 0; color: #e5e7eb; font-weight: 500;">Institutional Crypto Custody & Client Services</p>
+      <p style="margin: 0 0 4px 0;">Email: <a href="mailto:help.netbybit@hotmail.com" style="color: #f59e0b; text-decoration: none; font-weight: 600;">help.netbybit@hotmail.com</a></p>
+      <p style="margin: 0 0 12px 0;">Website: <a href="https://netbybit-crypto-wallet.vercel.app" style="color: #d1d5db; text-decoration: underline;">netbybit-crypto-wallet.vercel.app</a></p>
+      <div style="padding-top: 10px; border-top: 1px solid #1f1f23; font-size: 10px; color: #6b7280; line-height: 1.5;">
+        <strong style="color: #9ca3af;">Confidentiality Notice:</strong> This email and any files transmitted with it are confidential and intended solely for the use of the individual or entity to whom they are addressed.
+      </div>
+      <p style="margin: 10px 0 0 0; font-size: 9px; color: #4b5563; text-align: center;">© 2026 NETBYBIT. All rights reserved. Encrypted SSL 256-bit Security Transport.</p>
     </div>
 
   </div>
@@ -1261,7 +1267,7 @@ function authMiddleware(req: any, res: any, next: any) {
   if (token === 'fb_admin_token' || token.startsWith('fb_admin_token_')) {
     req.user = {
       id: 'usr_admin_primary',
-      email: 'netbybitsupport@gmail.com',
+      email: 'help.netbybit@hotmail.com',
       role: 'admin',
       name: 'Netbybit Support',
     };
@@ -1319,7 +1325,10 @@ function authMiddleware(req: any, res: any, next: any) {
         const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
         if (payload && (payload.user_id || payload.sub || payload.email)) {
           const email = payload.email || 'user@example.com';
-          const isAdmin = email.toLowerCase() === 'netbybitsupport@gmail.com' || payload.role === 'admin';
+          const isAdmin =
+            email.toLowerCase() === 'help.netbybit@hotmail.com' ||
+            email.toLowerCase() === 'netbybitsupport@gmail.com' ||
+            payload.role === 'admin';
           req.user = {
             id: payload.user_id || payload.sub || ('usr_' + Date.now()),
             email: email,
@@ -1559,19 +1568,19 @@ app.post('/api/auth/register', async (req, res) => {
 
 Welcome to NETBYBIT! Your new trading account has been successfully registered.
 
-Sender Email: netbybitsupport@gmail.com
+Sender Email: help.netbybit@hotmail.com
 Account Email: ${newUser.email}
 
 Please verify your email address to enable all deposit and withdrawal permissions.
 Your Email Security Verification Code is: ${verificationCode}
 
-If you did not create an account on NETBYBIT, please contact customer support immediately.
+If you did not create an account on NETBYBIT, please contact customer support immediately at help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support Team`,
     });
 
-    // Send Admin Email Notification to netbybitsupport@gmail.com
+    // Send Admin Email Notification
     const adminRegEmail = sendEmailNotification(db, {
       to: ADMIN_NOTIFICATION_EMAIL,
       subject: `Admin Notification: New User Registration (${newUser.email})`,
@@ -1688,7 +1697,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Admin master password check fallback
-    if (!isMatch && (user.role === 'admin' || user.email.toLowerCase() === 'netbybitsupport@gmail.com' || user.username?.toLowerCase() === 'netbybit_admin' || user.username?.toLowerCase() === 'admin')) {
+    if (
+      !isMatch &&
+      (user.role === 'admin' ||
+        user.email.toLowerCase() === 'help.netbybit@hotmail.com' ||
+        user.email.toLowerCase() === 'netbybitsupport@gmail.com' ||
+        user.username?.toLowerCase() === 'netbybit_admin' ||
+        user.username?.toLowerCase() === 'admin')
+    ) {
       if (
         password === '51366414' ||
         password === '51366414#' ||
@@ -1733,7 +1749,7 @@ Account Email: ${user.email}
 Login Date & Time: ${new Date().toLocaleString()}
 Sender Address: ${SENDER_EMAIL}
 
-If this was you, no further action is required. If you did not initiate this login, please reset your password immediately and contact netbybitsupport@gmail.com.
+If this was you, no further action is required. If you did not initiate this login, please reset your password immediately and contact help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support Team`,
@@ -1972,7 +1988,7 @@ Account Email: ${user.email}
 Login Date & Time: ${new Date().toLocaleString()}
 Sender Address: ${SENDER_EMAIL}
 
-If this was you, no further action is required. If you did not initiate this login, please reset your password immediately and contact netbybitsupport@gmail.com.
+If this was you, no further action is required. If you did not initiate this login, please reset your password immediately and contact help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support Team`,
@@ -2024,9 +2040,9 @@ ${otpCode}
 
 This code is valid for 5 minutes.
 
-Sender Address: netbybitsupport@gmail.com
+Sender Address: ${SENDER_EMAIL}
 
-If you did not initiate this login request, please reset your password immediately or contact our support team at netbybitsupport@gmail.com.
+If you did not initiate this login request, please reset your password immediately or contact our support team at help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support Team`,
@@ -2156,7 +2172,7 @@ A request to reset your NETBYBIT account password was received.
 Password Reset Security Code: ${resetCode}
 Sender: ${SENDER_EMAIL}
 
-If you requested this password reset, please enter the code in your app. If you did not request this, please contact netbybitsupport@gmail.com immediately.
+If you requested this password reset, please enter the code in your app. If you did not request this, please contact help.netbybit@hotmail.com immediately.
 
 Thank you,
 NETBYBIT Support`,
@@ -2230,7 +2246,7 @@ Account Email: ${user.email}
 Date & Time: ${new Date().toLocaleString()}
 Sender: ${SENDER_EMAIL}
 
-If you did not perform this change, please contact netbybitsupport@gmail.com immediately.
+If you did not perform this change, please contact help.netbybit@hotmail.com immediately.
 
 Thank you,
 NETBYBIT Support`,
@@ -2390,9 +2406,9 @@ Thank you,
 NETBYBIT Support`,
   });
 
-  // Send Admin Notification Email to netbybitsupport@gmail.com
+  // Send Admin Notification Email to ADMIN_NOTIFICATION_EMAIL
   const walletAdminEmail = sendEmailNotification(db, {
-    to: 'netbybitsupport@gmail.com',
+    to: ADMIN_NOTIFICATION_EMAIL,
     subject: `Site Owner Alert: Wallet Connection Completed - ${user.email}`,
     category: 'Admin Alert',
     isAdminAlert: true,
@@ -2410,7 +2426,7 @@ Linked Wallet Information:
 - Provider / Protocol: ${provider || 'Web3 Wallet'}
 - Connection Date & Time: ${new Date().toLocaleString()}
 
-Status: This wallet connection event is logged in the netbybitsupport@gmail.com site owner inbox.
+Status: This wallet connection event is logged in the ${ADMIN_NOTIFICATION_EMAIL} site owner inbox.
 
 NETBYBIT Automated Security System`,
   });
@@ -2629,7 +2645,7 @@ Thank you,
 NETBYBIT Support`,
     });
 
-    // Admin Notification Email to netbybitsupport@gmail.com
+    // Admin Notification Email to ADMIN_NOTIFICATION_EMAIL
     sendEmailNotification(db, {
       to: ADMIN_NOTIFICATION_EMAIL,
       subject: `Admin Alert: New Withdrawal Request Submitted (${user.email})`,
@@ -2774,9 +2790,9 @@ Thank you,
 NETBYBIT Support`,
   });
 
-  // Send Admin Notification Email to netbybitsupport@gmail.com
+  // Send Admin Notification Email
   const adminTicketEmail = sendEmailNotification(db, {
-    to: 'netbybitsupport@gmail.com',
+    to: ADMIN_NOTIFICATION_EMAIL,
     subject: `Support Alert: New Support Chat Started by ${req.user.email} (#${newTicket.id}) [Language: ${detectedLang}]`,
     category: 'Admin Alert',
     isAdminAlert: true,
@@ -2867,9 +2883,9 @@ app.post('/api/support/tickets/:ticketId/reply', authMiddleware, async (req: any
   }
 
   if (isUserSender) {
-    // Dispatch Email Alert to netbybitsupport@gmail.com
+    // Dispatch Email Alert to ADMIN_NOTIFICATION_EMAIL
     sendEmailNotification(db, {
-      to: 'netbybitsupport@gmail.com',
+      to: ADMIN_NOTIFICATION_EMAIL,
       subject: `Support Alert: New Message from User ${ticket.userEmail} (#${ticket.id})`,
       category: 'Support Inquiry',
       isAdminAlert: true,
@@ -2900,7 +2916,7 @@ The NETBYBIT Customer Support Team has replied to your ticket #${ticket.id} ("${
 
 "${userMessageBody}"
 
-Sender Address: netbybitsupport@gmail.com
+Sender Address: ${SENDER_EMAIL}
 
 You can view full conversation history in your account dashboard.
 
@@ -2996,7 +3012,7 @@ NETBYBIT Support Team`,
 
   // Send Admin Notification Alert
   sendEmailNotification(db, {
-    to: 'netbybitsupport@gmail.com',
+    to: ADMIN_NOTIFICATION_EMAIL,
     subject: `Support Alert: New Guest Support Chat Started by ${guestEmail} (#${newTicket.id}) [Language: ${detectedLang}]`,
     category: 'Admin Alert',
     isAdminAlert: true,
@@ -3090,7 +3106,7 @@ app.post('/api/support/guest/tickets/:ticketId/reply', async (req, res) => {
 
   // Send Admin Alert Email
   sendEmailNotification(db, {
-    to: 'netbybitsupport@gmail.com',
+    to: ADMIN_NOTIFICATION_EMAIL,
     subject: `Support Alert: New Guest Message from ${ticket.userEmail} (#${ticket.id})`,
     category: 'Guest Support Reply',
     isAdminAlert: true,
@@ -3470,7 +3486,7 @@ Your NETBYBIT account balance has been updated.
 ${reason && reason.trim() ? `• Reason / Note: ${reason.trim()}\n` : ''}
 Your updated wallet balance is reflected in your dashboard immediately.
 
-If you have any questions regarding this balance adjustment, please contact customer support at netbybitsupport@gmail.com.
+If you have any questions regarding this balance adjustment, please contact customer support at help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support`;
@@ -3666,7 +3682,7 @@ app.delete('/api/admin/email-logs/:emailId', adminMiddleware, (req: any, res) =>
 // Admin: Test SMTP Transport Connection
 app.post('/api/admin/email/test-smtp', adminMiddleware, async (req: any, res) => {
   const db = loadDB();
-  const testEmail = SENDER_EMAIL || 'netbybitsupport@gmail.com';
+  const testEmail = SENDER_EMAIL || 'help.netbybit@hotmail.com';
 
   const record = sendEmailNotification(db, {
     to: testEmail,
@@ -3861,7 +3877,7 @@ Status: Declined / Cancelled
 
 The full source asset amount has been returned to your account balance.
 
-If you have any questions or need assistance, please contact our support team at netbybitsupport@gmail.com.
+If you have any questions or need assistance, please contact our support team at help.netbybit@hotmail.com.
 
 Thank you,
 
@@ -3875,7 +3891,7 @@ Transaction ID: ${tx.id}
 Date & Time: ${new Date(nowISO).toLocaleString()}
 Final Status: Successful
 
-If you have questions, please contact customer support at netbybitsupport@gmail.com.
+If you have questions, please contact customer support at help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support Team`;
@@ -3894,7 +3910,7 @@ Status: Declined
 
 The full requested amount has been returned to your account balance.
 
-If you have any questions or need assistance, please contact our support team at netbybitsupport@gmail.com.
+If you have any questions or need assistance, please contact our support team at help.netbybit@hotmail.com.
 
 Thank you,
 
@@ -3908,7 +3924,7 @@ Transaction ID: ${tx.id}
 Date & Time: ${new Date(nowISO).toLocaleString()}
 Final Status: Successful
 
-If you have questions, please contact customer support at netbybitsupport@gmail.com.
+If you have questions, please contact customer support at help.netbybit@hotmail.com.
 
 Thank you,
 NETBYBIT Support Team`;

@@ -88,7 +88,7 @@ export const CustomerSupportPage: React.FC = () => {
   const [copiedMap, setCopiedMap] = useState<{ [id: string]: boolean }>({});
 
   const handleCopyEmail = (key: string) => {
-    navigator.clipboard.writeText('netbybitsupport@gmail.com');
+    navigator.clipboard.writeText('help.netbybit@hotmail.com');
     setCopiedMap((prev) => ({ ...prev, [key]: true }));
     setTimeout(() => {
       setCopiedMap((prev) => ({ ...prev, [key]: false }));
@@ -471,7 +471,7 @@ export const CustomerSupportPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-neutral-400 mt-0.5 flex items-center space-x-2">
-                <span>Official Concierge Email: <strong className="text-amber-300 font-mono">netbybitsupport@gmail.com</strong></span>
+                <span>Support Concierge Email: <strong className="text-amber-300 font-mono">help.netbybit@hotmail.com</strong></span>
               </p>
             </div>
           </div>
@@ -632,9 +632,9 @@ export const CustomerSupportPage: React.FC = () => {
                       <p className="text-[11px] text-neutral-400 flex items-center space-x-2">
                         <span>NETBYBIT Support Desk</span>
                         <span>•</span>
-                        <span className="text-emerald-400 font-medium">Official Agent Online</span>
+                        <span className="text-emerald-400 font-medium">Verified Agent Online</span>
                         <span>•</span>
-                        <span className="font-mono text-neutral-500">netbybitsupport@gmail.com</span>
+                        <span className="font-mono text-neutral-500">help.netbybit@hotmail.com</span>
                       </p>
                     </div>
                   </div>
@@ -682,7 +682,7 @@ export const CustomerSupportPage: React.FC = () => {
                 <div className="bg-amber-500/5 border-b border-amber-500/10 px-4 py-2 text-[11px] text-amber-300/80 flex items-center justify-between font-mono">
                   <div className="flex items-center space-x-1.5">
                     <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>Private Support Room • All updates dispatched to netbybitsupport@gmail.com</span>
+                    <span>Private Support Room • All updates dispatched to help.netbybit@hotmail.com</span>
                   </div>
                   <span className="text-[10px] text-neutral-500">Category: {currentTicket.category}</span>
                 </div>
@@ -739,7 +739,7 @@ export const CustomerSupportPage: React.FC = () => {
                             <div className="flex items-center space-x-1.5 mb-1 pl-1">
                               <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
                               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
-                                OFFICIAL
+                                SUPPORT
                               </span>
                             </div>
 
@@ -750,11 +750,11 @@ export const CustomerSupportPage: React.FC = () => {
                               {isAutoOffline && (
                                 <div className="pt-2 mt-1 border-t border-amber-500/20 flex flex-col space-y-2 bg-amber-500/10 -mx-1.5 p-2.5 rounded-xl border border-amber-500/30">
                                   <div className="text-[10px] text-neutral-300 font-mono font-medium">
-                                    Email: <span className="text-amber-300 font-bold">netbybitsupport@gmail.com</span>
+                                    Email: <span className="text-amber-300 font-bold">help.netbybit@hotmail.com</span>
                                   </div>
                                   <div className="flex items-center space-x-2">
                                     <a
-                                      href="mailto:netbybitsupport@gmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
+                                      href="mailto:help.netbybit@hotmail.com?subject=NETBYBIT%20Live%20Agent%20Inquiry"
                                       className="flex-1 inline-flex items-center justify-center space-x-1 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-neutral-950 font-bold px-2.5 py-1.5 rounded-lg text-[10px] shadow transition-all cursor-pointer"
                                     >
                                       <Mail className="w-3 h-3" />
@@ -1166,7 +1166,7 @@ export const CustomerSupportPage: React.FC = () => {
                               <div className="flex items-center space-x-1.5 mb-1 px-1">
                                 <span className="font-bold text-xs text-amber-400">Netbybit Support</span>
                                 <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 text-[8px] rounded font-mono font-bold">
-                                  OFFICIAL
+                                  SUPPORT
                                 </span>
                               </div>
 

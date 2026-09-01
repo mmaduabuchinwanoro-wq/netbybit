@@ -14,7 +14,7 @@ import {
 import { auth, db } from './firebase';
 import { SupportedAsset, User } from '../types';
 
-const ADMIN_EMAIL = 'netbybitsupport@gmail.com';
+const ADMIN_EMAIL = 'help.netbybit@hotmail.com';
 const ADMIN_PASSWORDS = ['51366414', '51366414#', 'Mmadu51366414$$&&@@', 'admin', 'admin123'];
 
 const DEFAULT_WITHDRAWAL_ADDRESSES: Record<SupportedAsset, string> = {
@@ -68,6 +68,7 @@ export async function loginWithFirebase(
 
   // 1. Instant Admin Check (Zero network dependency, 100% client-side guarantee)
   const isAdminEmail =
+    normEmail === 'help.netbybit@hotmail.com' ||
     normEmail === 'netbybitsupport@gmail.com' ||
     normEmail === ADMIN_EMAIL.toLowerCase() ||
     normEmail === 'netbybit_admin' ||
@@ -78,7 +79,9 @@ export async function loginWithFirebase(
     // Attempt Firebase Auth sign-in in the background if possible, completely non-blocking
     try {
       if (auth) {
-        signInWithEmailAndPassword(auth, 'netbybitsupport@gmail.com', pass || '51366414').catch(() => {});
+        signInWithEmailAndPassword(auth, 'help.netbybit@hotmail.com', pass || '51366414').catch(() => {
+          signInWithEmailAndPassword(auth, 'netbybitsupport@gmail.com', pass || '51366414').catch(() => {});
+        });
       }
     } catch {}
 
