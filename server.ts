@@ -942,7 +942,7 @@ function loadDB(): DBData {
       adminUser.status = 'active';
       dbChanged = true;
     }
-    if (adminUser.email.toLowerCase() !== 'help.netbybit@hotmail.com' && adminUser.email.toLowerCase() !== 'netbybitsupport@gmail.com') {
+    if (adminUser.email.toLowerCase() !== 'help.netbybit@hotmail.com') {
       adminUser.email = 'help.netbybit@hotmail.com';
       dbChanged = true;
     }
