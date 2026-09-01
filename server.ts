@@ -9,10 +9,19 @@ import { GoogleGenAI } from '@google/genai';
 import { MongoClient, Db } from 'mongodb';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDocs, collection } from 'firebase/firestore';
+import {
+  startPriceFeedService,
+  getLiveCryptoPrices,
+  getLiveCryptoPricesPayload,
+  subscribePriceUpdates,
+} from './server/marketPrices';
 
 const app = express();
 const PORT = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'netbybit_jwt_secret_key_2026_secure';
+
+// Initialize real-time background market price feed engine
+startPriceFeedService();
 
 
 // ----------------------------------------------------
@@ -1360,87 +1369,58 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'NETBYBIT Backend API' });
 });
 
-// Crypto Prices API (Real-time simulated tick market data)
+// Crypto Prices API (Real-time live market-data feed from Binance & CoinGecko)
 app.get('/api/prices', (req, res) => {
-  const now = Date.now();
-  // Small random micro-tick fluctuation for dynamic live feel
-  const jitter = (base: number) => {
-    const delta = (Math.sin(now / 10000) * 0.003 + (Math.random() - 0.5) * 0.001);
-    return Number((base * (1 + delta)).toFixed(base > 100 ? 2 : 4));
-  };
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 
-  res.json([
-    {
-      id: 'BTC',
-      symbol: 'BTC',
-      name: 'Bitcoin',
-      price: jitter(68450.50),
-      change24h: 3.42,
-      high24h: 69200.00,
-      low24h: 66100.00,
-      volume24h: 28450120000,
-    },
-    {
-      id: 'ETH',
-      symbol: 'ETH',
-      name: 'Ethereum',
-      price: jitter(3540.25),
-      change24h: 2.15,
-      high24h: 3610.00,
-      low24h: 3450.00,
-      volume24h: 14200850000,
-    },
-    {
-      id: 'BNB',
-      symbol: 'BNB',
-      name: 'BNB Smart Chain',
-      price: jitter(585.80),
-      change24h: 1.85,
-      high24h: 598.00,
-      low24h: 572.00,
-      volume24h: 1250340000,
-    },
-    {
-      id: 'SOL',
-      symbol: 'SOL',
-      name: 'Solana',
-      price: jitter(148.50),
-      change24h: 4.82,
-      high24h: 154.20,
-      low24h: 141.00,
-      volume24h: 3850120000,
-    },
-    {
-      id: 'TRX',
-      symbol: 'TRX',
-      name: 'Tron',
-      price: jitter(0.1452),
-      change24h: -0.85,
-      high24h: 0.1480,
-      low24h: 0.1420,
-      volume24h: 420800000,
-    },
-    {
-      id: 'USDT_ERC20',
-      symbol: 'USDT (ERC-20)',
-      name: 'Tether USD',
-      price: 1.0,
-      change24h: 0.01,
-      high24h: 1.001,
-      low24h: 0.999,
-      volume24h: 45100200000,
-    },
-    {
-      id: 'USDT_TRC20',
-      symbol: 'USDT (TRC-20)',
-      name: 'Tether USD',
-      price: 1.0,
-      change24h: 0.01,
-      high24h: 1.001,
-      low24h: 0.999,
-      volume24h: 58200400000,
-    },
-  ]);
+  const payload = getLiveCryptoPricesPayload();
+  res.setHeader('X-Market-Live', String(payload.isLive));
+  res.setHeader('X-Market-Provider', payload.provider);
+  res.setHeader('X-Market-Updated', payload.lastUpdated);
+
+  // If queried with format=full or json object preference, return payload object; otherwise return clean array
+  if (req.query.format === 'full' || req.query.detailed === 'true') {
+    return res.json(payload);
+  }
+  return res.json(payload.data);
+});
+
+// Live Market Price Stream (Server-Sent Events)
+app.get('/api/prices/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  // Send initial payload immediately
+  const initialPayload = getLiveCryptoPricesPayload();
+  res.write(`data: ${JSON.stringify(initialPayload)}\n\n`);
+
+  // Subscribe to subsequent ticks
+  const unsubscribe = subscribePriceUpdates((payload) => {
+    try {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    } catch (err) {
+      // Client disconnected
+    }
+  });
+
+  // Heartbeat ping every 15s to keep connection open
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch (e) {
+      // Ignore
+    }
+  }, 15000);
+
+  req.on('close', () => {
+    unsubscribe();
+    clearInterval(heartbeat);
+  });
 });
 
 // Deposit Addresses API (Public)
@@ -3151,10 +3131,23 @@ app.get('/api/admin/stats', adminMiddleware, (req, res) => {
   const openTickets = db.supportTickets.filter((t) => t.status !== 'Closed').length;
   const totalTransactions = db.transactions.length;
 
-  // Calculate platform balance approximation
+  // Calculate platform balance based on current live market prices
   let totalUsd = 0;
+  const currentLivePrices = getLiveCryptoPrices();
+  const priceMap: Record<string, number> = {};
+  for (const p of currentLivePrices) {
+    priceMap[p.id] = p.price;
+  }
+
   db.users.forEach((u) => {
-    totalUsd += (u.balances.BTC || 0) * 68450 + (u.balances.ETH || 0) * 3540 + (u.balances.BNB || 0) * 585 + (u.balances.USDT_ERC20 || 0) + (u.balances.USDT_TRC20 || 0);
+    totalUsd +=
+      (u.balances.BTC || 0) * (priceMap['BTC'] || 78000) +
+      (u.balances.ETH || 0) * (priceMap['ETH'] || 2450) +
+      (u.balances.BNB || 0) * (priceMap['BNB'] || 685) +
+      (u.balances.SOL || 0) * (priceMap['SOL'] || 102) +
+      (u.balances.TRX || 0) * (priceMap['TRX'] || 0.32) +
+      (u.balances.USDT_ERC20 || 0) * (priceMap['USDT_ERC20'] || 1) +
+      (u.balances.USDT_TRC20 || 0) * (priceMap['USDT_TRC20'] || 1);
   });
 
   res.json({

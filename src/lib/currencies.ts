@@ -65,6 +65,20 @@ export function convertUsdToFiat(usdAmount: number, currencyCode: string, liveRa
   return usdAmount * rate;
 }
 
+export function formatCryptoPrice(price: number): string {
+  if (price === 0) return '$0.00';
+  if (price >= 1000) {
+    return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (price >= 1) {
+    return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (price >= 0.01) {
+    return `$${price.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
+  }
+  return `$${price.toFixed(6)}`;
+}
+
 export function formatFiatValue(
   usdAmount: number,
   currencyCode: string,
@@ -74,9 +88,10 @@ export function formatFiatValue(
   const convertedAmount = convertUsdToFiat(usdAmount, currency.code, liveRates);
 
   const noDecimals = ['JPY', 'KRW', 'IDR', 'VND', 'GHS'].includes(currency.code);
+  const isSubDollar = !noDecimals && convertedAmount > 0 && convertedAmount < 1;
   const formattedNumber = convertedAmount.toLocaleString('en-US', {
-    minimumFractionDigits: noDecimals ? 0 : 2,
-    maximumFractionDigits: noDecimals ? 0 : 2,
+    minimumFractionDigits: noDecimals ? 0 : isSubDollar ? 4 : 2,
+    maximumFractionDigits: noDecimals ? 0 : isSubDollar ? 4 : 2,
   });
 
   return {

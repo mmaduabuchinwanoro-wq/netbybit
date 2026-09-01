@@ -18,7 +18,15 @@ import {
 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
-  const { user, prices, pricesLoading, setActivePage } = useAuth();
+  const { user, prices, pricesLoading, isPricesLive, lastPriceUpdate, setActivePage } = useAuth();
+
+  const formatDisplayPrice = (price: number, assetId?: string) => {
+    if (price === undefined || price === null || isNaN(price)) return '$0.00';
+    if (assetId === 'TRX' || (price > 0 && price < 1)) {
+      return '$' + price.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    }
+    return '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   return (
     <div className="space-y-16 pb-16">
@@ -126,14 +134,16 @@ export const HomePage: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-bold font-mono text-neutral-100">${p.price.toLocaleString()}</p>
+                        <p className="text-xs font-bold font-mono text-neutral-100">
+                          {formatDisplayPrice(p.price, p.id)}
+                        </p>
                         <span
-                          className={`text-[10px] font-bold ${
+                          className={`text-[10px] font-bold font-mono ${
                             p.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'
                           }`}
                         >
                           {p.change24h >= 0 ? '+' : ''}
-                          {p.change24h}%
+                          {p.change24h.toFixed(2)}%
                         </span>
                       </div>
                     </div>
@@ -225,15 +235,15 @@ export const HomePage: React.FC = () => {
                 {priceObj && (
                   <div className="text-right">
                     <p className="text-xs font-bold font-mono text-neutral-100">
-                      ${priceObj.price.toLocaleString()}
+                      {formatDisplayPrice(priceObj.price, asset.id)}
                     </p>
                     <span
-                      className={`text-[10px] font-bold ${
+                      className={`text-[10px] font-bold font-mono ${
                         priceObj.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'
                       }`}
                     >
                       {priceObj.change24h >= 0 ? '+' : ''}
-                      {priceObj.change24h}%
+                      {priceObj.change24h.toFixed(2)}%
                     </span>
                   </div>
                 )}

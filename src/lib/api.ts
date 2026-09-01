@@ -120,17 +120,134 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
-  // Public
+  // Public Real-Time Market Prices
   getPrices: async (): Promise<CryptoPrice[]> => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch('/api/prices?detailed=true', {
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const json = await res.json();
+        let list: CryptoPrice[] = [];
+        if (Array.isArray(json)) {
+          list = json;
+        } else if (json && Array.isArray(json.data)) {
+          list = json.data.map((item: any) => ({
+            ...item,
+            isLive: json.isLive ?? true,
+            lastUpdated: json.lastUpdated,
+          }));
+        }
+
+        if (list.length > 0) {
+          try {
+            localStorage.setItem('netbybit_cached_prices', JSON.stringify(list));
+          } catch {}
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn('Live price fetch warning, using fallback cache:', err);
+    }
+
+    // Attempt to read cached prices
+    try {
+      const cached = localStorage.getItem('netbybit_cached_prices');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+
+    // Fallback if initial fetch fails
     return [
-      { id: 'BTC', symbol: 'BTC', name: 'Bitcoin', price: 94850.25, change24h: 2.45, high24h: 96100, low24h: 92400, volume24h: 38500000000 },
-      { id: 'ETH', symbol: 'ETH', name: 'Ethereum', price: 2680.50, change24h: -1.12, high24h: 2750, low24h: 2620, volume24h: 18200000000 },
-      { id: 'BNB', symbol: 'BNB', name: 'Binance Coin', price: 645.10, change24h: 0.85, high24h: 655, low24h: 638, volume24h: 1400000000 },
-      { id: 'SOL', symbol: 'SOL', name: 'Solana', price: 185.30, change24h: 5.12, high24h: 190, low24h: 174, volume24h: 4200000000 },
-      { id: 'TRX', symbol: 'TRX', name: 'TRON', price: 0.235, change24h: 1.05, high24h: 0.24, low24h: 0.23, volume24h: 450000000 },
-      { id: 'USDT_ERC20', symbol: 'USDT', name: 'Tether (ERC-20)', price: 1.00, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 65000000000 },
-      { id: 'USDT_TRC20', symbol: 'USDT', name: 'Tether (TRC-20)', price: 1.00, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 65000000000 },
+      { id: 'BTC', symbol: 'BTC', name: 'Bitcoin', price: 78020.0, change24h: -0.85, high24h: 79250, low24h: 77675, volume24h: 28450120000, isLive: false },
+      { id: 'ETH', symbol: 'ETH', name: 'Ethereum', price: 2457.5, change24h: 0.12, high24h: 2490, low24h: 2437, volume24h: 14200850000, isLive: false },
+      { id: 'BNB', symbol: 'BNB', name: 'BNB Smart Chain', price: 686.8, change24h: -0.42, high24h: 695, low24h: 684, volume24h: 1250340000, isLive: false },
+      { id: 'SOL', symbol: 'SOL', name: 'Solana', price: 102.35, change24h: -1.45, high24h: 105.2, low24h: 101.8, volume24h: 3850120000, isLive: false },
+      { id: 'TRX', symbol: 'TRX', name: 'Tron', price: 0.3285, change24h: -2.05, high24h: 0.3356, low24h: 0.328, volume24h: 420800000, isLive: false },
+      { id: 'USDT_ERC20', symbol: 'USDT (ERC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 45100200000, isLive: false },
+      { id: 'USDT_TRC20', symbol: 'USDT (TRC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 58200400000, isLive: false },
     ];
+  },
+
+  subscribeToLivePrices: (
+    callback: (prices: CryptoPrice[], meta?: { isLive: boolean; provider: string; lastUpdated: string }) => void
+  ): (() => void) => {
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: any = null;
+    let isClosed = false;
+
+    const startPollingFallback = () => {
+      if (fallbackInterval || isClosed) return;
+      fallbackInterval = setInterval(async () => {
+        try {
+          const prices = await api.getPrices();
+          if (!isClosed && prices && prices.length > 0) {
+            callback(prices, { isLive: true, provider: 'Live Market Poller', lastUpdated: new Date().toISOString() });
+          }
+        } catch {}
+      }, 4000);
+    };
+
+    try {
+      if (typeof window !== 'undefined' && window.EventSource) {
+        eventSource = new EventSource('/api/prices/stream');
+
+        eventSource.onmessage = (event) => {
+          if (isClosed) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data && Array.isArray(data.data)) {
+              callback(data.data, {
+                isLive: data.isLive ?? true,
+                provider: data.provider || 'Live Market Stream',
+                lastUpdated: data.lastUpdated || new Date().toISOString(),
+              });
+            } else if (Array.isArray(data)) {
+              callback(data, {
+                isLive: true,
+                provider: 'Live Market Stream',
+                lastUpdated: new Date().toISOString(),
+              });
+            }
+          } catch (e) {
+            // Error parsing SSE message
+          }
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          startPollingFallback();
+        };
+      } else {
+        startPollingFallback();
+      }
+    } catch {
+      startPollingFallback();
+    }
+
+    return () => {
+      isClosed = true;
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+        fallbackInterval = null;
+      }
+    };
   },
 
   getDepositAddresses: async (): Promise<DepositAddresses> => {

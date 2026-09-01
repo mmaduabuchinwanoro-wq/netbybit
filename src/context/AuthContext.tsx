@@ -13,6 +13,9 @@ interface AuthContextType {
   unreadCount: number;
   loading: boolean;
   pricesLoading: boolean;
+  isPricesLive: boolean;
+  lastPriceUpdate: string | null;
+  priceProvider: string;
   activePage: string;
   setActivePage: (page: string) => void;
   goBack: (fallback?: string) => void;
@@ -60,6 +63,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [depositAddresses, setDepositAddresses] = useState<DepositAddresses>(DEFAULT_DEPOSIT);
   const [prices, setPrices] = useState<CryptoPrice[]>([]);
+  const [isPricesLive, setIsPricesLive] = useState<boolean>(true);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<string | null>(null);
+  const [priceProvider, setPriceProvider] = useState<string>('Live Market Feed');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(true);
@@ -125,15 +131,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setFiatRates(rates);
   };
 
-  const refreshPrices = async () => {
-    setPricesLoading(true);
+  const refreshPrices = async (isBackground = false) => {
+    if (!isBackground) {
+      setPricesLoading(true);
+    }
     try {
       const data = await api.getPrices();
-      setPrices(data);
+      if (data && data.length > 0) {
+        setPrices(data);
+        setIsPricesLive(true);
+        setLastPriceUpdate(new Date().toISOString());
+      }
     } catch (err) {
       console.error('Failed to load crypto prices', err);
     } finally {
-      setPricesLoading(false);
+      if (!isBackground) {
+        setPricesLoading(false);
+      }
     }
   };
 
@@ -202,12 +216,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshDepositAddresses();
     refreshUser();
 
-    // Poll live prices every 15s
-    const priceInterval = setInterval(refreshPrices, 15000);
+    // Real-time market price subscription via SSE with automatic polling fallback
+    const unsubscribeLivePrices = api.subscribeToLivePrices((newPrices, meta) => {
+      if (newPrices && newPrices.length > 0) {
+        setPrices(newPrices);
+        setIsPricesLive(meta?.isLive ?? true);
+        if (meta?.lastUpdated) setLastPriceUpdate(meta.lastUpdated);
+        if (meta?.provider) setPriceProvider(meta.provider);
+        setPricesLoading(false);
+      }
+    });
+
     // Refresh fiat rates every 5 mins
     const fiatInterval = setInterval(refreshFiatRates, 300000);
     return () => {
-      clearInterval(priceInterval);
+      unsubscribeLivePrices();
       clearInterval(fiatInterval);
     };
   }, []);
@@ -430,6 +453,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unreadCount,
         loading,
         pricesLoading,
+        isPricesLive,
+        lastPriceUpdate,
+        priceProvider,
         activePage,
         setActivePage,
         goBack,

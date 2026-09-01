@@ -60,6 +60,9 @@ export const DashboardPage: React.FC = () => {
     user,
     prices,
     pricesLoading,
+    isPricesLive,
+    lastPriceUpdate,
+    priceProvider,
     refreshPrices,
     calculateTotalUsdBalance,
     setActivePage,
@@ -727,22 +730,35 @@ export const DashboardPage: React.FC = () => {
       {/* TAB 3: MARKET TRENDS */}
       {activeTab === 'market' && (
         <div className="p-6 rounded-3xl bg-[#121318] border border-neutral-800 space-y-4 shadow-xl">
-          <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-4">
             <div>
-              <h3 className="text-sm font-bold text-neutral-100 flex items-center space-x-2">
-                <TrendingUp className="w-4 h-4 text-amber-400" />
-                <span>Live Crypto Market Index</span>
-              </h3>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Real-time market rates formatted in {selectedCurrency}
+              <div className="flex items-center space-x-2.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <h3 className="text-sm font-bold text-neutral-100 uppercase tracking-wider flex items-center space-x-2">
+                  <span>Live Crypto Market Prices</span>
+                </h3>
+                <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                  {isPricesLive ? 'Live Feed' : 'Connecting'}
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mt-1">
+                Real-time cryptocurrency market data • Formatted in {selectedCurrency}
+                {lastPriceUpdate && (
+                  <span className="text-[10px] text-neutral-500 ml-2 font-mono">
+                    Updated {new Date(lastPriceUpdate).toLocaleTimeString()}
+                  </span>
+                )}
               </p>
             </div>
             <button
               onClick={handleRefreshMarketData}
-              className="px-3 py-1.5 bg-neutral-900 border border-neutral-800 hover:border-amber-500/40 text-amber-300 text-xs font-bold rounded-xl flex items-center space-x-1.5"
+              className="px-3.5 py-2 bg-neutral-900 border border-neutral-800 hover:border-amber-500/40 text-amber-300 text-xs font-bold rounded-xl flex items-center space-x-2 transition-all self-start sm:self-auto shadow-sm"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
-              <span>Refresh Markets</span>
+              <span>Refresh Rates</span>
             </button>
           </div>
 

@@ -173,6 +173,8 @@ export interface CryptoPrice {
   high24h: number;
   low24h: number;
   volume24h: number;
+  lastUpdated?: string;
+  isLive?: boolean;
 }
 
 export interface ConnectedWallet {

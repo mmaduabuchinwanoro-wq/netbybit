@@ -183,8 +183,8 @@ export const SwapPage: React.FC = () => {
             </div>
           </div>
 
-          {/* SWAP TOGGLE BUTTON */}
-          <div className="flex justify-center -my-2 relative z-10">
+          {/* SWAP TOGGLE BUTTON & LIVE RATE */}
+          <div className="flex flex-col items-center justify-center -my-2 relative z-10 gap-1.5">
             <button
               type="button"
               onClick={handleSwapAssets}
@@ -193,6 +193,11 @@ export const SwapPage: React.FC = () => {
             >
               <Repeat className="w-4 h-4" />
             </button>
+            {fromPrice > 0 && toPrice > 0 && (
+              <span className="text-[10px] font-mono text-neutral-400 bg-neutral-900/90 px-2.5 py-0.5 rounded-full border border-neutral-800">
+                1 {fromAsset} ≈ {(fromPrice / toPrice).toLocaleString('en-US', { maximumFractionDigits: 6 })} {toAsset}
+              </span>
+            )}
           </div>
 
           {/* TO ASSET */}
