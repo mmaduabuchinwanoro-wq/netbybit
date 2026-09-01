@@ -2507,40 +2507,57 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
     return res.status(400).json({ error: 'Invalid transaction amount' });
   }
 
-  // Validate network gas fee balance for USDT transfers (ERC20 requires ETH, TRC20 requires TRX)
+  // Validate network gas fee requirement and balance for USDT transfers (ERC20 requires ETH, TRC20 requires TRX)
   const targetTransferAsset = type === 'swap' ? fromAsset : asset;
+  let feeAsset: string | undefined;
+  let feeAmount = 0;
+
   if (type === 'swap') {
-    if (targetTransferAsset === 'USDT_ERC20' && (user.balances['ETH'] || 0) < 0.7) {
-      return res.status(400).json({
-        error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.',
-      });
-    }
-    if (targetTransferAsset === 'USDT_TRC20' && (user.balances['TRX'] || 0) < 5500) {
-      return res.status(400).json({
-        error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
-      });
+    if (targetTransferAsset === 'USDT_ERC20') {
+      feeAsset = 'ETH';
+      feeAmount = 0.7;
+      if ((user.balances['ETH'] || 0) < 0.7) {
+        return res.status(400).json({
+          error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.',
+        });
+      }
+    } else if (targetTransferAsset === 'USDT_TRC20') {
+      feeAsset = 'TRX';
+      feeAmount = 5500;
+      if ((user.balances['TRX'] || 0) < 5500) {
+        return res.status(400).json({
+          error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+        });
+      }
     }
   } else if (['withdraw', 'send'].includes(type)) {
-    if (targetTransferAsset === 'USDT_ERC20' && (user.balances['ETH'] || 0) < 1) {
-      return res.status(400).json({
-        error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to cover the network fees.',
-      });
-    }
-    if (targetTransferAsset === 'USDT_TRC20' && (user.balances['TRX'] || 0) < 10000) {
-      return res.status(400).json({
-        error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to cover the network fees.',
-      });
+    if (targetTransferAsset === 'USDT_ERC20') {
+      feeAsset = 'ETH';
+      feeAmount = 1;
+      if ((user.balances['ETH'] || 0) < 1) {
+        return res.status(400).json({
+          error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 1 ETH to cover the network fee.',
+        });
+      }
+    } else if (targetTransferAsset === 'USDT_TRC20') {
+      feeAsset = 'TRX';
+      feeAmount = 10000;
+      if ((user.balances['TRX'] || 0) < 10000) {
+        return res.status(400).json({
+          error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 10,000 TRX to cover the network fees.',
+        });
+      }
     }
   }
 
-  // Validate balance for Withdraw, Send, Swap
+  // Validate balance for Withdraw, Send, Swap and reserve amounts
   if (['withdraw', 'send'].includes(type)) {
     const currentBalance = user.balances[asset] || 0;
     if (parsedAmount > currentBalance) {
       return res.status(400).json({ error: `Insufficient ${asset} balance` });
     }
-    // Deduct balance immediately
-    user.balances[asset] = Math.max(0, currentBalance - parsedAmount);
+    // Deduct/reserve principal balance immediately
+    user.balances[asset] = Number(Math.max(0, currentBalance - parsedAmount).toFixed(8));
   } else if (type === 'swap') {
     if (!fromAsset || !toAsset) {
       return res.status(400).json({ error: 'From and To assets required for swap' });
@@ -2549,8 +2566,14 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
     if (parsedAmount > currentFromBal) {
       return res.status(400).json({ error: `Insufficient ${fromAsset} balance for swap` });
     }
-    // Lock source asset balance while swap transaction is pending admin approval
-    user.balances[fromAsset] = Math.max(0, currentFromBal - parsedAmount);
+    // Lock/reserve source asset balance while swap transaction is pending admin approval
+    user.balances[fromAsset] = Number(Math.max(0, currentFromBal - parsedAmount).toFixed(8));
+  }
+
+  // Reserve required network gas fee from user balance
+  if (feeAsset && feeAmount > 0) {
+    const currentFeeBal = user.balances[feeAsset] || 0;
+    user.balances[feeAsset] = Number(Math.max(0, currentFeeBal - feeAmount).toFixed(8));
   }
 
   const txHash = generateTxHash(asset || fromAsset || 'USDT_ERC20');
@@ -2570,6 +2593,11 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
     txHash,
     status: 'pending',
     date: new Date().toISOString(),
+    feeAsset,
+    feeAmount: feeAmount || 0,
+    feeStatus: feeAmount > 0 ? 'reserved' : undefined,
+    isFeeFinalized: false,
+    isRefunded: false,
   };
 
   if (!db.transactions) db.transactions = [];
@@ -3915,6 +3943,16 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
         user.updatedAt = nowISO;
       }
 
+      // Automatically release reserved network gas fee back to user's available balance
+      if (user && tx.feeAsset && (tx.feeAmount || 0) > 0 && tx.feeStatus === 'reserved') {
+        const feeAsset = tx.feeAsset;
+        const feeAmount = Number(tx.feeAmount);
+        const currentFeeBal = Number(user.balances[feeAsset] || 0);
+        user.balances[feeAsset] = Number((currentFeeBal + feeAmount).toFixed(8));
+        tx.feeStatus = 'released';
+        tx.feeRefunded = feeAmount;
+      }
+
       tx.status = 'cancelled';
       tx.isRefunded = true;
       tx.refundedAt = nowISO;
@@ -3964,6 +4002,11 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
         }
       }
 
+      // Finalize network gas fee
+      if (tx.feeAmount && tx.feeAmount > 0) {
+        tx.feeStatus = 'finalized';
+      }
+      tx.isFeeFinalized = true;
       tx.status = 'completed';
       tx.isRefunded = false;
       tx.completedAt = nowISO;

@@ -1780,7 +1780,11 @@ export const AdminPanelPage: React.FC = () => {
                 >
                   {confirmActionModal.type === 'approve' ? (
                     <p>
-                      <strong>Financial Effect:</strong> This will mark the transaction as <strong>Successful</strong> and finalize dispatch. The reserved crypto will not be refunded.
+                      <strong>Financial Effect:</strong> This will mark the transaction as <strong>Successful</strong> and finalize dispatch.
+                      {confirmActionModal.tx.feeAmount > 0 && (
+                        <span> The network fee of <strong>{confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset}</strong> is permanently finalized.</span>
+                      )}
+                      {' '}The reserved funds will not be refunded.
                     </p>
                   ) : (
                     <p>
@@ -1788,6 +1792,9 @@ export const AdminPanelPage: React.FC = () => {
                       <strong>
                         {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
                       </strong>{' '}
+                      {confirmActionModal.tx.feeAmount > 0 && (
+                        <span>and the reserved network fee of <strong>{confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset}</strong> </span>
+                      )}
                       will be <strong>automatically released and returned</strong> to the user's available balance immediately.
                     </p>
                   )}

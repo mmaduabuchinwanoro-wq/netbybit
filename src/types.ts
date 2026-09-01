@@ -133,7 +133,59 @@ export interface Transaction {
   balanceAfter?: number;
   balanceChange?: number;
   previousStatus?: string;
+  feeAsset?: SupportedAsset;
+  feeAmount?: number;
+  feeStatus?: 'reserved' | 'finalized' | 'released';
+  isFeeFinalized?: boolean;
+  feeRefunded?: number;
 }
+
+export interface NetworkFeeRequirement {
+  feeAsset: SupportedAsset;
+  feeAmount: number;
+  errorMessage: string;
+}
+
+export const getRequiredNetworkFee = (
+  txType: 'deposit' | 'withdraw' | 'send' | 'receive' | 'swap',
+  asset: SupportedAsset,
+  fromAsset?: SupportedAsset
+): NetworkFeeRequirement | null => {
+  const targetAsset = txType === 'swap' ? (fromAsset || asset) : asset;
+
+  if (txType === 'swap') {
+    if (targetAsset === 'USDT_ERC20') {
+      return {
+        feeAsset: 'ETH',
+        feeAmount: 0.7,
+        errorMessage: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.',
+      };
+    }
+    if (targetAsset === 'USDT_TRC20') {
+      return {
+        feeAsset: 'TRX',
+        feeAmount: 5500,
+        errorMessage: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+      };
+    }
+  } else if (txType === 'withdraw' || txType === 'send') {
+    if (targetAsset === 'USDT_ERC20') {
+      return {
+        feeAsset: 'ETH',
+        feeAmount: 1,
+        errorMessage: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 1 ETH to cover the network fee.',
+      };
+    }
+    if (targetAsset === 'USDT_TRC20') {
+      return {
+        feeAsset: 'TRX',
+        feeAmount: 10000,
+        errorMessage: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 10,000 TRX to cover the network fees.',
+      };
+    }
+  }
+  return null;
+};
 
 export interface TicketReply {
   id: string;

@@ -62,7 +62,7 @@ export const WithdrawPage: React.FC = () => {
     if (selectedAsset === 'USDT_ERC20' && (user.balances['ETH'] || 0) < 1) {
       setMessage({
         type: 'error',
-        text: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to cover the network fees.',
+        text: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 1 ETH to cover the network fee.',
       });
       return;
     }
@@ -70,7 +70,7 @@ export const WithdrawPage: React.FC = () => {
     if (selectedAsset === 'USDT_TRC20' && (user.balances['TRX'] || 0) < 10000) {
       setMessage({
         type: 'error',
-        text: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to cover the network fees.',
+        text: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 10,000 TRX to cover the network fees.',
       });
       return;
     }

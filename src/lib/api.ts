@@ -665,6 +665,29 @@ export const api = {
     const uid = currentUser?.id || 'usr_' + Date.now();
     const email = currentUser?.email || 'user@example.com';
 
+    // Determine network fee requirement
+    let feeAsset: SupportedAsset | undefined;
+    let feeAmount = 0;
+    const targetTransferAsset = body.type === 'swap' ? (body.fromAsset || body.asset) : body.asset;
+
+    if (body.type === 'swap') {
+      if (targetTransferAsset === 'USDT_ERC20') {
+        feeAsset = 'ETH';
+        feeAmount = 0.7;
+      } else if (targetTransferAsset === 'USDT_TRC20') {
+        feeAsset = 'TRX';
+        feeAmount = 5500;
+      }
+    } else if (body.type === 'withdraw' || body.type === 'send') {
+      if (targetTransferAsset === 'USDT_ERC20') {
+        feeAsset = 'ETH';
+        feeAmount = 1;
+      } else if (targetTransferAsset === 'USDT_TRC20') {
+        feeAsset = 'TRX';
+        feeAmount = 10000;
+      }
+    }
+
     const cleanTx: Transaction = {
       id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       userId: uid,
@@ -677,6 +700,11 @@ export const api = {
       status: 'pending',
       date: new Date().toISOString(),
       destinationAddress: body.destinationAddress || '',
+      feeAsset,
+      feeAmount: feeAmount || 0,
+      feeStatus: feeAmount > 0 ? 'reserved' : undefined,
+      isFeeFinalized: false,
+      isRefunded: false,
     };
     if (body.fromAsset) cleanTx.fromAsset = body.fromAsset;
     if (body.toAsset) cleanTx.toAsset = body.toAsset;
@@ -702,6 +730,19 @@ export const api = {
         }
       } catch (e) {
         console.warn('Balance deduction error on swap:', e);
+      }
+    }
+
+    // Deduct/reserve network fee from user balance immediately
+    if (feeAsset && feeAmount > 0) {
+      try {
+        await api.updateUserBalance(uid, feeAsset, feeAmount, 'subtract');
+        if (currentUser) {
+          currentUser.balances[feeAsset] = Math.max(0, (currentUser.balances[feeAsset] || 0) - feeAmount);
+          localStorage.setItem('netbybit_cached_user', JSON.stringify(currentUser));
+        }
+      } catch (e) {
+        console.warn('Fee balance deduction error:', e);
       }
     }
 
@@ -1545,9 +1586,17 @@ export const api = {
         fsUpdate.refundedAt = nowISO;
         fsUpdate.refundAmount = txData.amount;
         fsUpdate.refundAsset = txData.type === 'swap' ? (txData.fromAsset || txData.asset) : txData.asset;
+        if (txData.feeAsset && (txData.feeAmount || 0) > 0) {
+          fsUpdate.feeStatus = 'released';
+          fsUpdate.feeRefunded = txData.feeAmount;
+        }
       } else if (isApprove) {
         fsUpdate.isRefunded = false;
         fsUpdate.completedAt = nowISO;
+        if (txData.feeAmount && txData.feeAmount > 0) {
+          fsUpdate.feeStatus = 'finalized';
+          fsUpdate.isFeeFinalized = true;
+        }
       }
       await setDoc(doc(db, 'transactions', txId), fsUpdate, { merge: true });
       await setDoc(doc(db, 'swaps', txId), fsUpdate, { merge: true });
