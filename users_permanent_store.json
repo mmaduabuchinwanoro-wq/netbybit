@@ -1741,7 +1741,7 @@
     "status": "active",
     "balances": {
       "BTC": 0,
-      "ETH": 0.6,
+      "ETH": 1,
       "BNB": 0,
       "SOL": 0,
       "TRX": 0,
@@ -1751,7 +1751,7 @@
     "name": "Belly bill",
     "role": "user",
     "id": "usr_1788277359990",
-    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "updatedAt": "2026-09-02T09:01:46.575Z",
     "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
     "emailVerified": false,
     "email": "bellybill@gmail.com",

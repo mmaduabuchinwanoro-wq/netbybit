@@ -574,35 +574,10 @@ export const AdminPanelPage: React.FC = () => {
     try {
       const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
 
-      // 1. Instantly update Firestore documents
-      try {
-        await updateDoc(doc(db, 'transactions', txId), {
-          status: canonicalStatus,
-          isRefunded: canonicalStatus === 'cancelled',
-          updatedAt: new Date().toISOString(),
-        });
-      } catch {
-        await setDoc(doc(db, 'transactions', txId), {
-          status: canonicalStatus,
-          isRefunded: canonicalStatus === 'cancelled',
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-      }
-      try {
-        await updateDoc(doc(db, 'withdrawals', txId), {
-          status: canonicalStatus,
-          isRefunded: canonicalStatus === 'cancelled',
-          updatedAt: new Date().toISOString(),
-        });
-      } catch {
-        await setDoc(doc(db, 'withdrawals', txId), {
-          status: canonicalStatus,
-          isRefunded: canonicalStatus === 'cancelled',
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-      }
+      // Authoritative update: executes database balance reversal first, then updates tx status & audit logs
+      const res = await api.updateTransactionStatus(txId, canonicalStatus);
 
-      // 2. Optimistic UI update in place
+      // Reflect updated status in local view state
       setAllTxs((prev) =>
         prev.map((t) =>
           t.id === txId
@@ -611,7 +586,6 @@ export const AdminPanelPage: React.FC = () => {
         )
       );
 
-      const res = await api.updateTransactionStatus(txId, canonicalStatus);
       setWithdrawalModal({
         message: res.message || `Withdrawal request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled & refunded'}`,
         auditEntry: (res as any).auditEntry,
@@ -676,22 +650,10 @@ export const AdminPanelPage: React.FC = () => {
     try {
       const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
 
-      // Instantly update Firestore document status in Firebase
-      try {
-        await updateDoc(doc(db, 'swaps', txId), {
-          status: canonicalStatus,
-          isRefunded: canonicalStatus === 'cancelled',
-          updatedAt: new Date().toISOString(),
-        });
-      } catch (fsErr) {
-        await setDoc(doc(db, 'swaps', txId), {
-          status: canonicalStatus,
-          isRefunded: canonicalStatus === 'cancelled',
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-      }
+      // Authoritative update: executes database balance reversal first, then updates tx status & audit logs
+      const res = await api.updateTransactionStatus(txId, canonicalStatus);
 
-      // Optimistic in place update
+      // Reflect updated status in local view state
       setAllTxs((prev) =>
         prev.map((t) =>
           t.id === txId
@@ -700,7 +662,6 @@ export const AdminPanelPage: React.FC = () => {
         )
       );
 
-      const res = await api.updateTransactionStatus(txId, canonicalStatus);
       setSwapModal({
         message: res.message || `Swap request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled & refunded'}`,
         auditEntry: (res as any).auditEntry,

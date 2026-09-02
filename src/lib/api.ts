@@ -1501,14 +1501,52 @@ export const api = {
 
     try {
       const snap = await getDoc(doc(db, 'transactions', txId));
-      if (snap.exists()) txData = snap.data() as Transaction;
+      if (snap.exists()) {
+        txData = snap.data() as Transaction;
+      } else {
+        const wSnap = await getDoc(doc(db, 'withdrawals', txId));
+        if (wSnap.exists()) txData = wSnap.data() as Transaction;
+      }
     } catch {}
 
     const isApprove = status === 'completed' || status === 'approved';
     const isDecline = status === 'failed' || status === 'cancelled' || status === 'declined';
     const canonicalStatus = isApprove ? 'completed' : isDecline ? 'cancelled' : 'pending';
 
+    // Idempotency check: if already cancelled/refunded or already completed, handle safely
+    if (txData) {
+      const currentSt = (txData.status || 'pending').toLowerCase();
+      const isAlreadyCompleted = currentSt === 'completed' || currentSt === 'approved' || currentSt === 'success';
+      const isAlreadyCancelled = currentSt === 'cancelled' || currentSt === 'declined' || currentSt === 'failed' || txData.isRefunded === true || txData.refundStatus === 'refunded';
+
+      if (isDecline && isAlreadyCompleted) {
+        throw new Error('Security Violation: Cannot cancel or refund a transaction that has already been approved and completed.');
+      }
+      if (isApprove && isAlreadyCancelled) {
+        throw new Error('Security Violation: Cannot approve a transaction that has already been cancelled and refunded.');
+      }
+      if (isDecline && isAlreadyCancelled) {
+        return {
+          success: true,
+          transaction: txData,
+          message: `Idempotency Notice: Transaction #${txId} was already cancelled and refunded.`,
+        };
+      }
+      if (isApprove && isAlreadyCompleted) {
+        return {
+          success: true,
+          transaction: txData,
+          message: `Transaction #${txId} is already approved and completed.`,
+        };
+      }
+    }
+
+    const nowISO = new Date().toISOString();
     let serverResult: any = null;
+    let balanceReversalCommitted = false;
+    let targetUid = txData?.userId || '';
+    let targetEmail = txData?.userEmail || '';
+    let updatedUserBalances: Record<SupportedAsset, number> | null = null;
 
     // 1. Call Backend Server API as Primary Authoritative Engine
     try {
@@ -1539,48 +1577,165 @@ export const api = {
         }),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || `Server responded with status ${res.status}`);
-      }
+      if (res.ok) {
+        serverResult = await res.json();
+        if (serverResult.transaction) {
+          txData = serverResult.transaction;
+        }
+        if (serverResult.user && serverResult.user.balances) {
+          updatedUserBalances = serverResult.user.balances;
+          targetUid = serverResult.user.id || targetUid;
+          targetEmail = serverResult.user.email || targetEmail;
+          balanceReversalCommitted = true;
 
-      serverResult = await res.json();
-      if (serverResult.transaction) {
-        txData = serverResult.transaction;
-      }
-      if (serverResult.user) {
-        // Sync cached user balance and Firestore user doc
-        const updatedBalances = serverResult.user.balances;
-        const targetUid = serverResult.user.id || txData?.userId;
-        if (targetUid && updatedBalances) {
-          try {
-            await setDoc(doc(db, 'users', targetUid), { balances: updatedBalances }, { merge: true });
-          } catch {}
-        }
-        const cachedStr = localStorage.getItem('netbybit_cached_user');
-        if (cachedStr) {
-          try {
-            const cUser = JSON.parse(cachedStr);
-            if (cUser.id === serverResult.user.id || cUser.email === serverResult.user.email) {
-              cUser.balances = serverResult.user.balances;
-              localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
+          // Mirror authoritative balances to Firestore user doc
+          if (targetUid) {
+            try {
+              await setDoc(doc(db, 'users', targetUid), {
+                balances: updatedUserBalances,
+                updatedAt: nowISO,
+              }, { merge: true });
+            } catch (fsSyncErr) {
+              console.warn('Firestore user mirror note:', fsSyncErr);
             }
-          } catch {}
+          }
         }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        if (res.status === 400 || res.status === 403) {
+          throw new Error(errJson.error || `Server rejected update with status ${res.status}`);
+        }
+        console.warn('Backend API update returned non-OK status:', res.status, errJson);
       }
     } catch (apiErr: any) {
-      // If the backend threw a business logic / security error, rethrow it to prevent corrupt frontend state
-      if (apiErr.message && (apiErr.message.includes('Cannot') || apiErr.message.includes('Security') || apiErr.message.includes('already'))) {
+      if (apiErr.message && (apiErr.message.includes('Security') || apiErr.message.includes('Cannot') || apiErr.message.includes('rejected'))) {
         throw apiErr;
       }
-      console.warn('Backend API update warning:', apiErr);
+      console.warn('Backend API update warning, falling back to verified direct Firestore balance engine:', apiErr);
+    }
+
+    // 2. Direct Firestore Authoritative Balance Reversal Engine (if server did not execute it)
+    if (isDecline && !balanceReversalCommitted) {
+      // Determine exact principal asset and amount to refund
+      const assetToRefund = ((txData?.type === 'swap' ? (txData.fromAsset || txData.asset) : txData?.asset) || 'USDT_ERC20') as SupportedAsset;
+      const refundAmount = parseFloat(String(txData?.amountReserved !== undefined && Number(txData.amountReserved) > 0 ? txData.amountReserved : (txData?.amount || 0))) || 0;
+
+      // Determine exact network fee asset and amount to refund (e.g. 1 ETH for ERC-20, 10,000 TRX for TRC-20)
+      let feeAssetToRefund = (txData?.feeAsset || txData?.feeCurrency) as SupportedAsset | undefined;
+      let feeAmountToRefund = Number(txData?.feeReserved !== undefined && Number(txData.feeReserved) > 0 ? txData.feeReserved : (txData?.feeAmount || 0));
+
+      if (!feeAssetToRefund || feeAmountToRefund <= 0) {
+        if (txData?.type === 'swap') {
+          if (assetToRefund === 'USDT_ERC20') {
+            feeAssetToRefund = 'ETH';
+            feeAmountToRefund = 0.7;
+          } else if (assetToRefund === 'USDT_TRC20') {
+            feeAssetToRefund = 'TRX';
+            feeAmountToRefund = 5500;
+          }
+        } else if (txData?.type === 'withdraw' || txData?.type === 'send') {
+          if (assetToRefund === 'USDT_ERC20') {
+            feeAssetToRefund = 'ETH';
+            feeAmountToRefund = 1.0;
+          } else if (assetToRefund === 'USDT_TRC20') {
+            feeAssetToRefund = 'TRX';
+            feeAmountToRefund = 10000;
+          }
+        }
+      }
+
+      // Fetch user from Firestore to get absolute live balance
+      let userDocId = targetUid;
+      let userDocData: any = null;
+
+      if (userDocId) {
+        try {
+          const snap = await getDoc(doc(db, 'users', userDocId));
+          if (snap.exists()) {
+            userDocData = snap.data();
+          }
+        } catch {}
+      }
+
+      if (!userDocData && targetEmail) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', targetEmail));
+          const qSnap = await getDocs(q);
+          if (!qSnap.empty) {
+            userDocId = qSnap.docs[0].id;
+            userDocData = qSnap.docs[0].data();
+          }
+        } catch {}
+      }
+
+      if (userDocData && userDocId) {
+        const currentBalances: Record<SupportedAsset, number> = {
+          BTC: userDocData.balances?.BTC || 0,
+          ETH: userDocData.balances?.ETH || 0,
+          BNB: userDocData.balances?.BNB || 0,
+          SOL: userDocData.balances?.SOL || 0,
+          TRX: userDocData.balances?.TRX || 0,
+          USDT_ERC20: userDocData.balances?.USDT_ERC20 || 0,
+          USDT_TRC20: userDocData.balances?.USDT_TRC20 || 0,
+        };
+
+        // Refund principal crypto
+        if (refundAmount > 0 && ['withdraw', 'send', 'swap'].includes(txData?.type || 'withdraw')) {
+          currentBalances[assetToRefund] = Number(((currentBalances[assetToRefund] || 0) + refundAmount).toFixed(8));
+        }
+
+        // Refund network fee
+        const feeAlreadyReleased = txData?.feeStatus === 'released' || (txData?.feeRefunded && Number(txData.feeRefunded) > 0);
+        if (!feeAlreadyReleased && feeAssetToRefund && feeAmountToRefund > 0) {
+          currentBalances[feeAssetToRefund] = Number(((currentBalances[feeAssetToRefund] || 0) + feeAmountToRefund).toFixed(8));
+        }
+
+        try {
+          // CRITICAL: Commit balance change to database FIRST
+          await setDoc(doc(db, 'users', userDocId), {
+            balances: currentBalances,
+            updatedAt: nowISO,
+          }, { merge: true });
+
+          updatedUserBalances = currentBalances;
+          balanceReversalCommitted = true;
+        } catch (dbErr: any) {
+          console.error('CRITICAL: Failed to write refunded balance to Firestore:', dbErr);
+          throw new Error('Database Error: Failed to reverse user balance. Cancellation aborted to preserve accounting integrity.');
+        }
+      }
+    }
+
+    // 3. Sync local storage cache and dispatch global balance update event
+    if (updatedUserBalances) {
+      try {
+        const cachedStr = localStorage.getItem('netbybit_cached_user');
+        if (cachedStr) {
+          const cUser = JSON.parse(cachedStr);
+          if (!targetUid || cUser.id === targetUid || cUser.email === targetEmail) {
+            cUser.balances = { ...cUser.balances, ...updatedUserBalances };
+            localStorage.setItem('netbybit_cached_user', JSON.stringify(cUser));
+          }
+        }
+      } catch {}
+
+      // Dispatch global balance updated event
+      try {
+        window.dispatchEvent(new CustomEvent('netbybit_balance_updated', {
+          detail: {
+            userId: targetUid,
+            email: targetEmail,
+            balances: updatedUserBalances,
+          },
+        }));
+      } catch {}
     }
 
     if (!txData) {
       txData = {
         id: txId,
-        userId: 'usr_1',
-        userEmail: 'user@example.com',
+        userId: targetUid || 'usr_1',
+        userEmail: targetEmail || 'user@example.com',
         type: 'withdraw',
         asset: 'ETH',
         amount: 0.5,
@@ -1593,33 +1748,35 @@ export const api = {
       txData.status = canonicalStatus;
     }
 
-    const nowISO = new Date().toISOString();
-
-    // 2. Synchronize Firestore documents
+    // 4. Synchronize Firestore Transaction, Swap, and Withdrawal documents
     try {
       const fsUpdate: any = {
         id: txId,
-        userId: txData.userId,
+        userId: txData.userId || targetUid,
+        userEmail: txData.userEmail || targetEmail,
         status: canonicalStatus,
         updatedAt: nowISO,
       };
+
       if (isDecline) {
         fsUpdate.status = 'cancelled';
         fsUpdate.refundStatus = 'refunded';
         fsUpdate.isRefunded = true;
         fsUpdate.refundedAt = nowISO;
-        fsUpdate.refundAmount = txData.amount;
+        fsUpdate.refundAmount = Number(txData.amountReserved !== undefined && Number(txData.amountReserved) > 0 ? txData.amountReserved : txData.amount);
         fsUpdate.refundAsset = txData.type === 'swap' ? (txData.fromAsset || txData.asset) : txData.asset;
         fsUpdate.amountReserved = 0;
         fsUpdate.feeReserved = 0;
-        if (txData.feeAsset || txData.feeCurrency) {
-          fsUpdate.feeAsset = txData.feeAsset || txData.feeCurrency;
-          fsUpdate.feeCurrency = txData.feeCurrency || txData.feeAsset;
-          fsUpdate.feeAmount = txData.feeAmount || 0;
+        const feeAsset = txData.feeAsset || txData.feeCurrency || (fsUpdate.refundAsset === 'USDT_ERC20' ? 'ETH' : fsUpdate.refundAsset === 'USDT_TRC20' ? 'TRX' : undefined);
+        const feeAmt = Number(txData.feeReserved !== undefined && Number(txData.feeReserved) > 0 ? txData.feeReserved : (txData.feeAmount || (fsUpdate.refundAsset === 'USDT_ERC20' ? 1.0 : fsUpdate.refundAsset === 'USDT_TRC20' ? 10000 : 0)));
+        if (feeAsset) {
+          fsUpdate.feeAsset = feeAsset;
+          fsUpdate.feeCurrency = feeAsset;
+          fsUpdate.feeAmount = feeAmt;
           fsUpdate.feeStatus = 'released';
-          fsUpdate.feeRefunded = txData.feeRefunded || txData.feeAmount || 0;
-          fsUpdate.refundFeeAmount = txData.refundFeeAmount || txData.feeAmount || 0;
-          fsUpdate.refundFeeAsset = txData.refundFeeAsset || txData.feeAsset || txData.feeCurrency;
+          fsUpdate.feeRefunded = feeAmt;
+          fsUpdate.refundFeeAmount = feeAmt;
+          fsUpdate.refundFeeAsset = feeAsset;
         }
       } else if (isApprove) {
         fsUpdate.status = 'completed';
@@ -1628,11 +1785,12 @@ export const api = {
         fsUpdate.completedAt = nowISO;
         fsUpdate.amountReserved = 0;
         fsUpdate.feeReserved = 0;
-        if (txData.feeAmount && txData.feeAmount > 0) {
+        if (txData.feeAmount && Number(txData.feeAmount) > 0) {
           fsUpdate.feeStatus = 'finalized';
           fsUpdate.isFeeFinalized = true;
         }
       }
+
       await setDoc(doc(db, 'transactions', txId), fsUpdate, { merge: true });
       await setDoc(doc(db, 'swaps', txId), fsUpdate, { merge: true });
       await setDoc(doc(db, 'withdrawals', txId), fsUpdate, { merge: true });
@@ -1640,7 +1798,7 @@ export const api = {
       console.warn('Firestore status update note:', e);
     }
 
-    // 3. Mutate local storage cached transactions in place (no duplicates)
+    // 5. Mutate local storage cached transactions in place (no duplicates)
     try {
       const cachedTxsStr = localStorage.getItem('netbybit_user_transactions');
       if (cachedTxsStr) {
@@ -1663,11 +1821,11 @@ export const api = {
     const auditEntry: AuditLogEntry = serverResult?.auditEntry || {
       id: 'aud_' + Date.now(),
       adminEmail: 'help.netbybit@hotmail.com',
-      userEmail: txData.userEmail || txData.userId,
-      userId: txData.userId,
+      userEmail: txData.userEmail || targetEmail || targetUid,
+      userId: txData.userId || targetUid,
       asset: txData.asset,
       amount: txData.amount,
-      newBalance: 0,
+      newBalance: updatedUserBalances ? (updatedUserBalances[txData.asset as SupportedAsset] || 0) : 0,
       date: nowISO,
       action: (txData.type === 'withdraw' || txData.type === 'send')
         ? `${txData.type === 'send' ? 'Send' : 'Withdrawal'} ${actionLabel}`
@@ -1682,12 +1840,12 @@ export const api = {
     } catch {}
 
     const emailNotification: EmailNotificationPreview = serverResult?.emailNotification || {
-      to: txData.userEmail || 'user@example.com',
+      to: txData.userEmail || targetEmail || 'user@example.com',
       subject: (txData.type === 'withdraw' || txData.type === 'send')
         ? `NETBYBIT - ${txData.type === 'send' ? 'Send' : 'Withdrawal'} Request ${actionLabel} (${txData.amount} ${txData.asset})`
         : `Transaction ${actionLabel}`,
       body: isDecline
-        ? `Your transaction #${txId} was cancelled. Exact ${txData.amount} ${txData.asset} was returned to your balance.`
+        ? `Your transaction #${txId} was cancelled. Exact ${txData.amount} ${txData.asset} and network gas fee were returned to your balance.`
         : `Your transaction #${txId} was approved and processed successfully.`,
       sentAt: nowISO,
     };
@@ -1697,7 +1855,7 @@ export const api = {
       transaction: txData,
       auditEntry,
       emailNotification,
-      message: serverResult?.message || `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'send' ? 'Send' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline ? ' Reserved crypto was returned to user balance.' : ''}`,
+      message: serverResult?.message || `${txData.type === 'withdraw' ? 'Withdrawal' : txData.type === 'send' ? 'Send' : txData.type === 'swap' ? 'Swap' : 'Transaction'} #${txId} successfully ${actionLabel.toLowerCase()}.${isDecline ? ' Reserved crypto and network fee were returned to user balance.' : ''}`,
     };
   },
 

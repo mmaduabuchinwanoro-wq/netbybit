@@ -4251,6 +4251,30 @@ NETBYBIT Support Team`;
       });
     }
 
+    // Direct synchronous Firestore update to guarantee immediate persistence
+    const dbInstance = getFirestoreDb();
+    if (dbInstance) {
+      try {
+        const syncPromises: Promise<any>[] = [];
+        if (user && user.id) {
+          syncPromises.push(setDoc(doc(dbInstance, 'users', user.id), JSON.parse(JSON.stringify(user)), { merge: true }));
+        }
+        if (tx && tx.id) {
+          syncPromises.push(setDoc(doc(dbInstance, 'transactions', tx.id), JSON.parse(JSON.stringify(tx)), { merge: true }));
+          syncPromises.push(setDoc(doc(dbInstance, 'withdrawals', tx.id), JSON.parse(JSON.stringify(tx)), { merge: true }));
+          if (tx.type === 'swap') {
+            syncPromises.push(setDoc(doc(dbInstance, 'swaps', tx.id), JSON.parse(JSON.stringify(tx)), { merge: true }));
+          }
+        }
+        if (auditEntry && auditEntry.id) {
+          syncPromises.push(setDoc(doc(dbInstance, 'audit_logs', auditEntry.id), JSON.parse(JSON.stringify(auditEntry)), { merge: true }));
+        }
+        await Promise.allSettled(syncPromises);
+      } catch (fsErr) {
+        console.warn('Sync Firestore status save note:', fsErr);
+      }
+    }
+
     await saveDB(db);
 
     res.json({
@@ -4260,6 +4284,7 @@ NETBYBIT Support Team`;
         userEmail: user ? user.email : (tx.userEmail || 'Unknown'),
       },
       user,
+      balances: user ? user.balances : {},
       auditEntry,
       emailNotification,
       message: `${tx.type === 'swap' ? 'Swap' : 'Withdrawal'} transaction #${tx.id} was successfully ${isApprove ? 'approved' : 'cancelled and refunded'}. Available balance updated.`,
