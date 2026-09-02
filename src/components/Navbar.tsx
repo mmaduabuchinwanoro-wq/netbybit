@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { NetbybitLogo } from './NetbybitLogo';
 import { CurrencySwitcher } from './CurrencySwitcher';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
+import { LiveCryptoPriceIndicator } from './LiveCryptoPriceIndicator';
 import {
   Shield,
   ArrowDownLeft,
@@ -59,16 +60,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenConnectWallet }) => {
 
   return (
     <header className="sticky top-0 z-50 bg-neutral-950/85 backdrop-blur-xl border-b border-amber-500/20 text-neutral-100 shadow-2xl">
-      {/* Top mini-bar displaying status */}
-      <div className="bg-neutral-950/90 border-b border-neutral-800/80 px-4 py-1.5 text-xs text-neutral-400 flex justify-between items-center">
-        <div className="flex items-center space-x-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="font-mono text-emerald-400 font-semibold text-[11px]">NETBYBIT VAULT ACTIVE</span>
-          <span className="hidden sm:inline text-neutral-700">|</span>
-          <span className="hidden sm:inline text-neutral-400 text-[11px]">Institutional Multi-Network Cold Storage</span>
+      {/* Top mini-bar displaying live cryptocurrency price indicator and system status */}
+      <div className="bg-neutral-950/95 border-b border-neutral-850 px-3 sm:px-4 py-1.5 text-xs text-neutral-400 flex flex-wrap justify-between items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <LiveCryptoPriceIndicator variant="ticker" />
+        </div>
+        <div className="hidden md:flex items-center space-x-2 text-[11px] font-mono text-neutral-400 shrink-0">
+          <span className="text-neutral-700">|</span>
+          <span className="text-emerald-400 font-semibold">Institutional Cold Storage</span>
         </div>
       </div>
 

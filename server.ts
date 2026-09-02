@@ -3055,11 +3055,15 @@ Log in to the Admin Panel / Staff Support Console to respond to this visitor.`,
   });
 });
 
-// Guest Support Tickets: Get Ticket by ID & Email
+// Guest Support Tickets: Get Ticket by ID & Email (Strict Isolation)
 app.get('/api/support/guest/tickets/:ticketId', (req, res) => {
   const { ticketId } = req.params;
   const emailQuery = (req.query.email as string || '').trim().toLowerCase();
   
+  if (!emailQuery) {
+    return res.status(400).json({ error: 'Email parameter is required to access guest tickets.' });
+  }
+
   const db = loadDB();
   const ticket = db.supportTickets?.find((t) => t.id === ticketId);
 
@@ -3067,8 +3071,14 @@ app.get('/api/support/guest/tickets/:ticketId', (req, res) => {
     return res.status(404).json({ error: 'Guest support chat ticket not found.' });
   }
 
-  // Security check: if email query provided, ensure it matches
-  if (emailQuery && ticket.userEmail.toLowerCase() !== emailQuery) {
+  // Security check: Ensure ticket belongs to a guest, not a registered user
+  const isGuestTicket = ticket.id.startsWith('TKT-GUEST') || (ticket.userId && ticket.userId.startsWith('guest_'));
+  if (!isGuestTicket) {
+    return res.status(403).json({ error: 'Unauthorized: Registered user tickets cannot be accessed via guest endpoint.' });
+  }
+
+  // Strict email ownership match
+  if (ticket.userEmail.toLowerCase().trim() !== emailQuery) {
     return res.status(403).json({ error: 'Unauthorized to view this ticket.' });
   }
 
@@ -3084,6 +3094,10 @@ app.post('/api/support/guest/tickets/:ticketId/reply', async (req, res) => {
     return res.status(400).json({ error: 'Reply message cannot be empty' });
   }
 
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'Email is required to reply to guest support ticket.' });
+  }
+
   const db = loadDB();
   const ticket = db.supportTickets?.find((t) => t.id === ticketId);
 
@@ -3091,7 +3105,12 @@ app.post('/api/support/guest/tickets/:ticketId/reply', async (req, res) => {
     return res.status(404).json({ error: 'Guest support chat ticket not found.' });
   }
 
-  if (email && ticket.userEmail.toLowerCase() !== email.trim().toLowerCase()) {
+  const isGuestTicket = ticket.id.startsWith('TKT-GUEST') || (ticket.userId && ticket.userId.startsWith('guest_'));
+  if (!isGuestTicket) {
+    return res.status(403).json({ error: 'Unauthorized: Registered user tickets cannot be updated via guest endpoint.' });
+  }
+
+  if (ticket.userEmail.toLowerCase().trim() !== email.trim().toLowerCase()) {
     return res.status(403).json({ error: 'Email mismatch for this ticket.' });
   }
 

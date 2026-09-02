@@ -138,7 +138,7 @@ export interface Transaction {
   feeCurrency?: string;
   amountReserved?: number;
   feeReserved?: number;
-  feeStatus?: 'reserved' | 'finalized' | 'released';
+  feeStatus?: 'reserved' | 'finalized' | 'released' | 'none';
   isFeeFinalized?: boolean;
   feeRefunded?: number;
   refundStatus?: 'none' | 'refunded' | 'not_applicable';

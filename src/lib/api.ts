@@ -1858,8 +1858,14 @@ export const api = {
     return res;
   },
 
-  getGuestSupportTicket: async (ticketId: string, email?: string): Promise<SupportTicket> => {
-    // 1. Try Firestore
+  getGuestSupportTicket: async (ticketId: string, email?: string): Promise<SupportTicket | null> => {
+    if (!ticketId || !email) {
+      return null;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Try Firestore with strict guest and email checks
     try {
       let snap = await getDoc(doc(db, 'support_tickets', ticketId));
       if (!snap.exists()) {
@@ -1867,7 +1873,8 @@ export const api = {
       }
       if (snap.exists()) {
         const ticket = snap.data() as SupportTicket;
-        if (!email || ticket.userEmail.toLowerCase() === email.toLowerCase().trim()) {
+        const isGuest = ticket.id.startsWith('TKT-GUEST') || (ticket.userId && ticket.userId.startsWith('guest_'));
+        if (isGuest && ticket.userEmail?.toLowerCase().trim() === cleanEmail) {
           return ticket;
         }
       }
@@ -1876,26 +1883,19 @@ export const api = {
     // 2. Try Backend Guest endpoint
     try {
       const res = await fetch(
-        `/api/support/guest/tickets/${ticketId}${email ? `?email=${encodeURIComponent(email.trim())}` : ''}`
+        `/api/support/guest/tickets/${ticketId}?email=${encodeURIComponent(cleanEmail)}`
       );
       if (res.ok) {
         const json = await res.json();
-        if (json?.ticket) return json.ticket as SupportTicket;
+        if (json?.ticket && (json.ticket.id.startsWith('TKT-GUEST') || json.ticket.userId?.startsWith('guest_'))) {
+          if (json.ticket.userEmail?.toLowerCase().trim() === cleanEmail) {
+            return json.ticket as SupportTicket;
+          }
+        }
       }
     } catch {}
 
-    return {
-      id: ticketId,
-      userId: 'guest',
-      userEmail: email || 'guest@example.com',
-      userName: 'Guest User',
-      subject: 'Guest Inquiry',
-      category: 'Support',
-      message: 'Inquiry',
-      status: 'Open',
-      createdAt: new Date().toISOString(),
-      replies: [],
-    };
+    return null;
   },
 
   getSupportTickets: async (): Promise<SupportTicket[]> => {
@@ -1917,9 +1917,9 @@ export const api = {
     if (!currentUser || !currentUser.id) {
       const guestTicketId = localStorage.getItem('netbybit_guest_ticket_id');
       const guestEmail = localStorage.getItem('netbybit_guest_email');
-      if (guestTicketId) {
+      if (guestTicketId && guestEmail) {
         try {
-          const guestTicket = await api.getGuestSupportTicket(guestTicketId, guestEmail || undefined);
+          const guestTicket = await api.getGuestSupportTicket(guestTicketId, guestEmail);
           if (guestTicket && guestTicket.id === guestTicketId) {
             return [guestTicket];
           }
@@ -1938,7 +1938,7 @@ export const api = {
       const snap1 = await getDocs(q1);
       snap1.forEach((d) => {
         const t = d.data() as SupportTicket;
-        if (t && (t.userId === currentUserId || (currentUserEmail && t.userEmail?.toLowerCase() === currentUserEmail))) {
+        if (t && t.userId === currentUserId) {
           ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
         }
       });
@@ -1949,38 +1949,13 @@ export const api = {
       const snap1b = await getDocs(q1b);
       snap1b.forEach((d) => {
         const t = d.data() as SupportTicket;
-        if (t && (t.userId === currentUserId || (currentUserEmail && t.userEmail?.toLowerCase() === currentUserEmail))) {
+        if (t && t.userId === currentUserId) {
           ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
         }
       });
     } catch {}
 
-    // 2. Fetch from Firestore filtered by user's email if available
-    if (currentUserEmail) {
-      try {
-        const q2 = query(collection(db, 'support_tickets'), where('userEmail', '==', currentUserEmail));
-        const snap2 = await getDocs(q2);
-        snap2.forEach((d) => {
-          const t = d.data() as SupportTicket;
-          if (t && (t.userId === currentUserId || t.userEmail?.toLowerCase() === currentUserEmail)) {
-            ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
-          }
-        });
-      } catch {}
-
-      try {
-        const q2b = query(collection(db, 'supportTickets'), where('userEmail', '==', currentUserEmail));
-        const snap2b = await getDocs(q2b);
-        snap2b.forEach((d) => {
-          const t = d.data() as SupportTicket;
-          if (t && (t.userId === currentUserId || t.userEmail?.toLowerCase() === currentUserEmail)) {
-            ticketMap.set(t.id || d.id, { ...t, id: t.id || d.id });
-          }
-        });
-      } catch {}
-    }
-
-    // 3. Fetch from backend API /api/support/tickets (server-enforced JWT user isolation)
+    // 2. Fetch from backend API /api/support/tickets (server-enforced JWT user isolation)
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
       if (token) {
@@ -1991,7 +1966,7 @@ export const api = {
           const serverTickets = await res.json();
           if (Array.isArray(serverTickets)) {
             serverTickets.forEach((t) => {
-              if (t && t.id) {
+              if (t && t.id && t.userId === currentUserId) {
                 ticketMap.set(t.id, t);
               }
             });
@@ -2000,13 +1975,8 @@ export const api = {
       }
     } catch {}
 
-    // 4. Strict isolation filter: drop any tickets belonging to other user IDs or emails
-    const list = Array.from(ticketMap.values()).filter((t) => {
-      const matchId = t.userId === currentUserId;
-      const matchEmail = currentUserEmail && t.userEmail?.toLowerCase().trim() === currentUserEmail;
-      return matchId || matchEmail;
-    });
-
+    // 3. Strict isolation filter: drop any tickets belonging to other user IDs
+    const list = Array.from(ticketMap.values()).filter((t) => t.userId === currentUserId);
     list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     return list;
   },

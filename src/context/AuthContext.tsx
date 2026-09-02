@@ -260,17 +260,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           (docSnap) => {
             if (docSnap.exists()) {
               const freshData = docSnap.data() as User;
-              setUser((prev) => {
-                if (!prev) return freshData;
-                const updated = {
-                  ...prev,
-                  ...freshData,
-                  balances: freshData.balances || prev.balances,
-                  withdrawalAddresses: freshData.withdrawalAddresses || prev.withdrawalAddresses,
-                };
-                localStorage.setItem('netbybit_cached_user', JSON.stringify(updated));
-                return updated;
-              });
+              // Ensure this data matches the current user ID
+              if (freshData && (!freshData.id || freshData.id === user.id)) {
+                setUser((prev) => {
+                  if (!prev) return freshData;
+                  const updated = {
+                    ...prev,
+                    ...freshData,
+                    balances: freshData.balances || prev.balances,
+                    withdrawalAddresses: freshData.withdrawalAddresses || prev.withdrawalAddresses,
+                  };
+                  localStorage.setItem('netbybit_cached_user', JSON.stringify(updated));
+                  return updated;
+                });
+              }
             }
           },
           (err) => {
@@ -282,52 +285,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Failed to bind real-time user listener:', e);
     }
 
-    try {
-      if (db && user.email) {
-        const qEmail = query(collection(db, 'users'), where('email', '==', user.email.toLowerCase()));
-        unsubEmail = onSnapshot(
-          qEmail,
-          (snap) => {
-            if (!snap.empty) {
-              const matchingDocs = snap.docs.map((d) => d.data() as User);
-              const mergedBalances: Record<string, number> = {};
-              for (const u of matchingDocs) {
-                if (u.balances) {
-                  for (const [k, v] of Object.entries(u.balances)) {
-                    mergedBalances[k] = Math.max(Number(v) || 0, mergedBalances[k] || 0);
-                  }
-                }
-              }
-              if (Object.keys(mergedBalances).length > 0) {
-                setUser((prev) => {
-                  if (!prev) return prev;
-                  const updated = {
-                    ...prev,
-                    balances: {
-                      ...prev.balances,
-                      ...mergedBalances,
-                    },
-                  };
-                  localStorage.setItem('netbybit_cached_user', JSON.stringify(updated));
-                  return updated;
-                });
-              }
-            }
-          },
-          (err) => {
-            console.warn('Real-time email query listener note:', err);
-          }
-        );
-      }
-    } catch (e) {
-      console.warn('Failed to bind real-time email listener:', e);
-    }
-
     // Instant local custom event listener
     const handleBalanceEvent = (e: any) => {
       const detail = e.detail;
       if (detail && detail.balances) {
-        if (!detail.email || detail.email.toLowerCase() === user.email?.toLowerCase()) {
+        if (!detail.userId || detail.userId === user.id) {
           setUser((prev) => {
             if (!prev) return prev;
             const updated = {
@@ -348,10 +310,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       if (unsubDoc) unsubDoc();
-      if (unsubEmail) unsubEmail();
       window.removeEventListener('netbybit_balance_updated', handleBalanceEvent);
     };
-  }, [user?.id, user?.email]);
+  }, [user?.id]);
 
   const setSelectedCurrency = async (curr: string) => {
     const cleanCurr = curr.toUpperCase();
@@ -373,6 +334,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, pass: string) => {
+    // Clear any previous guest ticket or foreign session remnants before setting user
+    localStorage.removeItem('netbybit_guest_ticket_id');
+    localStorage.removeItem('netbybit_guest_email');
+    localStorage.removeItem('netbybit_guest_name');
+    localStorage.removeItem('netbybit_user_transactions');
+    localStorage.removeItem('netbybit_wallet_requests');
+
     const res = await api.login({ email, password: pass });
     if (res.token && res.user) {
       setAuthToken(res.token);
@@ -386,12 +354,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setActivePage('dashboard');
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('netbybit:login', { detail: res.user }));
+      }
       return { user: res.user };
     }
     throw new Error('Invalid login response');
   };
 
   const verify2FA = async (tempToken: string, code: string) => {
+    localStorage.removeItem('netbybit_guest_ticket_id');
+    localStorage.removeItem('netbybit_guest_email');
+    localStorage.removeItem('netbybit_guest_name');
+    localStorage.removeItem('netbybit_user_transactions');
+    localStorage.removeItem('netbybit_wallet_requests');
+
     const res = await api.verify2FA({ tempToken, code });
     setAuthToken(res.token);
     setUser(res.user);
@@ -403,6 +380,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setActivePage('admin');
     } else {
       setActivePage('dashboard');
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:login', { detail: res.user }));
     }
     return res.user;
   };
@@ -416,16 +396,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, pass: string, name: string, username?: string) => {
+    localStorage.removeItem('netbybit_guest_ticket_id');
+    localStorage.removeItem('netbybit_guest_email');
+    localStorage.removeItem('netbybit_guest_name');
+    localStorage.removeItem('netbybit_user_transactions');
+    localStorage.removeItem('netbybit_wallet_requests');
+
     const res = await api.register({ email, password: pass, name, username });
     setAuthToken(res.token);
     setUser(res.user);
     setActivePage('dashboard');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:login', { detail: res.user }));
+    }
   };
 
   const logout = () => {
     removeAuthToken();
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('netbybit_token');
+      localStorage.removeItem('netbybit_cached_user');
+      localStorage.removeItem('netbybit_guest_ticket_id');
+      localStorage.removeItem('netbybit_guest_email');
+      localStorage.removeItem('netbybit_guest_name');
+      localStorage.removeItem('netbybit_user_transactions');
+      localStorage.removeItem('netbybit_wallet_requests');
+    } catch {}
     setUser(null);
+    setNotifications([]);
+    setIsLiveChatOpen(false);
     setActivePage('home');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:logout'));
+    }
   };
 
   const calculateTotalUsdBalance = (userBalances?: Record<string, number>): number => {

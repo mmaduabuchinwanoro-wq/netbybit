@@ -1,18 +1,29 @@
 [
   {
+    "username": "netbybit_admin",
     "status": "active",
-    "passwordHash": "$2b$10$Dqq9MlosD81xL4k1uf3cieuUCpm17BbPSfs1e60kwpAhFZyi9OMNe",
-    "createdAt": "2026-08-04T13:00:23.189Z",
-    "role": "admin",
-    "id": "usr_admin_primary",
-    "pendingTwoFactorSecret": "2XPYXPIFEDCUD55M",
-    "email": "help.netbybit@hotmail.com",
     "emailVerified": false,
+    "createdAt": "2026-08-04T13:00:23.189Z",
+    "email": "help.netbybit@hotmail.com",
+    "role": "admin",
     "name": "Platform Administrator",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "preferredCurrency": "USD",
-    "twoFactorEnabled": true,
+    "pendingTwoFactorSecret": "2XPYXPIFEDCUD55M",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "0x400773d018e8ad3575458b5e8b11ff55078451c9",
+      "TRX": "TYKh3ktyqwNMUYoo89UrMbdqjV3CUKWQ8M",
+      "BTC": "1Fy9Up78qVeawXCLnAqcnRJrvjiXLJF21d",
+      "BNB": "0x400773d018e8ad3575458b5e8b11ff55078451c9",
+      "USDT_TRC20": "TYKh3ktyqwNMUYoo89UrMbdqjV3CUKWQ8M",
+      "SOL": "7XwK3nJ5pM4q2yZ8vW9R1t6Y3u0I2o8P4s5D6f7G8h9J",
+      "ETH": "0x400773d018e8ad3575458b5e8b11ff55078451c9"
+    },
+    "twoFactorSecret": "2XPYXPIFEDCUD55M",
+    "id": "usr_admin_primary",
     "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "twoFactorEnabled": true,
+    "preferredCurrency": "USD",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "passwordHash": "$2b$10$ToIDpxYbIzWrKkzgwQGNVOO1pEZFDIa4nQnszvBNvM2bmy9US3z2W",
     "balances": {
       "BTC": 1.25,
       "ETH": 15.5,
@@ -21,21 +32,12 @@
       "TRX": 12500,
       "USDT_ERC20": 25000,
       "USDT_TRC20": 15000
-    },
-    "username": "netbybit_admin",
-    "withdrawalAddresses": {
-      "TRX": "TYKh3ktyqwNMUYoo89UrMbdqjV3CUKWQ8M",
-      "USDT_TRC20": "TYKh3ktyqwNMUYoo89UrMbdqjV3CUKWQ8M",
-      "USDT_ERC20": "0x400773d018e8ad3575458b5e8b11ff55078451c9",
-      "ETH": "0x400773d018e8ad3575458b5e8b11ff55078451c9",
-      "SOL": "7XwK3nJ5pM4q2yZ8vW9R1t6Y3u0I2o8P4s5D6f7G8h9J",
-      "BNB": "0x400773d018e8ad3575458b5e8b11ff55078451c9",
-      "BTC": "1Fy9Up78qVeawXCLnAqcnRJrvjiXLJF21d"
-    },
-    "twoFactorSecret": "2XPYXPIFEDCUD55M"
+    }
   },
   {
-    "passwordHash": "$2b$10$Vt2HntPKdUgakzOs.u3pYe4s5ni5ikNZEmarQZGvdPgQXAkYUhFJi",
+    "status": "active",
+    "createdAt": "2026-08-04T13:00:23.340Z",
+    "emailVerified": false,
     "balances": {
       "BTC": 0.5,
       "ETH": 2,
@@ -45,72 +47,35 @@
       "USDT_ERC20": 2500,
       "USDT_TRC20": 2500
     },
-    "withdrawalAddresses": {
-      "TRX": "",
-      "SOL": "",
-      "ETH": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "BNB": "",
-      "BTC": ""
-    },
-    "username": "trader",
-    "status": "active",
-    "id": "usr_demo_trader_1",
-    "emailVerified": false,
     "email": "trader@netbybit.com",
-    "createdAt": "2026-08-04T13:00:23.340Z",
+    "id": "usr_demo_trader_1",
+    "avatar": "",
+    "username": "trader",
     "role": "user",
     "name": "Demo Trader",
-    "avatar": "",
-    "updatedAt": "2026-09-01T12:25:26.873Z"
-  },
-  {
-    "passwordHash": "$2b$10$fQgds1NJ.O6oJLzw7U9wnew0KPIwFMIsl/QTVjhr9KxVArzzxYZKy",
-    "createdAt": "2026-08-04T13:00:27.257Z",
     "withdrawalAddresses": {
-      "ETH": "",
-      "SOL": "",
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
       "TRX": "",
-      "USDT_TRC20": ""
-    },
-    "id": "usr_1785848427257_rqr81",
-    "status": "active",
-    "email": "testuser99@gmail.com",
-    "verificationCode": "826447",
-    "avatar": "",
-    "emailVerified": false,
-    "name": "Test User",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "role": "user",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "username": "testuser99"
-  },
-  {
-    "withdrawalAddresses": {
-      "USDT_ERC20": "",
+      "BNB": "",
       "USDT_TRC20": "",
-      "TRX": "",
+      "BTC": "",
+      "ETH": "",
+      "USDT_ERC20": "",
+      "SOL": ""
+    },
+    "passwordHash": "$2b$10$Vt2HntPKdUgakzOs.u3pYe4s5ni5ikNZEmarQZGvdPgQXAkYUhFJi",
+    "updatedAt": "2026-09-02T08:29:03.706Z"
+  },
+  {
+    "status": "active",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
       "BTC": "",
       "BNB": "",
-      "SOL": "",
-      "ETH": ""
+      "USDT_TRC20": "",
+      "TRX": ""
     },
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "email": "testuser2026@netbybit.com",
-    "status": "active",
-    "username": "testuser2026",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -120,20 +85,21 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "resetCode": null,
-    "createdAt": "2026-08-06T08:38:48.880Z",
-    "passwordHash": "$2b$10$oJtILk.vqgrFudiUB//iPeULAq4wEKiGRFkapwMr0ugR9L31cPGr6",
-    "id": "usr_1786005528880_cf1gp",
-    "verificationCode": "911767",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "avatar": "",
     "role": "user",
     "name": "Test User",
-    "avatar": "",
+    "createdAt": "2026-08-04T13:00:27.257Z",
+    "email": "testuser99@gmail.com",
+    "passwordHash": "$2b$10$fQgds1NJ.O6oJLzw7U9wnew0KPIwFMIsl/QTVjhr9KxVArzzxYZKy",
+    "username": "testuser99",
+    "id": "usr_1785848427257_rqr81",
+    "verificationCode": "826447",
     "emailVerified": false
   },
   {
+    "createdAt": "2026-08-06T08:38:48.880Z",
     "status": "active",
-    "createdAt": "2026-08-06T09:38:22.636Z",
-    "id": "usr_1786009102636_7hiai",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -144,39 +110,61 @@
       "USDT_TRC20": 0
     },
     "withdrawalAddresses": {
-      "BTC": "",
-      "BNB": "",
-      "SOL": "",
-      "ETH": "",
       "TRX": "",
+      "BNB": "",
+      "BTC": "",
       "USDT_ERC20": "",
-      "USDT_TRC20": ""
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": ""
     },
-    "username": "perm_user_2026",
+    "email": "testuser2026@netbybit.com",
+    "avatar": "",
+    "passwordHash": "$2b$10$oJtILk.vqgrFudiUB//iPeULAq4wEKiGRFkapwMr0ugR9L31cPGr6",
+    "username": "testuser2026",
     "emailVerified": false,
     "role": "user",
-    "passwordHash": "$2b$10$5FYlMzGOilaJCur.2.8w/.FS3eX4zDmxN3U2GLbxB/YQk2VXPMs7G",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "verificationCode": "200398",
-    "avatar": "",
-    "name": "Permanent User 2026",
-    "email": "testuser_permanent_2026@netbybit.com"
+    "name": "Test User",
+    "resetCode": null,
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "id": "usr_1786005528880_cf1gp",
+    "verificationCode": "911767"
   },
   {
-    "name": "Monalisa Bilosun",
     "withdrawalAddresses": {
-      "BTC": "",
-      "SOL": "",
-      "USDT_TRC20": "",
       "BNB": "",
-      "ETH": "",
+      "USDT_TRC20": "",
+      "BTC": "",
       "TRX": "",
-      "USDT_ERC20": ""
+      "ETH": "",
+      "USDT_ERC20": "",
+      "SOL": ""
     },
     "status": "active",
-    "id": "usr_1786010306950_93gow",
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "avatar": "",
     "role": "user",
+    "name": "Permanent User 2026",
+    "createdAt": "2026-08-06T09:38:22.636Z",
+    "email": "testuser_permanent_2026@netbybit.com",
+    "passwordHash": "$2b$10$5FYlMzGOilaJCur.2.8w/.FS3eX4zDmxN3U2GLbxB/YQk2VXPMs7G",
+    "username": "perm_user_2026",
+    "id": "usr_1786009102636_7hiai",
+    "verificationCode": "200398",
+    "emailVerified": false
+  },
+  {
+    "email": "monalisabilosun@gmail.com",
+    "id": "usr_1786010306950_93gow",
     "balances": {
       "BTC": 0.5,
       "ETH": 2,
@@ -187,18 +175,42 @@
       "USDT_TRC20": 0
     },
     "createdAt": "2026-08-06T09:58:26.950Z",
+    "withdrawalAddresses": {
+      "BTC": "",
+      "SOL": "",
+      "USDT_TRC20": "",
+      "BNB": "",
+      "ETH": "",
+      "TRX": "",
+      "USDT_ERC20": ""
+    },
     "username": "monalisa_bilosun",
-    "email": "monalisabilosun@gmail.com",
-    "emailVerified": true,
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "name": "Monalisa Bilosun",
+    "role": "user",
+    "status": "active",
     "verificationCode": "792813",
     "passwordHash": "$2b$10$7i9xmywG3ECZ2kDc9ZxxFOYrypclNTP.HOJ0RI4dUtGRSnt0oacgi",
-    "updatedAt": "2026-09-01T12:25:26.873Z"
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "emailVerified": true
   },
   {
-    "createdAt": "2026-08-06T10:34:47.179Z",
-    "avatar": "",
-    "name": "Test User Persistence",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "status": "active",
+    "username": "testuser_1786012487008",
     "id": "usr_1786012487179_xk2ep",
+    "avatar": "",
+    "emailVerified": false,
+    "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "TRX": "",
+      "BNB": "",
+      "BTC": "",
+      "USDT_ERC20": "",
+      "ETH": "",
+      "SOL": ""
+    },
+    "verificationCode": "892970",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -208,33 +220,19 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "username": "testuser_1786012487008",
+    "name": "Test User Persistence",
     "role": "user",
-    "passwordHash": "$2b$10$7EFyySSom666nqESiGNhzebeG0OKXrcGkW4fH2IN1ngftHvUUIQRG",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "withdrawalAddresses": {
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "SOL": "",
-      "ETH": "",
-      "BNB": "",
-      "BTC": "",
-      "TRX": ""
-    },
-    "status": "active",
-    "verificationCode": "892970",
     "email": "testuser_1786012487008@netbybit.com",
-    "emailVerified": false
+    "createdAt": "2026-08-06T10:34:47.179Z",
+    "passwordHash": "$2b$10$7EFyySSom666nqESiGNhzebeG0OKXrcGkW4fH2IN1ngftHvUUIQRG"
   },
   {
-    "role": "user",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "passwordHash": "$2b$10$WQnWlAbWEpW6jBtpajd9vOfNRJBFOsuGOPw1xLpAzxFaOuXqcpWfy",
-    "name": "Registered User Test",
-    "id": "usr_1786028808454_ts8l7",
-    "username": "registered_user_1786028808289",
     "verificationCode": "537578",
-    "avatar": "",
+    "id": "usr_1786028808454_ts8l7",
+    "name": "Registered User Test",
+    "role": "user",
     "balances": {
       "BTC": 0.75,
       "ETH": 0,
@@ -244,57 +242,71 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "email": "registered_user_1786028808289@netbybit.com",
-    "createdAt": "2026-08-06T15:06:48.455Z",
-    "emailVerified": false,
-    "status": "active",
+    "avatar": "",
     "withdrawalAddresses": {
-      "TRX": "",
+      "USDT_ERC20": "",
       "SOL": "",
       "ETH": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "BNB": "",
-      "BTC": ""
-    }
-  },
-  {
-    "createdAt": "2026-08-07T09:05:36.342Z",
-    "avatar": "",
-    "username": "customer_1786093536171",
-    "role": "user",
-    "balances": {
-      "BTC": 1.5,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "name": "Jane Customer",
-    "verificationCode": "864573",
-    "id": "usr_1786093536342_4ombw",
-    "email": "customer_1786093536171@netbybit.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "emailVerified": false,
-    "withdrawalAddresses": {
       "TRX": "",
-      "USDT_ERC20": "",
       "USDT_TRC20": "",
       "BTC": "",
-      "BNB": "",
-      "SOL": "",
-      "ETH": ""
+      "BNB": ""
     },
-    "passwordHash": "$2b$10$BLgCv/0okv0EjDbvC9S6LuAondblRM8NvjZdQYfylUfSPvl7HXxVe",
-    "status": "active"
+    "username": "registered_user_1786028808289",
+    "status": "active",
+    "emailVerified": false,
+    "email": "registered_user_1786028808289@netbybit.com",
+    "createdAt": "2026-08-06T15:06:48.455Z"
   },
   {
-    "createdAt": "2026-08-07T15:40:45.963Z",
-    "avatar": "",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "USDT_TRC20": "",
+      "TRX": "",
+      "BTC": "",
+      "BNB": ""
+    },
+    "name": "Jane Customer",
     "role": "user",
+    "emailVerified": false,
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "balances": {
+      "BTC": 1.5,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
+    "passwordHash": "$2b$10$BLgCv/0okv0EjDbvC9S6LuAondblRM8NvjZdQYfylUfSPvl7HXxVe",
+    "username": "customer_1786093536171",
+    "createdAt": "2026-08-07T09:05:36.342Z",
+    "id": "usr_1786093536342_4ombw",
+    "email": "customer_1786093536171@netbybit.com",
+    "status": "active",
+    "verificationCode": "864573"
+  },
+  {
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "status": "active",
     "username": "customer_1786117245802",
+    "id": "usr_1786117245963_j0sn4",
+    "avatar": "",
+    "emailVerified": false,
+    "withdrawalAddresses": {
+      "TRX": "",
+      "BNB": "",
+      "USDT_ERC20": "",
+      "BTC": "",
+      "ETH": "",
+      "USDT_TRC20": "",
+      "SOL": ""
+    },
+    "verificationCode": "478401",
     "balances": {
       "BTC": 1.5,
       "ETH": 0,
@@ -305,25 +317,16 @@
       "USDT_TRC20": 0
     },
     "name": "Jane Customer",
-    "verificationCode": "478401",
-    "id": "usr_1786117245963_j0sn4",
+    "role": "user",
     "email": "customer_1786117245802@netbybit.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "emailVerified": false,
-    "withdrawalAddresses": {
-      "TRX": "",
-      "SOL": "",
-      "ETH": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "BNB": "",
-      "BTC": ""
-    },
-    "passwordHash": "$2b$10$gn0iO57uiNJUrpCOGzvdPeKpq0EeVd81EqDkwcxfwjFh.te7CZ3SW",
-    "status": "active"
+    "createdAt": "2026-08-07T15:40:45.963Z",
+    "passwordHash": "$2b$10$gn0iO57uiNJUrpCOGzvdPeKpq0EeVd81EqDkwcxfwjFh.te7CZ3SW"
   },
   {
+    "avatar": "",
     "verificationCode": "345098",
+    "id": "usr_1786117565146_j72xl",
+    "email": "testuser_1786117564960@netbybit.com",
     "balances": {
       "BTC": 0,
       "ETH": 1,
@@ -333,32 +336,39 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "username": "testuser_1786117564960",
-    "avatar": "",
     "withdrawalAddresses": {
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "TRX": "",
       "SOL": "",
       "ETH": "",
+      "USDT_TRC20": "",
+      "BTC": "",
       "BNB": "",
-      "BTC": ""
+      "TRX": "",
+      "USDT_ERC20": ""
     },
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "passwordHash": "$2b$10$okqjAK2oB/2oMoAXheyVXeF.dpGXjEkDubPALfXejmkU09NQk6Vp.",
+    "createdAt": "2026-08-07T15:46:05.146Z",
     "status": "active",
+    "role": "user",
     "emailVerified": false,
     "name": "Test User",
-    "role": "user",
-    "createdAt": "2026-08-07T15:46:05.146Z",
-    "id": "usr_1786117565146_j72xl",
-    "email": "testuser_1786117564960@netbybit.com"
+    "username": "testuser_1786117564960"
   },
   {
-    "createdAt": "2026-08-07T15:46:13.914Z",
-    "avatar": "",
+    "withdrawalAddresses": {
+      "SOL": "",
+      "ETH": "",
+      "USDT_TRC20": "",
+      "BTC": "",
+      "BNB": "",
+      "TRX": "",
+      "USDT_ERC20": ""
+    },
+    "name": "Test User",
     "role": "user",
-    "username": "testuser_1786117573784",
+    "emailVerified": false,
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "balances": {
       "BTC": 0.0015,
       "ETH": 1,
@@ -368,29 +378,29 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "name": "Test User",
-    "verificationCode": "171946",
+    "createdAt": "2026-08-07T15:46:13.914Z",
+    "username": "testuser_1786117573784",
+    "passwordHash": "$2b$10$J.iyVELtJeKUDB0ezz396.uIcgyzDqm0xqCq2iCbPgtb6R3NK.BNa",
     "id": "usr_1786117573914_8erw0",
     "email": "testuser_1786117573784@netbybit.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "emailVerified": false,
-    "withdrawalAddresses": {
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "TRX": "",
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "BNB": ""
-    },
-    "passwordHash": "$2b$10$J.iyVELtJeKUDB0ezz396.uIcgyzDqm0xqCq2iCbPgtb6R3NK.BNa",
-    "status": "active"
+    "status": "active",
+    "verificationCode": "171946"
   },
   {
-    "createdAt": "2026-08-07T15:55:20.561Z",
-    "avatar": "",
-    "username": "e2e_user_1786118120379",
+    "withdrawalAddresses": {
+      "SOL": "",
+      "USDT_TRC20": "",
+      "ETH": "",
+      "TRX": "",
+      "BTC": "",
+      "BNB": "",
+      "USDT_ERC20": ""
+    },
+    "emailVerified": false,
+    "name": "E2E User",
     "role": "user",
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "balances": {
       "BTC": 0.0075,
       "ETH": 1,
@@ -400,73 +410,19 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "name": "E2E User",
-    "verificationCode": "324903",
+    "username": "e2e_user_1786118120379",
+    "createdAt": "2026-08-07T15:55:20.561Z",
+    "passwordHash": "$2b$10$xtLgg2a16ZvCMEnuJsxGPejn3GJN900qM5oazIysHIRn2KwT79E0m",
     "id": "usr_1786118120561_8yra9",
     "email": "e2e_user_1786118120379@netbybit.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "emailVerified": false,
-    "withdrawalAddresses": {
-      "TRX": "",
-      "BNB": "",
-      "BTC": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "SOL": "",
-      "ETH": ""
-    },
-    "passwordHash": "$2b$10$xtLgg2a16ZvCMEnuJsxGPejn3GJN900qM5oazIysHIRn2KwT79E0m",
-    "status": "active"
+    "status": "active",
+    "verificationCode": "324903"
   },
   {
-    "createdAt": "2026-08-07T16:07:54.425Z",
     "avatar": "",
-    "role": "user",
-    "username": "live_user_1786118874247",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "name": "Live User",
     "verificationCode": "628004",
     "id": "usr_1786118874425_8q5ji",
     "email": "live_user_1786118874247@netbybit.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "emailVerified": false,
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "BTC": "",
-      "BNB": "",
-      "TRX": ""
-    },
-    "passwordHash": "$2b$10$tadcLlzNfw80rbcuNYSsKe3k6/7/6W2EDvw2VJwB9ciRNcZsId7BO",
-    "status": "active"
-  },
-  {
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "verificationCode": "566082",
-    "status": "active",
-    "email": "persisted_user_1786119835563@netbybit.com",
-    "emailVerified": false,
-    "withdrawalAddresses": {
-      "TRX": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "ETH": "",
-      "SOL": "",
-      "BNB": "",
-      "BTC": ""
-    },
-    "passwordHash": "$2b$10$n52HI9I2vt75rEbRbTNYpOrWhBoOJvmdR7qGZkAI6RZBgPWfjWnEG",
-    "username": "persisted_user_1786119835563",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -476,29 +432,60 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "name": "Persistence Test User",
-    "id": "usr_1786119835726_pcgvl",
-    "createdAt": "2026-08-07T16:23:55.726Z",
-    "avatar": "",
-    "role": "user"
-  },
-  {
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "verificationCode": "551179",
-    "email": "firestore_user_1786120850567@netbybit.com",
-    "status": "active",
-    "emailVerified": false,
     "withdrawalAddresses": {
-      "ETH": "",
-      "SOL": "",
       "BNB": "",
+      "USDT_TRC20": "",
       "BTC": "",
       "TRX": "",
       "USDT_ERC20": "",
-      "USDT_TRC20": ""
+      "ETH": "",
+      "SOL": ""
     },
-    "passwordHash": "$2b$10$O849HA3BmIoyeejTZOJAUuNjFZqK4BwwU3VxdFlC1/UkAK4kSWvHi",
-    "username": "firestore_user_1786120850567",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "passwordHash": "$2b$10$tadcLlzNfw80rbcuNYSsKe3k6/7/6W2EDvw2VJwB9ciRNcZsId7BO",
+    "createdAt": "2026-08-07T16:07:54.425Z",
+    "status": "active",
+    "emailVerified": false,
+    "role": "user",
+    "name": "Live User",
+    "username": "live_user_1786118874247"
+  },
+  {
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "passwordHash": "$2b$10$n52HI9I2vt75rEbRbTNYpOrWhBoOJvmdR7qGZkAI6RZBgPWfjWnEG",
+    "verificationCode": "566082",
+    "id": "usr_1786119835726_pcgvl",
+    "role": "user",
+    "name": "Persistence Test User",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "BTC": "",
+      "BNB": "",
+      "USDT_TRC20": "",
+      "TRX": ""
+    },
+    "avatar": "",
+    "username": "persisted_user_1786119835563",
+    "emailVerified": false,
+    "status": "active",
+    "createdAt": "2026-08-07T16:23:55.726Z",
+    "email": "persisted_user_1786119835563@netbybit.com"
+  },
+  {
+    "verificationCode": "551179",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "emailVerified": false,
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -509,30 +496,28 @@
       "USDT_TRC20": 0
     },
     "name": "Firestore Test User",
+    "role": "user",
+    "avatar": "",
     "id": "usr_1786120852003_h9zd4",
-    "createdAt": "2026-08-07T16:40:52.003Z",
-    "role": "user",
-    "avatar": ""
-  },
-  {
-    "status": "active",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "id": "usr_1786121708955_1i6r1",
-    "passwordHash": "$2b$10$3Xe7OKBJhlrpycEBD3ku9.ymPO6gS44V3uAyqKEfWsRRNsIUFF.iS",
-    "emailVerified": false,
-    "verificationCode": "388026",
-    "role": "user",
     "withdrawalAddresses": {
-      "TRX": "",
+      "USDT_TRC20": "",
       "SOL": "",
       "ETH": "",
-      "USDT_TRC20": "",
       "USDT_ERC20": "",
-      "BNB": "",
-      "BTC": ""
+      "TRX": "",
+      "BTC": "",
+      "BNB": ""
     },
-    "createdAt": "2026-08-07T16:55:08.955Z",
+    "passwordHash": "$2b$10$O849HA3BmIoyeejTZOJAUuNjFZqK4BwwU3VxdFlC1/UkAK4kSWvHi",
+    "username": "firestore_user_1786120850567",
+    "createdAt": "2026-08-07T16:40:52.003Z",
+    "email": "firestore_user_1786120850567@netbybit.com",
+    "status": "active"
+  },
+  {
     "avatar": "",
+    "verificationCode": "388026",
+    "id": "usr_1786121708955_1i6r1",
     "email": "netbybit_firebase_1786121707021@example.com",
     "balances": {
       "BTC": 0,
@@ -543,30 +528,28 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "username": "netbybit_firebase_1786121707021",
-    "name": "Firestore Verified User"
-  },
-  {
-    "status": "active",
-    "preferredCurrency": "USD",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "id": "usr_1786122171779_hnnjr",
-    "passwordHash": "$2b$10$7n/x9zzxS6HnIbM1kBuHIe.7NYxNpBEnenoxaxWD6raBjn9zJZwgG",
-    "verificationCode": "297237",
-    "emailVerified": false,
-    "role": "user",
     "withdrawalAddresses": {
       "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "TRX": "",
-      "SOL": "",
       "ETH": "",
+      "SOL": "",
+      "TRX": "",
+      "USDT_ERC20": "",
       "BNB": "",
       "BTC": ""
     },
-    "createdAt": "2026-08-07T17:02:51.779Z",
-    "avatar": "",
-    "email": "diegodaniel@gmail.com",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "passwordHash": "$2b$10$3Xe7OKBJhlrpycEBD3ku9.ymPO6gS44V3uAyqKEfWsRRNsIUFF.iS",
+    "createdAt": "2026-08-07T16:55:08.955Z",
+    "status": "active",
+    "emailVerified": false,
+    "role": "user",
+    "name": "Firestore Verified User",
+    "username": "netbybit_firebase_1786121707021"
+  },
+  {
+    "verificationCode": "297237",
+    "emailVerified": false,
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -576,25 +559,45 @@
       "USDT_ERC20": 1000000,
       "USDT_TRC20": 0
     },
+    "role": "user",
+    "name": "Diego  Daniel",
+    "avatar": "",
+    "id": "usr_1786122171779_hnnjr",
+    "withdrawalAddresses": {
+      "TRX": "",
+      "USDT_TRC20": "",
+      "BNB": "",
+      "BTC": "",
+      "USDT_ERC20": "",
+      "ETH": "",
+      "SOL": ""
+    },
+    "passwordHash": "$2b$10$7n/x9zzxS6HnIbM1kBuHIe.7NYxNpBEnenoxaxWD6raBjn9zJZwgG",
     "username": "Diego312",
-    "name": "Diego  Daniel"
+    "createdAt": "2026-08-07T17:02:51.779Z",
+    "email": "diegodaniel@gmail.com",
+    "status": "active",
+    "preferredCurrency": "USD"
   },
   {
-    "role": "user",
-    "createdAt": "2026-08-07T17:31:35.972Z",
+    "email": "netbybit_admin_test_1786123893850@example.com",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "withdrawalAddresses": {
-      "BTC": "",
-      "BNB": "",
-      "ETH": "",
       "USDT_ERC20": "",
+      "TRX": "",
+      "BNB": "",
+      "BTC": "",
       "USDT_TRC20": "",
-      "SOL": "",
-      "TRX": ""
+      "ETH": "",
+      "SOL": ""
     },
-    "name": "Admin Test User",
+    "verificationCode": "226961",
     "status": "active",
+    "emailVerified": false,
     "username": "netbybit_admin_test_1786123893850",
-    "passwordHash": "$2b$10$wQ4V54qJkmmdoxYGbL4XWObnqIfwxdBSmZNwzICcHmHmsch3fhOey",
+    "name": "Admin Test User",
+    "role": "user",
+    "id": "usr_1786123895972_vonur",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -604,66 +607,46 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "id": "usr_1786123895972_vonur",
-    "emailVerified": false,
-    "email": "netbybit_admin_test_1786123893850@example.com",
     "avatar": "",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "verificationCode": "226961"
+    "passwordHash": "$2b$10$wQ4V54qJkmmdoxYGbL4XWObnqIfwxdBSmZNwzICcHmHmsch3fhOey",
+    "createdAt": "2026-08-07T17:31:35.972Z"
   },
   {
+    "withdrawalAddresses": {
+      "TRX": "",
+      "USDT_ERC20": "",
+      "BTC": "",
+      "BNB": "",
+      "USDT_TRC20": "",
+      "SOL": "",
+      "ETH": ""
+    },
     "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "status": "active",
+    "role": "user",
     "name": "Admin Tester",
-    "id": "usr_1786123948744_1q6gk",
-    "email": "admin_tester_1786123947321@example.com",
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
     "passwordHash": "$2b$10$SSHbtjOH9tqOumoImEa1R.ETSUMyNZ8dgbOjA1EIC2fZKV1LpYW2W",
     "username": "admin_tester_1786123947321",
-    "avatar": "",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "TRX": ""
-    },
     "createdAt": "2026-08-07T17:32:28.744Z",
-    "role": "user",
+    "id": "usr_1786123948744_1q6gk",
+    "email": "admin_tester_1786123947321@example.com",
+    "status": "active",
     "verificationCode": "513876"
   },
   {
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "verificationCode": "421849",
-    "role": "user",
-    "emailVerified": false,
-    "avatar": "",
-    "name": "Monalisa bilosun",
-    "id": "usr_1786124600548_2jden",
-    "createdAt": "2026-08-07T17:43:20.548Z",
     "status": "active",
-    "passwordHash": "$2b$10$/kgT7YsWsiiIHgB0jNQwQ.g40jKIpIJF2J9X.VWjclnpjdvhQiqbC",
-    "withdrawalAddresses": {
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "ETH": "",
-      "SOL": "",
-      "TRX": ""
-    },
-    "email": "diegodaniel4401@gmail.com",
+    "createdAt": "2026-08-07T17:43:20.548Z",
+    "emailVerified": false,
     "balances": {
       "BTC": 0,
       "ETH": 0.4,
@@ -673,23 +656,30 @@
       "USDT_ERC20": 5000000,
       "USDT_TRC20": 500000
     },
-    "username": "lisa12"
+    "email": "diegodaniel4401@gmail.com",
+    "id": "usr_1786124600548_2jden",
+    "username": "lisa12",
+    "avatar": "",
+    "verificationCode": "421849",
+    "role": "user",
+    "name": "Monalisa bilosun",
+    "withdrawalAddresses": {
+      "SOL": "",
+      "USDT_ERC20": "",
+      "ETH": "",
+      "TRX": "",
+      "USDT_TRC20": "",
+      "BTC": "",
+      "BNB": ""
+    },
+    "passwordHash": "$2b$10$/kgT7YsWsiiIHgB0jNQwQ.g40jKIpIJF2J9X.VWjclnpjdvhQiqbC",
+    "updatedAt": "2026-09-02T08:29:03.705Z"
   },
   {
-    "id": "usr_1786134217196_8l1gc",
-    "name": "Uwaoma",
     "status": "active",
-    "email": "uwaomachi@gmail.com",
     "username": "uwaoma 12",
-    "withdrawalAddresses": {
-      "BTC": "",
-      "SOL": "",
-      "USDT_TRC20": "",
-      "BNB": "",
-      "ETH": "Lllfetgdd",
-      "TRX": "",
-      "USDT_ERC20": ""
-    },
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "createdAt": "2026-08-07T20:23:37.196Z",
     "balances": {
       "BTC": 0,
       "ETH": 0.4,
@@ -699,32 +689,31 @@
       "USDT_ERC20": 500000,
       "USDT_TRC20": 500000
     },
-    "createdAt": "2026-08-07T20:23:37.196Z",
+    "email": "uwaomachi@gmail.com",
+    "name": "Uwaoma",
     "role": "user",
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-    "passwordHash": "$2b$10$GLawlkkEahMLasab.i8Pd.pQ3DWyUzTvJjANUePeTNEI9b7kE3Xhy",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "withdrawalAddresses": {
+      "BTC": "",
+      "SOL": "",
+      "USDT_TRC20": "",
+      "BNB": "",
+      "ETH": "Lllfetgdd",
+      "TRX": "",
+      "USDT_ERC20": ""
+    },
+    "id": "usr_1786134217196_8l1gc",
+    "emailVerified": false,
     "verificationCode": "944286",
-    "emailVerified": false
+    "passwordHash": "$2b$10$GLawlkkEahMLasab.i8Pd.pQ3DWyUzTvJjANUePeTNEI9b7kE3Xhy",
+    "updatedAt": "2026-09-02T08:29:03.706Z"
   },
   {
-    "role": "user",
-    "name": "Dominic",
-    "status": "active",
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "TRX": ""
-    },
-    "verificationCode": "233724",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "avatar": "",
-    "id": "usr_1786135953678_34g08",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "passwordHash": "$2b$10$WMwX1bZ9cajQanR2AjH5ue39z//dLfGpdO0WUABlHQIDhieHlfU.O",
+    "verificationCode": "233724",
+    "id": "usr_1786135953678_34g08",
+    "name": "Dominic",
+    "role": "user",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -734,12 +723,37 @@
       "USDT_ERC20": 500000,
       "USDT_TRC20": 0
     },
+    "avatar": "",
+    "withdrawalAddresses": {
+      "SOL": "",
+      "ETH": "",
+      "USDT_ERC20": "",
+      "BTC": "",
+      "BNB": "",
+      "USDT_TRC20": "",
+      "TRX": ""
+    },
     "username": "Emma",
-    "email": "dominicemma36@gmail.com",
+    "status": "active",
     "emailVerified": false,
-    "createdAt": "2026-08-07T20:52:33.678Z"
+    "createdAt": "2026-08-07T20:52:33.678Z",
+    "email": "dominicemma36@gmail.com"
   },
   {
+    "createdAt": "2026-08-08T17:29:25.569Z",
+    "withdrawalAddresses": {
+      "BTC": "",
+      "SOL": "",
+      "USDT_TRC20": "",
+      "BNB": "",
+      "ETH": "",
+      "TRX": "",
+      "USDT_ERC20": ""
+    },
+    "username": "Wteher",
+    "role": "user",
+    "name": "Diego  Daniel",
+    "id": "usr_1786210165569_ogfpb",
     "status": "active",
     "balances": {
       "BTC": 0,
@@ -750,33 +764,29 @@
       "USDT_ERC20": 50000,
       "USDT_TRC20": 1100000
     },
-    "role": "user",
-    "username": "Wteher",
-    "withdrawalAddresses": {
-      "BTC": "",
-      "SOL": "",
-      "USDT_TRC20": "",
-      "BNB": "",
-      "ETH": "",
-      "TRX": "",
-      "USDT_ERC20": ""
-    },
     "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
     "email": "diego@gmail.com",
-    "id": "usr_1786210165569_ogfpb",
-    "createdAt": "2026-08-08T17:29:25.569Z",
-    "name": "Diego  Daniel",
-    "preferredCurrency": "USD",
-    "emailVerified": false,
-    "verificationCode": "810054",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "passwordHash": "$2b$10$7jgHnmGs3n9wx2HyhsP0kOh7PmCXfeN1bOWRNofIAs5BTwG/DjjcG",
-    "updatedAt": "2026-09-01T12:25:26.873Z"
+    "preferredCurrency": "USD",
+    "verificationCode": "810054",
+    "emailVerified": false
   },
   {
-    "createdAt": "2026-08-09T15:53:54.638Z",
-    "passwordHash": "$2b$10$CQa.M7CYGYB2X731MZGwhu80KS4Bwid87ZjTCKXYVsD9zko3.Fr6a",
-    "status": "active",
-    "username": "Diego",
+    "withdrawalAddresses": {
+      "SOL": "",
+      "ETH": "",
+      "USDT_ERC20": "",
+      "BTC": "",
+      "BNB": "",
+      "TRX": "",
+      "USDT_TRC20": ""
+    },
+    "role": "user",
+    "name": "Diego  Daniel",
+    "emailVerified": false,
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.705Z",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -786,97 +796,83 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "email": "diego11@gmail.com",
-    "role": "user",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "avatar": "",
-    "withdrawalAddresses": {
-      "BNB": "",
-      "BTC": "",
-      "USDT_ERC20": "",
-      "ETH": "",
-      "SOL": "",
-      "USDT_TRC20": "",
-      "TRX": ""
-    },
+    "passwordHash": "$2b$10$CQa.M7CYGYB2X731MZGwhu80KS4Bwid87ZjTCKXYVsD9zko3.Fr6a",
+    "username": "Diego",
+    "createdAt": "2026-08-09T15:53:54.638Z",
     "id": "usr_1786290834638_aj2oo",
-    "verificationCode": "690669",
-    "emailVerified": false,
-    "name": "Diego  Daniel"
+    "email": "diego11@gmail.com",
+    "status": "active",
+    "verificationCode": "690669"
   },
   {
-    "role": "user",
-    "name": "Thomson Krooks",
     "status": "active",
-    "withdrawalAddresses": {
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "ETH": "",
-      "SOL": "",
-      "TRX": ""
-    },
     "verificationCode": "133717",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "avatar": "",
+    "email": "thomsonkrooks@gmail.com",
+    "username": "thomsonkrooks@gmail.com",
+    "emailVerified": false,
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "id": "usr_1786313971037_lcgyg",
     "passwordHash": "$2b$10$zKciwtZYiDz1hwiz6BexAOS9ML1A8E0F0qFyxZX72lru/sN00TG9i",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "username": "thomsonkrooks@gmail.com",
-    "email": "thomsonkrooks@gmail.com",
-    "emailVerified": false,
-    "createdAt": "2026-08-09T22:19:31.037Z"
-  },
-  {
-    "emailVerified": false,
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "username": "chike412",
-    "verificationCode": "677423",
-    "id": "usr_1786452361263_v3vvq",
-    "status": "active",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "email": "chike100856@gmail.com",
-    "name": "Chike kizito",
-    "avatar": "",
+    "createdAt": "2026-08-09T22:19:31.037Z",
     "withdrawalAddresses": {
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "TRX": "",
       "ETH": "",
+      "USDT_ERC20": "",
       "SOL": "",
+      "TRX": "",
+      "BNB": "",
       "BTC": "",
-      "BNB": ""
+      "USDT_TRC20": ""
     },
-    "role": "user",
-    "passwordHash": "$2b$10$Y8idCeAe/ZTiVjwl9anp1ejk5CjLKaTiITbLqGG0Gr8K5RckDf0UW",
-    "createdAt": "2026-08-11T12:46:01.263Z"
-  },
-  {
-    "id": "usr_1786468081102_gj6ie",
-    "name": "Diego  Daniel",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
     "avatar": "",
     "role": "user",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "name": "Thomson Krooks"
+  },
+  {
+    "verificationCode": "677423",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "username": "chike412",
+    "status": "active",
+    "name": "Chike kizito",
+    "role": "user",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
+    "email": "chike100856@gmail.com",
+    "id": "usr_1786452361263_v3vvq",
     "emailVerified": false,
-    "username": "Dieg123",
-    "verificationCode": "276184",
+    "avatar": "",
+    "createdAt": "2026-08-11T12:46:01.263Z",
+    "withdrawalAddresses": {
+      "BTC": "",
+      "USDT_TRC20": "",
+      "BNB": "",
+      "TRX": "",
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": ""
+    },
+    "passwordHash": "$2b$10$Y8idCeAe/ZTiVjwl9anp1ejk5CjLKaTiITbLqGG0Gr8K5RckDf0UW"
+  },
+  {
+    "avatar": "",
+    "passwordHash": "$2b$10$r7/ONgWwkbXR.ie/sUBt.uqRuupFbveKuJPEeBNoPjxVQA/oAHFOC",
+    "role": "user",
+    "name": "Diego  Daniel",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -887,40 +883,35 @@
       "USDT_TRC20": 0
     },
     "email": "man@gmail.com",
+    "emailVerified": false,
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "id": "usr_1786468081102_gj6ie",
+    "createdAt": "2026-08-11T17:08:01.102Z",
+    "status": "active",
     "withdrawalAddresses": {
       "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "TRX": "",
-      "ETH": "",
       "SOL": "",
+      "ETH": "",
+      "TRX": "",
+      "USDT_ERC20": "",
       "BTC": "",
       "BNB": ""
     },
-    "passwordHash": "$2b$10$r7/ONgWwkbXR.ie/sUBt.uqRuupFbveKuJPEeBNoPjxVQA/oAHFOC",
-    "createdAt": "2026-08-11T17:08:01.102Z",
-    "status": "active"
+    "username": "Dieg123",
+    "verificationCode": "276184"
   },
   {
-    "createdAt": "2026-08-16T10:03:52.340Z",
-    "preferredCurrency": "USD",
+    "twoFactorEnabled": false,
+    "status": "active",
     "withdrawalAddresses": {
-      "TRX": "",
       "USDT_ERC20": "",
-      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
+      "TRX": "",
       "BNB": "",
       "BTC": "",
-      "SOL": "",
-      "ETH": ""
+      "USDT_TRC20": ""
     },
-    "status": "active",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "id": "usr_1786874632340",
-    "name": "jonhericking",
-    "is2FAEnabled": false,
-    "twoFactorEnabled": false,
-    "role": "user",
-    "email": "jonhericking@gmail.com",
     "balances": {
       "BTC": 0.12,
       "ETH": 1.5,
@@ -930,24 +921,18 @@
       "USDT_ERC20": 1000,
       "USDT_TRC20": 1000
     },
-    "username": "jonhericking"
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "name": "jonhericking",
+    "role": "user",
+    "is2FAEnabled": false,
+    "createdAt": "2026-08-16T10:03:52.340Z",
+    "email": "jonhericking@gmail.com",
+    "username": "jonhericking",
+    "preferredCurrency": "USD",
+    "id": "usr_1786874632340",
+    "emailVerified": false
   },
   {
-    "createdAt": "2026-08-25T17:57:55.775Z",
-    "name": "Air Marshal Stephen Gareth Chappell",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "emailVerified": false,
-    "withdrawalAddresses": {
-      "TRX": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "BTC": "1Fy9Up78qVeawXCLnAqcnRJrvjiXLJF21d",
-      "BNB": "",
-      "SOL": "",
-      "ETH": ""
-    },
-    "id": "usr_1787680674939",
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
     "balances": {
       "BTC": 6,
       "ETH": 0.2,
@@ -957,16 +942,27 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 999900
     },
+    "email": "stephengarethchappell15@gmail.com",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "emailVerified": false,
+    "id": "usr_1787680674939",
+    "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
+      "TRX": "",
+      "USDT_ERC20": "",
+      "BNB": "",
+      "BTC": "1Fy9Up78qVeawXCLnAqcnRJrvjiXLJF21d"
+    },
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "createdAt": "2026-08-25T17:57:55.775Z",
     "username": "stephengarethchappell1",
     "status": "active",
     "role": "user",
-    "email": "stephengarethchappell15@gmail.com"
+    "name": "Air Marshal Stephen Gareth Chappell"
   },
   {
-    "createdAt": "2026-08-26T09:04:23.408Z",
-    "passwordHash": "$2b$10$4BlwS0QWBZvVp7U23fOl.eV3fqRbYFSYw.F6KyK4n6ZDcO0.fb6ou",
-    "status": "active",
-    "username": "trader_1787735061364",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -976,77 +972,79 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
+    "passwordHash": "$2b$10$4BlwS0QWBZvVp7U23fOl.eV3fqRbYFSYw.F6KyK4n6ZDcO0.fb6ou",
     "email": "testuser_1787735061364@example.com",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "verificationCode": "335278",
+    "id": "usr_1787735063408_352rk",
+    "status": "active",
+    "createdAt": "2026-08-26T09:04:23.408Z",
+    "name": "Test Trader",
     "role": "user",
+    "emailVerified": false,
     "avatar": "",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
     "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "TRX": "",
+      "BTC": "",
       "USDT_TRC20": "",
+      "BNB": ""
+    },
+    "username": "trader_1787735061364"
+  },
+  {
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
+    "passwordHash": "$2b$10$ugednvGsmN0OFyYNtp3S/eX8uedLcHXZkJl/Vj5gpmC78ZcLRwwQ6",
+    "email": "trader_1787735084462@netbybit.test",
+    "verificationCode": "779429",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "status": "active",
+    "id": "usr_1787735086406_hhq4l",
+    "createdAt": "2026-08-26T09:04:46.406Z",
+    "name": "Alex Trader",
+    "role": "user",
+    "emailVerified": false,
+    "avatar": "",
+    "withdrawalAddresses": {
       "USDT_ERC20": "",
       "TRX": "",
-      "ETH": "",
-      "SOL": "",
-      "BNB": "",
-      "BTC": ""
-    },
-    "id": "usr_1787735063408_352rk",
-    "verificationCode": "335278",
-    "emailVerified": false,
-    "name": "Test Trader"
-  },
-  {
-    "createdAt": "2026-08-26T09:04:46.406Z",
-    "withdrawalAddresses": {
       "BTC": "",
       "BNB": "",
-      "USDT_ERC20": "",
-      "SOL": "",
       "USDT_TRC20": "",
-      "ETH": "",
-      "TRX": ""
-    },
-    "status": "active",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "passwordHash": "$2b$10$ugednvGsmN0OFyYNtp3S/eX8uedLcHXZkJl/Vj5gpmC78ZcLRwwQ6",
-    "id": "usr_1787735086406_hhq4l",
-    "avatar": "",
-    "name": "Alex Trader",
-    "verificationCode": "779429",
-    "role": "user",
-    "email": "trader_1787735084462@netbybit.test",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
+      "SOL": "",
+      "ETH": ""
     },
     "username": "alex_1787735084462"
   },
   {
     "createdAt": "2026-08-26T09:05:19.319Z",
     "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
       "TRX": "",
       "BNB": "",
-      "USDT_TRC20": "",
       "BTC": "",
-      "USDT_ERC20": "",
-      "ETH": "",
-      "SOL": ""
+      "USDT_ERC20": ""
     },
     "status": "active",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "username": "trader_1787735117436",
     "passwordHash": "$2b$10$QsuHGTRU/kBFxkazHqr9B.lNjuZnekpyQhBwHps/6nRUvJeDUM0rG",
+    "emailVerified": false,
+    "role": "user",
+    "name": "Demo Trader",
     "id": "usr_1787735119319_ysloq",
     "avatar": "",
-    "name": "Demo Trader",
-    "role": "user",
-    "verificationCode": "854205",
-    "email": "trader_demo_1787735117436@netbybit.test",
     "balances": {
       "BTC": 1.2,
       "ETH": 0,
@@ -1056,13 +1054,29 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 10000
     },
-    "username": "trader_1787735117436"
+    "email": "trader_demo_1787735117436@netbybit.test",
+    "verificationCode": "854205",
+    "updatedAt": "2026-09-02T08:29:03.706Z"
   },
   {
     "createdAt": "2026-08-26T09:06:02.901Z",
-    "passwordHash": "$2b$10$ID1f2BvPiuAqIzHS3BrTZ.4aZLT8jKIJZc.SeOgQ1XMqHGh9lY3CO",
+    "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
+      "TRX": "",
+      "BNB": "",
+      "BTC": "",
+      "USDT_ERC20": ""
+    },
     "status": "active",
     "username": "marcus_1787735160913",
+    "passwordHash": "$2b$10$ID1f2BvPiuAqIzHS3BrTZ.4aZLT8jKIJZc.SeOgQ1XMqHGh9lY3CO",
+    "emailVerified": false,
+    "role": "user",
+    "name": "Marcus Vance",
+    "id": "usr_1787735162901_8qphh",
+    "avatar": "",
     "balances": {
       "BTC": 1.5,
       "ETH": 0,
@@ -1073,44 +1087,11 @@
       "USDT_TRC20": 3500
     },
     "email": "trader_qa_1787735160913@netbybit.test",
-    "role": "user",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "avatar": "",
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "TRX": ""
-    },
-    "id": "usr_1787735162901_8qphh",
     "verificationCode": "115594",
-    "emailVerified": false,
-    "name": "Marcus Vance"
+    "updatedAt": "2026-09-02T08:29:03.706Z"
   },
   {
-    "passwordHash": "$2b$10$q0gSXj.YcbhPhx8zHqF.We4NrwvDqBnqgT/NHiseBYpPtzTKNCIPe",
-    "emailVerified": false,
-    "id": "usr_1787735189344_q0tjc",
-    "avatar": "",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "verificationCode": "805361",
-    "email": "trader_qa_1787735187452@netbybit.test",
-    "withdrawalAddresses": {
-      "BNB": "",
-      "BTC": "",
-      "SOL": "",
-      "ETH": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "TRX": ""
-    },
     "status": "active",
-    "name": "Marcus Vance",
-    "username": "marcus_1787735187452",
-    "role": "user",
     "balances": {
       "BTC": 2.5,
       "ETH": 0,
@@ -1120,18 +1101,29 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "createdAt": "2026-08-26T09:06:29.344Z"
+    "role": "user",
+    "name": "Marcus Vance",
+    "createdAt": "2026-08-26T09:06:29.344Z",
+    "verificationCode": "805361",
+    "emailVerified": false,
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "withdrawalAddresses": {
+      "BTC": "",
+      "BNB": "",
+      "TRX": "",
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "USDT_TRC20": ""
+    },
+    "passwordHash": "$2b$10$q0gSXj.YcbhPhx8zHqF.We4NrwvDqBnqgT/NHiseBYpPtzTKNCIPe",
+    "username": "marcus_1787735187452",
+    "id": "usr_1787735189344_q0tjc",
+    "email": "trader_qa_1787735187452@netbybit.test"
   },
   {
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
     "status": "active",
-    "id": "usr_1787735205333_xrbnz",
-    "email": "trader_qa_1787735204322@netbybit.test",
-    "name": "Marcus Vance",
-    "passwordHash": "$2b$10$TJJZFiA4JwuQz6cUR6cNx.FzgtSR2QjMbTz/BM7vw63v7h96pPF.a",
-    "avatar": "",
-    "username": "marcus_1787735204322",
     "balances": {
       "BTC": 1.5,
       "ETH": 0,
@@ -1141,68 +1133,47 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 3500
     },
-    "createdAt": "2026-08-26T09:06:45.333Z",
     "role": "user",
+    "name": "Marcus Vance",
+    "createdAt": "2026-08-26T09:06:45.333Z",
+    "verificationCode": "242500",
+    "emailVerified": false,
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "withdrawalAddresses": {
-      "ETH": "",
-      "SOL": "",
       "BTC": "",
+      "USDT_TRC20": "",
       "BNB": "",
       "TRX": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": ""
+      "SOL": "",
+      "USDT_ERC20": "",
+      "ETH": ""
     },
-    "verificationCode": "242500"
+    "passwordHash": "$2b$10$TJJZFiA4JwuQz6cUR6cNx.FzgtSR2QjMbTz/BM7vw63v7h96pPF.a",
+    "id": "usr_1787735205333_xrbnz",
+    "username": "marcus_1787735204322",
+    "email": "trader_qa_1787735204322@netbybit.test"
   },
   {
-    "status": "active",
-    "createdAt": "2026-08-26T09:07:18.767Z",
-    "balances": {
-      "BTC": 2.5,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 15000,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 3500
-    },
-    "username": "marcus_1787735237742",
+    "avatar": "",
+    "id": "usr_1787735238767_axvg6",
     "verificationCode": "368421",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
     "role": "user",
+    "name": "Marcus Vance",
+    "email": "trader_qa_1787735237742@netbybit.test",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "username": "marcus_1787735237742",
     "passwordHash": "$2b$10$kSvKKa51Jx5o0Aqx0TRm7.AxJxLGEI0DBSE.BOxk.LFzRJltuXcie",
     "withdrawalAddresses": {
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
       "BNB": "",
       "BTC": "",
-      "SOL": "",
-      "ETH": "",
-      "TRX": ""
-    },
-    "id": "usr_1787735238767_axvg6",
-    "avatar": "",
-    "email": "trader_qa_1787735237742@netbybit.test",
-    "name": "Marcus Vance"
-  },
-  {
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "BNB": "",
       "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "TRX": ""
+      "TRX": "",
+      "ETH": "",
+      "SOL": "",
+      "USDT_TRC20": ""
     },
-    "id": "usr_1787735259200_cdt8d",
-    "createdAt": "2026-08-26T09:07:39.200Z",
-    "verificationCode": "222465",
-    "status": "active",
-    "name": "Marcus Vance",
-    "username": "marcus_1787735258157",
-    "passwordHash": "$2b$10$XqlmqUlmlATKHZklHcISceHJpgpsq0I5UNq8QyW7E/px5qT/5dZzG",
+    "emailVerified": false,
     "balances": {
       "BTC": 2.5,
       "ETH": 0,
@@ -1212,18 +1183,44 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 3500
     },
-    "emailVerified": false,
-    "email": "trader_qa_1787735258157@netbybit.test",
-    "avatar": "",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "role": "user"
+    "status": "active",
+    "createdAt": "2026-08-26T09:07:18.767Z"
   },
   {
-    "id": "usr_1787834612789",
+    "balances": {
+      "BTC": 2.5,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 15000,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 3500
+    },
+    "passwordHash": "$2b$10$XqlmqUlmlATKHZklHcISceHJpgpsq0I5UNq8QyW7E/px5qT/5dZzG",
+    "email": "trader_qa_1787735258157@netbybit.test",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "verificationCode": "222465",
+    "id": "usr_1787735259200_cdt8d",
     "status": "active",
-    "is2FAEnabled": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "createdAt": "2026-08-26T09:07:39.200Z",
+    "name": "Marcus Vance",
+    "role": "user",
+    "emailVerified": false,
+    "avatar": "",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "ETH": "",
+      "SOL": "",
+      "TRX": "",
+      "USDT_TRC20": "",
+      "BNB": "",
+      "BTC": ""
+    },
+    "username": "marcus_1787735258157"
+  },
+  {
     "email": "kimyoo5136@gmail.com",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "balances": {
       "BTC": 0.12,
       "ETH": 1.5,
@@ -1233,39 +1230,27 @@
       "USDT_ERC20": 6000,
       "USDT_TRC20": 101000
     },
-    "username": "kimyoo5136",
-    "role": "user",
-    "preferredCurrency": "USD",
-    "emailVerified": false,
     "twoFactorEnabled": false,
-    "createdAt": "2026-08-27T12:43:32.789Z",
-    "name": "kimyoo5136",
     "withdrawalAddresses": {
+      "USDT_ERC20": "",
       "TRX": "",
-      "ETH": "",
-      "SOL": "",
       "BTC": "",
       "BNB": "",
       "USDT_TRC20": "",
-      "USDT_ERC20": ""
-    }
+      "SOL": "",
+      "ETH": ""
+    },
+    "name": "kimyoo5136",
+    "role": "user",
+    "status": "active",
+    "is2FAEnabled": false,
+    "id": "usr_1787834612789",
+    "emailVerified": false,
+    "username": "kimyoo5136",
+    "preferredCurrency": "USD",
+    "createdAt": "2026-08-27T12:43:32.789Z"
   },
   {
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "BNB": "",
-      "TRX": ""
-    },
-    "id": "usr_1787837754053_ygb80",
-    "createdAt": "2026-08-27T13:35:54.053Z",
-    "verificationCode": "793752",
-    "status": "active",
-    "name": "Test Investor",
-    "username": "user1787837753002",
     "balances": {
       "BTC": 2.5,
       "ETH": 0,
@@ -1276,22 +1261,42 @@
       "USDT_TRC20": 0
     },
     "passwordHash": "$2b$10$hpfSIFlYv6JBaEcp/HHnyezsdyYt9pbrEmlUOAaTfHRyogGfIhPlG",
-    "emailVerified": false,
+    "verificationCode": "793752",
+    "withdrawalAddresses": {
+      "BTC": "",
+      "BNB": "",
+      "USDT_ERC20": "",
+      "TRX": "",
+      "SOL": "",
+      "USDT_TRC20": "",
+      "ETH": ""
+    },
+    "createdAt": "2026-08-27T13:35:54.053Z",
     "avatar": "",
+    "emailVerified": false,
     "email": "testuser_1787837753002@netbybit.vault",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "role": "user"
+    "name": "Test Investor",
+    "role": "user",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "status": "active",
+    "id": "usr_1787837754053_ygb80",
+    "username": "user1787837753002"
   },
   {
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "status": "active",
-    "passwordHash": "$2b$10$NypbMuzwOKov/sWQ6GKNG.qgQH2LRio0g/AxV4lTe1dFx82mhKY5i",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
+      "USDT_ERC20": "",
+      "TRX": "",
+      "BNB": "",
+      "BTC": ""
+    },
     "id": "usr_1787837795005_1nong",
-    "email": "testuser_1787837793955@netbybit.vault",
+    "emailVerified": false,
+    "role": "user",
     "name": "Test Investor",
-    "avatar": "",
-    "username": "user1787837793955",
     "balances": {
       "BTC": 2.5,
       "ETH": 0,
@@ -1301,24 +1306,29 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "withdrawalAddresses": {
-      "TRX": "",
-      "BTC": "",
-      "BNB": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "SOL": "",
-      "ETH": ""
-    },
-    "role": "user",
-    "createdAt": "2026-08-27T13:36:35.005Z",
-    "verificationCode": "826512"
+    "verificationCode": "826512",
+    "avatar": "",
+    "username": "user1787837793955",
+    "passwordHash": "$2b$10$NypbMuzwOKov/sWQ6GKNG.qgQH2LRio0g/AxV4lTe1dFx82mhKY5i",
+    "status": "active",
+    "email": "testuser_1787837793955@netbybit.vault",
+    "createdAt": "2026-08-27T13:36:35.005Z"
   },
   {
-    "twoFactorEnabled": false,
-    "status": "active",
-    "createdAt": "2026-08-30T18:36:46.682Z",
-    "preferredCurrency": "USD",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "USDT_TRC20": "",
+      "TRX": "",
+      "BTC": "",
+      "BNB": ""
+    },
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "id": "usr_1788115005670",
+    "emailVerified": false,
+    "name": "احمد جمال محمود",
+    "role": "user",
     "balances": {
       "BTC": 0,
       "ETH": 0.5,
@@ -1328,27 +1338,30 @@
       "USDT_ERC20": 2000000,
       "USDT_TRC20": 0
     },
-    "username": "Ahmed gamal",
-    "emailVerified": false,
-    "is2FAEnabled": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "role": "user",
-    "withdrawalAddresses": {
-      "SOL": "",
-      "ETH": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "BTC": "",
-      "BNB": "",
-      "TRX": ""
-    },
-    "id": "usr_1788115005670",
     "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-    "name": "احمد جمال محمود",
+    "twoFactorEnabled": false,
+    "is2FAEnabled": false,
+    "username": "Ahmed gamal",
+    "preferredCurrency": "USD",
+    "status": "active",
+    "createdAt": "2026-08-30T18:36:46.682Z",
     "email": "ahmedgamal01010774@gmail.com"
   },
   {
-    "username": "nwano123",
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "role": "user",
+    "name": "Nwanoro Mmaduabuchi",
+    "emailVerified": false,
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "USDT_TRC20": "",
+      "TRX": "",
+      "BTC": "",
+      "BNB": ""
+    },
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "balances": {
       "BTC": 1,
       "ETH": 0,
@@ -1358,31 +1371,33 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 4510000
     },
-    "name": "Nwanoro Mmaduabuchi",
-    "withdrawalAddresses": {
-      "TRX": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "SOL": "",
-      "ETH": "",
-      "BTC": "",
-      "BNB": ""
-    },
-    "id": "usr_1788081612523",
     "email": "nwanoro@gmail.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "createdAt": "2026-08-30T09:20:13.289Z",
     "status": "active",
-    "emailVerified": false,
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-    "role": "user"
+    "id": "usr_1788081612523",
+    "username": "nwano123",
+    "createdAt": "2026-08-30T09:20:13.289Z"
   },
   {
-    "role": "user",
+    "id": "usr_1788085624658",
+    "username": "boogielogik",
     "createdAt": "2026-08-30T10:27:04.658Z",
-    "emailVerified": false,
+    "withdrawalAddresses": {
+      "SOL": "",
+      "USDT_TRC20": "",
+      "ETH": "",
+      "TRX": "",
+      "BTC": "",
+      "USDT_ERC20": "",
+      "BNB": ""
+    },
     "email": "boogielogik@gmail.com",
+    "role": "user",
     "name": "boogielogik",
+    "is2FAEnabled": false,
+    "status": "active",
+    "emailVerified": false,
+    "twoFactorEnabled": false,
+    "preferredCurrency": "USD",
     "balances": {
       "BTC": 0.12,
       "ETH": 1.5,
@@ -1392,47 +1407,21 @@
       "USDT_ERC20": 1000,
       "USDT_TRC20": 1000
     },
-    "twoFactorEnabled": false,
-    "username": "boogielogik",
-    "id": "usr_1788085624658",
-    "withdrawalAddresses": {
-      "ETH": "",
-      "SOL": "",
-      "USDT_ERC20": "",
-      "BTC": "",
-      "BNB": "",
-      "USDT_TRC20": "",
-      "TRX": ""
-    },
-    "preferredCurrency": "USD",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "status": "active",
-    "is2FAEnabled": false
+    "updatedAt": "2026-09-02T08:29:03.706Z"
   },
   {
-    "id": "usr_1788086309915",
-    "connectedWallet": {
-      "address": "0x122270c4fd355f1f55fc0de0c7d3d13b782fffae",
-      "provider": "Coinbase Wallet",
-      "network": "Ethereum Mainnet"
-    },
-    "name": "Uwaoma Buchi",
-    "email": "uwaomabuchi@gmail.com",
-    "status": "active",
-    "role": "user",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
     "withdrawalAddresses": {
-      "TRX": "",
-      "ETH": "uwaomabuchi@gmail.com",
-      "SOL": "",
-      "BNB": "",
       "BTC": "",
+      "BNB": "",
+      "TRX": "",
       "USDT_ERC20": "uwaomabuchi@gmail.com",
+      "SOL": "",
+      "ETH": "uwaomabuchi@gmail.com",
       "USDT_TRC20": "uwaomabuchi@gmail.com"
     },
-    "username": "buchi121",
-    "createdAt": "2026-08-30T10:38:30.775Z",
+    "id": "usr_1788086309915",
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "balances": {
       "BTC": 0,
       "ETH": 2.7345879959308244,
@@ -1442,25 +1431,39 @@
       "USDT_ERC20": 4995000,
       "USDT_TRC20": 5000000
     },
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150"
+    "role": "user",
+    "name": "Uwaoma Buchi",
+    "emailVerified": false,
+    "email": "uwaomabuchi@gmail.com",
+    "status": "active",
+    "username": "buchi121",
+    "connectedWallet": {
+      "address": "0x122270c4fd355f1f55fc0de0c7d3d13b782fffae",
+      "provider": "Coinbase Wallet",
+      "network": "Ethereum Mainnet"
+    },
+    "createdAt": "2026-08-30T10:38:30.775Z"
   },
   {
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "email": "auysistwuwaaoay@gmail.com",
-    "withdrawalAddresses": {
-      "TRX": "",
-      "SOL": "",
-      "ETH": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "BTC": "",
-      "BNB": ""
-    },
-    "createdAt": "2026-08-30T18:41:27.448Z",
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
     "username": "1234",
     "name": "Uwaoma123456",
     "emailVerified": false,
+    "role": "user",
+    "id": "usr_1788115285838",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "TRX": "",
+      "BNB": "",
+      "BTC": "",
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": ""
+    },
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "status": "active",
+    "createdAt": "2026-08-30T18:41:27.448Z",
+    "email": "auysistwuwaaoay@gmail.com",
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -1469,19 +1472,24 @@
       "TRX": 0,
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
-    },
-    "role": "user",
-    "id": "usr_1788115285838",
-    "status": "active"
+    }
   },
   {
-    "email": "martinjennifer992@gmail.com",
-    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "createdAt": "2026-08-30T18:47:48.107Z",
-    "name": "Jennifer",
-    "role": "user",
+    "withdrawalAddresses": {
+      "SOL": "",
+      "ETH": "",
+      "USDT_ERC20": "",
+      "TRX": "",
+      "USDT_TRC20": "",
+      "BTC": "",
+      "BNB": ""
+    },
+    "status": "active",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "username": "Martin",
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "id": "usr_1788115666652",
+    "emailVerified": false,
     "balances": {
       "BTC": 0,
       "ETH": 0,
@@ -1491,35 +1499,22 @@
       "USDT_ERC20": 1000000,
       "USDT_TRC20": 0
     },
-    "emailVerified": false,
-    "status": "active",
-    "withdrawalAddresses": {
-      "TRX": "",
-      "USDT_TRC20": "",
-      "USDT_ERC20": "",
-      "BTC": "",
-      "BNB": "",
-      "SOL": "",
-      "ETH": ""
-    },
-    "id": "usr_1788115666652"
+    "email": "martinjennifer992@gmail.com",
+    "createdAt": "2026-08-30T18:47:48.107Z",
+    "name": "Jennifer",
+    "role": "user"
   },
   {
-    "withdrawalAddresses": {
-      "TRX": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "BNB": "",
-      "BTC": "",
-      "ETH": "",
-      "SOL": ""
-    },
-    "id": "usr_1788264561124_uoqd6",
-    "createdAt": "2026-09-01T12:09:21.124Z",
-    "verificationCode": "858292",
     "status": "active",
-    "name": "Test Trader",
-    "username": "testuser_1788264558653",
+    "withdrawalAddresses": {
+      "USDT_ERC20": "",
+      "SOL": "",
+      "ETH": "",
+      "USDT_TRC20": "",
+      "TRX": "",
+      "BTC": "",
+      "BNB": ""
+    },
     "passwordHash": "$2b$10$rtYU2iTiJ8wLIyll6QWpNukMsQAYQ8KV0mtcDW.0HZ7Vrd1RNHBa2",
     "balances": {
       "BTC": 0,
@@ -1530,142 +1525,85 @@
       "USDT_ERC20": 0,
       "USDT_TRC20": 0
     },
-    "emailVerified": false,
+    "createdAt": "2026-09-01T12:09:21.124Z",
+    "id": "usr_1788264561124_uoqd6",
+    "verificationCode": "858292",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "avatar": "",
+    "role": "user",
+    "name": "Test Trader",
+    "username": "testuser_1788264558653",
     "email": "testuser_1788264558653@example.com",
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "role": "user"
+    "emailVerified": false
   },
   {
+    "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
+      "TRX": "",
+      "USDT_ERC20": "",
+      "BNB": "",
+      "BTC": ""
+    },
     "id": "usr_1788264612918_jjx20",
-    "verificationCode": "423603",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "avatar": "",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
+    },
+    "role": "user",
     "name": "Test Trader",
+    "emailVerified": false,
     "email": "testuser_1788264610518@example.com",
     "status": "active",
-    "role": "user",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
+    "verificationCode": "423603",
     "passwordHash": "$2b$10$3hUYpttqUWWy50QJ01k7GukB5FDh.WmXA0ZzAlqm0rbyx3ublEbeG",
-    "withdrawalAddresses": {
-      "TRX": "",
-      "SOL": "",
-      "USDT_ERC20": "",
-      "USDT_TRC20": "",
-      "ETH": "",
-      "BNB": "",
-      "BTC": ""
-    },
     "username": "testuser_1788264610518",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "createdAt": "2026-09-01T12:10:12.918Z",
-    "avatar": ""
+    "createdAt": "2026-09-01T12:10:12.918Z"
   },
   {
-    "id": "usr_1788264641830_a0rlf",
-    "verificationCode": "949135",
-    "name": "Test Trader",
-    "email": "testuser_1788264639553@example.com",
     "status": "active",
-    "role": "user",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "passwordHash": "$2b$10$S/g.1KDxQyKJe.tMXV7M4uvDwxDM2WpiPDeRbojv67SpQBRVtgO.K",
     "withdrawalAddresses": {
-      "TRX": "",
-      "SOL": "",
       "ETH": "",
-      "USDT_ERC20": "",
+      "SOL": "",
       "USDT_TRC20": "",
       "BNB": "",
-      "BTC": ""
-    },
-    "username": "testuser_1788264639553",
-    "createdAt": "2026-09-01T12:10:41.830Z",
-    "balances": {
-      "BTC": 0,
-      "ETH": 0,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 0,
-      "USDT_ERC20": 0,
-      "USDT_TRC20": 0
-    },
-    "avatar": ""
-  },
-  {
-    "avatar": "",
-    "verificationCode": "784959",
-    "role": "user",
-    "createdAt": "2026-09-01T12:11:28.284Z",
-    "emailVerified": false,
-    "email": "testuser_1788264686039@example.com",
-    "name": "Test Trader",
-    "balances": {
-      "BTC": 200,
-      "ETH": 5,
-      "BNB": 0,
-      "SOL": 0,
-      "TRX": 24500,
-      "USDT_ERC20": 1000,
-      "USDT_TRC20": 800
-    },
-    "id": "usr_1788264688284_iiaip",
-    "username": "testuser_1788264686039",
-    "withdrawalAddresses": {
-      "TRX": "",
-      "SOL": "",
-      "ETH": "",
-      "USDT_ERC20": "",
-      "BNB": "",
-      "USDT_TRC20": "",
-      "BTC": ""
-    },
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "status": "active",
-    "passwordHash": "$2b$10$81Sykr0hZgzzuOnA3ntG.OHVLujf9/a0sXRQCkbW7GxfytmF99GoK"
-  },
-  {
-    "verificationCode": "505998",
-    "id": "usr_1788264731377_ekbsh",
-    "name": "Test Trader",
-    "email": "testuser_1788264729110@example.com",
-    "status": "active",
-    "role": "user",
-    "emailVerified": false,
-    "updatedAt": "2026-09-01T12:25:26.873Z",
-    "passwordHash": "$2b$10$HUqGuQP6sarwcNyZ/7cyXOlyW98zZ9QH02eFlAFcPuB6h.BlU8sDu",
-    "withdrawalAddresses": {
       "BTC": "",
-      "BNB": "",
-      "ETH": "",
-      "SOL": "",
       "USDT_ERC20": "",
-      "USDT_TRC20": "",
       "TRX": ""
     },
-    "username": "testuser_1788264729110",
-    "createdAt": "2026-09-01T12:12:11.377Z",
     "balances": {
-      "BTC": 200,
-      "ETH": 5,
+      "BTC": 0,
+      "ETH": 0,
       "BNB": 0,
       "SOL": 0,
-      "TRX": 24500,
-      "USDT_ERC20": 1000,
-      "USDT_TRC20": 800
+      "TRX": 0,
+      "USDT_ERC20": 0,
+      "USDT_TRC20": 0
     },
-    "avatar": ""
+    "passwordHash": "$2b$10$S/g.1KDxQyKJe.tMXV7M4uvDwxDM2WpiPDeRbojv67SpQBRVtgO.K",
+    "id": "usr_1788264641830_a0rlf",
+    "createdAt": "2026-09-01T12:10:41.830Z",
+    "verificationCode": "949135",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "avatar": "",
+    "name": "Test Trader",
+    "role": "user",
+    "username": "testuser_1788264639553",
+    "email": "testuser_1788264639553@example.com",
+    "emailVerified": false
   },
   {
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "avatar": "",
+    "email": "testuser_1788264686039@example.com",
     "balances": {
       "BTC": 200,
       "ETH": 5,
@@ -1675,26 +1613,88 @@
       "USDT_ERC20": 1000,
       "USDT_TRC20": 800
     },
-    "createdAt": "2026-09-01T12:25:01.195Z",
-    "email": "testuser_1788265498338@example.com",
-    "emailVerified": false,
-    "id": "usr_1788265501195_bwdra",
-    "name": "Test Trader",
-    "passwordHash": "$2b$10$cSXvGQMfgmhtNy9H7Wjko.4S.Jsy4ujler94z12OOY/x3wXiWc/wm",
     "role": "user",
-    "status": "active",
-    "username": "testuser_1788265498338",
-    "verificationCode": "791785",
+    "name": "Test Trader",
+    "verificationCode": "784959",
     "withdrawalAddresses": {
       "BNB": "",
       "BTC": "",
+      "USDT_TRC20": "",
+      "TRX": "",
       "ETH": "",
       "SOL": "",
+      "USDT_ERC20": ""
+    },
+    "status": "active",
+    "username": "testuser_1788264686039",
+    "id": "usr_1788264688284_iiaip",
+    "passwordHash": "$2b$10$81Sykr0hZgzzuOnA3ntG.OHVLujf9/a0sXRQCkbW7GxfytmF99GoK",
+    "createdAt": "2026-09-01T12:11:28.284Z",
+    "emailVerified": false
+  },
+  {
+    "status": "active",
+    "withdrawalAddresses": {
+      "BNB": "",
+      "USDT_TRC20": "",
+      "BTC": "",
+      "TRX": "",
+      "ETH": "",
+      "SOL": "",
+      "USDT_ERC20": ""
+    },
+    "passwordHash": "$2b$10$HUqGuQP6sarwcNyZ/7cyXOlyW98zZ9QH02eFlAFcPuB6h.BlU8sDu",
+    "balances": {
+      "BTC": 200,
+      "ETH": 5,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 24500,
+      "USDT_ERC20": 1000,
+      "USDT_TRC20": 800
+    },
+    "createdAt": "2026-09-01T12:12:11.377Z",
+    "id": "usr_1788264731377_ekbsh",
+    "verificationCode": "505998",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "avatar": "",
+    "role": "user",
+    "name": "Test Trader",
+    "username": "testuser_1788264729110",
+    "email": "testuser_1788264729110@example.com",
+    "emailVerified": false
+  },
+  {
+    "withdrawalAddresses": {
+      "USDT_TRC20": "",
+      "SOL": "",
+      "ETH": "",
       "TRX": "",
       "USDT_ERC20": "",
-      "USDT_TRC20": ""
+      "BTC": "",
+      "BNB": ""
     },
-    "updatedAt": "2026-09-01T12:25:26.873Z"
+    "id": "usr_1788265501195_bwdra",
+    "avatar": "",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "balances": {
+      "BTC": 200,
+      "ETH": 5,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 24500,
+      "USDT_ERC20": 1000,
+      "USDT_TRC20": 800
+    },
+    "role": "user",
+    "name": "Test Trader",
+    "emailVerified": false,
+    "email": "testuser_1788265498338@example.com",
+    "status": "active",
+    "verificationCode": "791785",
+    "username": "testuser_1788265498338",
+    "passwordHash": "$2b$10$cSXvGQMfgmhtNy9H7Wjko.4S.Jsy4ujler94z12OOY/x3wXiWc/wm",
+    "createdAt": "2026-09-01T12:25:01.195Z"
   },
   {
     "avatar": "",
@@ -1715,6 +1715,7 @@
     "passwordHash": "$2b$10$ZAeLutVtrD0TSNCOoPDaqueLXKpssUBzy7EpSIIkADFETSHPeMX4u",
     "role": "user",
     "status": "active",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
     "username": "testuser_1788265516564",
     "verificationCode": "620937",
     "withdrawalAddresses": {
@@ -1725,7 +1726,100 @@
       "TRX": "",
       "USDT_ERC20": "",
       "USDT_TRC20": ""
+    }
+  },
+  {
+    "withdrawalAddresses": {
+      "TRX": "",
+      "BNB": "",
+      "USDT_TRC20": "",
+      "BTC": "",
+      "ETH": "",
+      "SOL": "",
+      "USDT_ERC20": ""
     },
-    "updatedAt": "2026-09-01T12:25:26.873Z"
+    "status": "active",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0.6,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 1000000,
+      "USDT_TRC20": 0
+    },
+    "name": "Belly bill",
+    "role": "user",
+    "id": "usr_1788277359990",
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+    "emailVerified": false,
+    "email": "bellybill@gmail.com",
+    "createdAt": "2026-09-01T15:42:41.090Z",
+    "username": "bellybill121"
+  },
+  {
+    "updatedAt": "2026-09-02T08:29:03.706Z",
+    "email": "hendradipanegara5@gmail.com",
+    "balances": {
+      "BTC": 0,
+      "ETH": 0,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 0,
+      "USDT_ERC20": 500000,
+      "USDT_TRC20": 0
+    },
+    "name": "hendradipanegara5",
+    "role": "user",
+    "preferredCurrency": "USD",
+    "withdrawalAddresses": {
+      "BNB": "",
+      "BTC": "",
+      "TRX": "",
+      "USDT_TRC20": "",
+      "ETH": "",
+      "SOL": "",
+      "USDT_ERC20": ""
+    },
+    "twoFactorEnabled": false,
+    "status": "active",
+    "username": "hendradipanegara5",
+    "id": "usr_1788281979266",
+    "is2FAEnabled": false,
+    "createdAt": "2026-09-01T16:59:39.266Z",
+    "emailVerified": false
+  },
+  {
+    "avatar": "",
+    "balances": {
+      "BTC": 200,
+      "ETH": 5,
+      "BNB": 0,
+      "SOL": 0,
+      "TRX": 24500,
+      "USDT_ERC20": 1000,
+      "USDT_TRC20": 800
+    },
+    "createdAt": "2026-09-02T08:28:43.213Z",
+    "email": "testuser_1788337721496@example.com",
+    "emailVerified": false,
+    "id": "usr_1788337723213_h944k",
+    "name": "Test Trader",
+    "passwordHash": "$2b$10$..gvSIi5D0FlFTrs4ajxuORd9Z842NDbpFU1PEc1/9hlZyeFxiPpy",
+    "role": "user",
+    "status": "active",
+    "username": "testuser_1788337721496",
+    "verificationCode": "160150",
+    "withdrawalAddresses": {
+      "BNB": "",
+      "BTC": "",
+      "ETH": "",
+      "SOL": "",
+      "TRX": "",
+      "USDT_ERC20": "",
+      "USDT_TRC20": ""
+    },
+    "updatedAt": "2026-09-02T08:29:04.506Z"
   }
 ]

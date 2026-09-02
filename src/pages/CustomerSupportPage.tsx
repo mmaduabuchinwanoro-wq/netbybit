@@ -248,7 +248,12 @@ export const CustomerSupportPage: React.FC = () => {
       const customEvent = e as CustomEvent<SupportTicket>;
       if (customEvent.detail) {
         const updated = customEvent.detail;
+        if (user && updated.userId !== user.id) {
+          // If not admin, ignore tickets from other users
+          if (user.role !== 'admin') return;
+        }
         setTickets((prev) => {
+          if (user && updated.userId !== user.id) return prev;
           const idx = prev.findIndex((t) => t.id === updated.id);
           if (idx >= 0) {
             const copy = [...prev];
@@ -257,21 +262,36 @@ export const CustomerSupportPage: React.FC = () => {
           }
           return [updated, ...prev];
         });
-        setAdminTickets((prev) => {
-          const idx = prev.findIndex((t) => t.id === updated.id);
-          if (idx >= 0) {
-            const copy = [...prev];
-            copy[idx] = updated;
-            return copy;
-          }
-          return [updated, ...prev];
-        });
+        if (user?.role === 'admin') {
+          setAdminTickets((prev) => {
+            const idx = prev.findIndex((t) => t.id === updated.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = updated;
+              return copy;
+            }
+            return [updated, ...prev];
+          });
+        }
       }
     };
 
+    const handleLogoutEvent = () => {
+      setTickets([]);
+      setSelectedTicketId(null);
+      setAdminTickets([]);
+      setStaffSelectedTicketId(null);
+      setGuestEmailInput('');
+      setGuestNameInput('');
+    };
+
     window.addEventListener('netbybit:ticket_updated', handleTicketUpdated);
-    return () => window.removeEventListener('netbybit:ticket_updated', handleTicketUpdated);
-  }, []);
+    window.addEventListener('netbybit:logout', handleLogoutEvent);
+    return () => {
+      window.removeEventListener('netbybit:ticket_updated', handleTicketUpdated);
+      window.removeEventListener('netbybit:logout', handleLogoutEvent);
+    };
+  }, [user?.id, user?.role]);
 
   // Real-time polling every 2.5 seconds as infallible fallback
   useEffect(() => {

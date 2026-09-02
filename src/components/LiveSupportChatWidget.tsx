@@ -147,25 +147,28 @@ export const LiveSupportChatWidget: React.FC = () => {
   // Load existing ticket on startup or when user changes
   useEffect(() => {
     let isMounted = true;
+    setActiveTicket(null); // Clear previous user's ticket immediately
+
     const loadChat = async () => {
       if (user) {
+        setIsGuestStarted(false);
         try {
           const tickets = await api.getSupportTickets();
           if (isMounted && tickets && tickets.length > 0) {
-            setActiveTicket((prev) => {
-              if (!prev) return tickets[0];
-              const match = tickets.find((t) => t.id === prev.id);
-              return match || tickets[0];
-            });
+            // Strictly match current user ID
+            const userOwned = tickets.filter((t) => t.userId === user.id);
+            if (userOwned.length > 0) {
+              setActiveTicket(userOwned[0]);
+            }
           }
         } catch {}
       } else {
         const storedTicketId = localStorage.getItem('netbybit_guest_ticket_id');
         const storedEmail = localStorage.getItem('netbybit_guest_email');
-        if (storedTicketId) {
+        if (storedTicketId && storedEmail) {
           try {
-            const ticket = await api.getGuestSupportTicket(storedTicketId, storedEmail || undefined);
-            if (isMounted && ticket) {
+            const ticket = await api.getGuestSupportTicket(storedTicketId, storedEmail);
+            if (isMounted && ticket && ticket.id === storedTicketId) {
               setActiveTicket(ticket);
               setIsGuestStarted(true);
             }
@@ -177,7 +180,7 @@ export const LiveSupportChatWidget: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   // 1. Real-Time Firestore Document Listeners on Active Ticket
   useEffect(() => {
@@ -190,9 +193,10 @@ export const LiveSupportChatWidget: React.FC = () => {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = { ...docSnap.data(), id: docSnap.id } as SupportTicket;
+          // Verify ownership before setting
+          if (user && data.userId !== user.id) return;
           setActiveTicket((prev) => {
-            if (!prev) return data;
-            // Prevent discarding un-synced optimistic local replies
+            if (!prev || prev.id !== data.id) return data;
             const incomingIds = new Set((data.replies || []).map((r) => r.id));
             const pendingLocal = (prev.replies || []).filter(
               (r) => r.id?.startsWith('rpl_user_') && !incomingIds.has(r.id)
@@ -215,8 +219,9 @@ export const LiveSupportChatWidget: React.FC = () => {
       (docSnap) => {
         if (docSnap.exists()) {
           const data = { ...docSnap.data(), id: docSnap.id } as SupportTicket;
+          if (user && data.userId !== user.id) return;
           setActiveTicket((prev) => {
-            if (!prev) return data;
+            if (!prev || prev.id !== data.id) return data;
             const incomingIds = new Set((data.replies || []).map((r) => r.id));
             const pendingLocal = (prev.replies || []).filter(
               (r) => r.id?.startsWith('rpl_user_') && !incomingIds.has(r.id)
@@ -237,7 +242,7 @@ export const LiveSupportChatWidget: React.FC = () => {
       unsub1();
       unsub2();
     };
-  }, [activeTicket?.id]);
+  }, [activeTicket?.id, user?.id]);
 
   // 2. Real-Time Firestore User Collection Query Listener
   useEffect(() => {
@@ -251,12 +256,15 @@ export const LiveSupportChatWidget: React.FC = () => {
         if (!snapshot.empty) {
           const docs: SupportTicket[] = [];
           snapshot.forEach((d) => {
-            docs.push({ ...(d.data() as SupportTicket), id: d.id });
+            const t = d.data() as SupportTicket;
+            if (t && t.userId === currentUserId) {
+              docs.push({ ...t, id: d.id });
+            }
           });
           docs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
           if (docs.length > 0) {
             setActiveTicket((prev) => {
-              if (!prev) return docs[0];
+              if (!prev || prev.userId !== currentUserId) return docs[0];
               const match = docs.find((d) => d.id === prev.id);
               return match || docs[0];
             });
@@ -271,7 +279,7 @@ export const LiveSupportChatWidget: React.FC = () => {
     return () => unsub();
   }, [user?.id]);
 
-  // 3. Fast Revalidation Polling (every 2.5s) when chat is open
+  // 3. Fast Revalidation Polling (every 3s) when chat is open
   useEffect(() => {
     if (!isOpen) return;
 
@@ -280,17 +288,20 @@ export const LiveSupportChatWidget: React.FC = () => {
         if (user) {
           const tickets = await api.getSupportTickets();
           if (tickets && tickets.length > 0) {
-            setActiveTicket((prev) => {
-              if (!prev) return tickets[0];
-              const match = tickets.find((t) => t.id === prev.id);
-              return match || tickets[0];
-            });
+            const userOwned = tickets.filter((t) => t.userId === user.id);
+            if (userOwned.length > 0) {
+              setActiveTicket((prev) => {
+                if (!prev || prev.userId !== user.id) return userOwned[0];
+                const match = userOwned.find((t) => t.id === prev.id);
+                return match || userOwned[0];
+              });
+            }
           }
         } else {
           const storedTicketId = localStorage.getItem('netbybit_guest_ticket_id');
           const storedEmail = localStorage.getItem('netbybit_guest_email');
-          if (storedTicketId) {
-            const ticket = await api.getGuestSupportTicket(storedTicketId, storedEmail || undefined);
+          if (storedTicketId && storedEmail) {
+            const ticket = await api.getGuestSupportTicket(storedTicketId, storedEmail);
             if (ticket) {
               setActiveTicket(ticket);
               setIsGuestStarted(true);
@@ -300,9 +311,9 @@ export const LiveSupportChatWidget: React.FC = () => {
       } catch {}
     };
 
-    const interval = setInterval(poll, 2500);
+    const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [isOpen, user]);
+  }, [isOpen, user?.id]);
 
   // 4. Instant Broadcast Event & Storage Sync across Tabs and Components
   useEffect(() => {
@@ -310,6 +321,7 @@ export const LiveSupportChatWidget: React.FC = () => {
       const customEvent = e as CustomEvent<SupportTicket>;
       if (customEvent.detail) {
         const updated = customEvent.detail;
+        if (user && updated.userId !== user.id) return;
         setActiveTicket((prev) => {
           if (!prev || prev.id === updated.id) {
             return updated;
@@ -319,11 +331,23 @@ export const LiveSupportChatWidget: React.FC = () => {
       }
     };
 
+    const handleLogoutEvent = () => {
+      setActiveTicket(null);
+      setGuestName('');
+      setGuestEmail('');
+      setGuestSubject('');
+      setIsGuestStarted(false);
+      setInputText('');
+      setIsOpen(false);
+    };
+
     window.addEventListener('netbybit:ticket_updated', handleTicketUpdated);
+    window.addEventListener('netbybit:logout', handleLogoutEvent);
     return () => {
       window.removeEventListener('netbybit:ticket_updated', handleTicketUpdated);
+      window.removeEventListener('netbybit:logout', handleLogoutEvent);
     };
-  }, []);
+  }, [user?.id]);
 
   const handleCopyEmail = (key: string = 'banner') => {
     navigator.clipboard.writeText('help.netbybit@hotmail.com');
