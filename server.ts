@@ -11,6 +11,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, getDocs, collection } from 'firebase/firestore';
 import {
   startPriceFeedService,
+  syncLiveMarketPrices,
   getLiveCryptoPrices,
   getLiveCryptoPricesPayload,
   subscribePriceUpdates,
@@ -1385,6 +1386,18 @@ app.get('/api/prices', (req, res) => {
     return res.json(payload);
   }
   return res.json(payload.data);
+});
+
+// Force refresh prices immediately
+app.post('/api/prices/refresh', async (req, res) => {
+  try {
+    await syncLiveMarketPrices();
+    const payload = getLiveCryptoPricesPayload();
+    res.json({ success: true, ...payload });
+  } catch (err: any) {
+    const payload = getLiveCryptoPricesPayload();
+    res.json({ success: false, error: err.message, ...payload });
+  }
 });
 
 // Live Market Price Stream (Server-Sent Events)

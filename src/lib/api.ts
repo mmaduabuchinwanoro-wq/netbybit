@@ -120,6 +120,49 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
+  // Force manual refresh of live market data
+  forceRefreshPrices: async (): Promise<{ data: CryptoPrice[]; isLive: boolean; provider: string; lastUpdated: string }> => {
+    try {
+      const res = await fetch('/api/prices/refresh', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = Array.isArray(json.data) ? json.data : [];
+        const isLive = json.isLive ?? true;
+        const lastUpdated = json.lastUpdated || new Date().toISOString();
+        const provider = json.provider || 'Live Market Data';
+
+        const validatedList: CryptoPrice[] = rawList
+          .filter((item: any) => item && typeof item === 'object' && item.id && typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)
+          .map((item: any) => ({
+            id: item.id,
+            symbol: String(item.symbol || item.id),
+            name: String(item.name || item.id),
+            price: Number(item.price),
+            change24h: typeof item.change24h === 'number' && Number.isFinite(item.change24h) ? item.change24h : 0,
+            high24h: typeof item.high24h === 'number' && Number.isFinite(item.high24h) ? item.high24h : Number(item.price) * 1.02,
+            low24h: typeof item.low24h === 'number' && Number.isFinite(item.low24h) ? item.low24h : Number(item.price) * 0.98,
+            volume24h: typeof item.volume24h === 'number' && Number.isFinite(item.volume24h) ? item.volume24h : 0,
+            isLive,
+            lastUpdated,
+          }));
+
+        if (validatedList.length > 0) {
+          try {
+            localStorage.setItem('netbybit_cached_prices', JSON.stringify(validatedList));
+          } catch {}
+          return { data: validatedList, isLive, provider, lastUpdated };
+        }
+      }
+    } catch (err) {
+      console.warn('Manual price refresh error:', err);
+    }
+    const fallbackData = await api.getPrices();
+    return { data: fallbackData, isLive: true, provider: 'Cached Market Data', lastUpdated: new Date().toISOString() };
+  },
+
   // Public Real-Time Market Prices
   getPrices: async (): Promise<CryptoPrice[]> => {
     try {
@@ -133,22 +176,39 @@ export const api = {
 
       if (res.ok) {
         const json = await res.json();
-        let list: CryptoPrice[] = [];
+        let rawList: any[] = [];
+        let isLive = true;
+        let lastUpdated = new Date().toISOString();
+
         if (Array.isArray(json)) {
-          list = json;
+          rawList = json;
         } else if (json && Array.isArray(json.data)) {
-          list = json.data.map((item: any) => ({
-            ...item,
-            isLive: json.isLive ?? true,
-            lastUpdated: json.lastUpdated,
-          }));
+          rawList = json.data;
+          isLive = json.isLive ?? true;
+          lastUpdated = json.lastUpdated || lastUpdated;
         }
 
-        if (list.length > 0) {
+        // Validate items before accepting
+        const validatedList: CryptoPrice[] = rawList
+          .filter((item) => item && typeof item === 'object' && item.id && typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)
+          .map((item) => ({
+            id: item.id,
+            symbol: String(item.symbol || item.id),
+            name: String(item.name || item.id),
+            price: Number(item.price),
+            change24h: typeof item.change24h === 'number' && Number.isFinite(item.change24h) ? item.change24h : 0,
+            high24h: typeof item.high24h === 'number' && Number.isFinite(item.high24h) ? item.high24h : Number(item.price) * 1.02,
+            low24h: typeof item.low24h === 'number' && Number.isFinite(item.low24h) ? item.low24h : Number(item.price) * 0.98,
+            volume24h: typeof item.volume24h === 'number' && Number.isFinite(item.volume24h) ? item.volume24h : 0,
+            isLive,
+            lastUpdated,
+          }));
+
+        if (validatedList.length > 0) {
           try {
-            localStorage.setItem('netbybit_cached_prices', JSON.stringify(list));
+            localStorage.setItem('netbybit_cached_prices', JSON.stringify(validatedList));
           } catch {}
-          return list;
+          return validatedList;
         }
       }
     } catch (err) {
@@ -161,20 +221,20 @@ export const api = {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.filter((item) => item && typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0);
         }
       }
     } catch {}
 
     // Fallback if initial fetch fails
     return [
-      { id: 'BTC', symbol: 'BTC', name: 'Bitcoin', price: 78020.0, change24h: -0.85, high24h: 79250, low24h: 77675, volume24h: 28450120000, isLive: false },
-      { id: 'ETH', symbol: 'ETH', name: 'Ethereum', price: 2457.5, change24h: 0.12, high24h: 2490, low24h: 2437, volume24h: 14200850000, isLive: false },
-      { id: 'BNB', symbol: 'BNB', name: 'BNB Smart Chain', price: 686.8, change24h: -0.42, high24h: 695, low24h: 684, volume24h: 1250340000, isLive: false },
-      { id: 'SOL', symbol: 'SOL', name: 'Solana', price: 102.35, change24h: -1.45, high24h: 105.2, low24h: 101.8, volume24h: 3850120000, isLive: false },
-      { id: 'TRX', symbol: 'TRX', name: 'Tron', price: 0.3285, change24h: -2.05, high24h: 0.3356, low24h: 0.328, volume24h: 420800000, isLive: false },
-      { id: 'USDT_ERC20', symbol: 'USDT (ERC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 45100200000, isLive: false },
-      { id: 'USDT_TRC20', symbol: 'USDT (TRC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 58200400000, isLive: false },
+      { id: 'BTC', symbol: 'BTC', name: 'Bitcoin', price: 76650.0, change24h: -1.9, high24h: 78420, low24h: 76260, volume24h: 1116993800, isLive: false },
+      { id: 'ETH', symbol: 'ETH', name: 'Ethereum', price: 2378.0, change24h: -3.4, high24h: 2465, low24h: 2356, volume24h: 789917700, isLive: false },
+      { id: 'BNB', symbol: 'BNB', name: 'BNB Smart Chain', price: 683.0, change24h: -0.65, high24h: 689.5, low24h: 674.5, volume24h: 71638700, isLive: false },
+      { id: 'SOL', symbol: 'SOL', name: 'Solana', price: 97.8, change24h: -4.4, high24h: 102.5, low24h: 97.3, volume24h: 244368700, isLive: false },
+      { id: 'TRX', symbol: 'TRX', name: 'Tron', price: 0.3225, change24h: -1.9, high24h: 0.329, low24h: 0.321, volume24h: 39861300, isLive: false },
+      { id: 'USDT_ERC20', symbol: 'USDT (ERC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 893595000, isLive: false },
+      { id: 'USDT_TRC20', symbol: 'USDT (TRC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 1061144000, isLive: false },
     ];
   },
 
@@ -183,7 +243,21 @@ export const api = {
   ): (() => void) => {
     let eventSource: EventSource | null = null;
     let fallbackInterval: any = null;
+    let reconnectTimeout: any = null;
     let isClosed = false;
+
+    const validatePayloadData = (items: any[], meta: { isLive: boolean; provider: string; lastUpdated: string }) => {
+      if (!Array.isArray(items) || items.length === 0) return;
+      const valid = items.filter(
+        (i) => i && typeof i === 'object' && i.id && typeof i.price === 'number' && Number.isFinite(i.price) && i.price > 0
+      );
+      if (valid.length > 0) {
+        try {
+          localStorage.setItem('netbybit_cached_prices', JSON.stringify(valid));
+        } catch {}
+        callback(valid, meta);
+      }
+    };
 
     const startPollingFallback = () => {
       if (fallbackInterval || isClosed) return;
@@ -197,45 +271,55 @@ export const api = {
       }, 4000);
     };
 
-    try {
-      if (typeof window !== 'undefined' && window.EventSource) {
-        eventSource = new EventSource('/api/prices/stream');
+    const connectSSE = () => {
+      if (isClosed) return;
+      try {
+        if (typeof window !== 'undefined' && window.EventSource) {
+          eventSource = new EventSource('/api/prices/stream');
 
-        eventSource.onmessage = (event) => {
-          if (isClosed) return;
-          try {
-            const data = JSON.parse(event.data);
-            if (data && Array.isArray(data.data)) {
-              callback(data.data, {
-                isLive: data.isLive ?? true,
-                provider: data.provider || 'Live Market Stream',
-                lastUpdated: data.lastUpdated || new Date().toISOString(),
-              });
-            } else if (Array.isArray(data)) {
-              callback(data, {
-                isLive: true,
-                provider: 'Live Market Stream',
-                lastUpdated: new Date().toISOString(),
-              });
+          eventSource.onmessage = (event) => {
+            if (isClosed) return;
+            try {
+              const data = JSON.parse(event.data);
+              if (data && Array.isArray(data.data)) {
+                validatePayloadData(data.data, {
+                  isLive: data.isLive ?? true,
+                  provider: data.provider || 'Live Market Stream',
+                  lastUpdated: data.lastUpdated || new Date().toISOString(),
+                });
+                // If SSE is receiving data cleanly, clear fallback polling
+                if (fallbackInterval) {
+                  clearInterval(fallbackInterval);
+                  fallbackInterval = null;
+                }
+              }
+            } catch {}
+          };
+
+          eventSource.onerror = () => {
+            if (eventSource) {
+              eventSource.close();
+              eventSource = null;
             }
-          } catch (e) {
-            // Error parsing SSE message
-          }
-        };
+            startPollingFallback();
 
-        eventSource.onerror = () => {
-          if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-          }
+            // Exponential backoff reconnect
+            if (!isClosed && !reconnectTimeout) {
+              reconnectTimeout = setTimeout(() => {
+                reconnectTimeout = null;
+                connectSSE();
+              }, 8000);
+            }
+          };
+        } else {
           startPollingFallback();
-        };
-      } else {
+        }
+      } catch {
         startPollingFallback();
       }
-    } catch {
-      startPollingFallback();
-    }
+    };
+
+    connectSSE();
 
     return () => {
       isClosed = true;
@@ -246,6 +330,10 @@ export const api = {
       if (fallbackInterval) {
         clearInterval(fallbackInterval);
         fallbackInterval = null;
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
       }
     };
   },

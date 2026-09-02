@@ -51,16 +51,23 @@ export const LiveCryptoPriceIndicator: React.FC<LiveCryptoPriceIndicatorProps> =
     if (price >= 1000) {
       return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } else if (price >= 1) {
-      return price.toFixed(2);
-    } else {
+      return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else if (price >= 0.01) {
       return price.toFixed(4);
+    } else {
+      return price.toFixed(6);
     }
   };
+
+  const formattedTime = lastPriceUpdate
+    ? new Date(lastPriceUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '';
 
   if (variant === 'badge') {
     return (
       <div
-        className={`inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-neutral-900/90 border border-neutral-800 text-xs text-neutral-300 font-mono ${className}`}
+        title={`Provider: ${priceProvider || 'Live Feed'} | Updated: ${formattedTime}`}
+        className={`inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-neutral-900/90 border border-neutral-800 text-xs text-neutral-300 font-mono select-none ${className}`}
       >
         <span className="relative flex h-2 w-2">
           <span
@@ -75,15 +82,23 @@ export const LiveCryptoPriceIndicator: React.FC<LiveCryptoPriceIndicatorProps> =
           />
         </span>
         <span className="text-[11px] font-semibold text-neutral-200">
-          {isPricesLive ? 'LIVE MARKET' : 'PRICE FEED'}
+          {isPricesLive ? 'LIVE MARKET' : 'STALE FEED'}
         </span>
+        {formattedTime && (
+          <span className="text-[10px] text-neutral-500 border-l border-neutral-800 pl-1.5 hidden sm:inline">
+            {formattedTime}
+          </span>
+        )}
       </div>
     );
   }
 
   if (variant === 'compact') {
     return (
-      <div className={`flex items-center space-x-3 overflow-x-auto no-scrollbar py-1 ${className}`}>
+      <div
+        title={`Provider: ${priceProvider || 'Live Feed'} | Updated: ${formattedTime}`}
+        className={`flex items-center space-x-3 overflow-x-auto no-scrollbar py-1 select-none ${className}`}
+      >
         <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono font-bold text-emerald-400 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>LIVE</span>
@@ -124,6 +139,7 @@ export const LiveCryptoPriceIndicator: React.FC<LiveCryptoPriceIndicatorProps> =
   // Default 'ticker' horizontal stream banner
   return (
     <div
+      title={`Live Data Provider: ${priceProvider || 'Market Data Engine'}${lastPriceUpdate ? ` • Updated ${formattedTime}` : ''}`}
       className={`relative flex items-center overflow-hidden w-full text-xs font-mono select-none ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

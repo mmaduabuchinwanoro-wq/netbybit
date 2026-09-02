@@ -136,11 +136,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPricesLoading(true);
     }
     try {
-      const data = await api.getPrices();
-      if (data && data.length > 0) {
-        setPrices(data);
-        setIsPricesLive(true);
-        setLastPriceUpdate(new Date().toISOString());
+      const res = await api.forceRefreshPrices();
+      if (res.data && res.data.length > 0) {
+        setPrices(res.data);
+        setIsPricesLive(res.isLive);
+        setLastPriceUpdate(res.lastUpdated);
+        setPriceProvider(res.provider);
       }
     } catch (err) {
       console.error('Failed to load crypto prices', err);
