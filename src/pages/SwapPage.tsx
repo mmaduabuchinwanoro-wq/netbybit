@@ -194,9 +194,21 @@ export const SwapPage: React.FC = () => {
               <Repeat className="w-4 h-4" />
             </button>
             {fromPrice > 0 && toPrice > 0 && (
-              <span className="text-[10px] font-mono text-neutral-400 bg-neutral-900/90 px-2.5 py-0.5 rounded-full border border-neutral-800">
-                1 {fromAsset} ≈ {(fromPrice / toPrice).toLocaleString('en-US', { maximumFractionDigits: 6 })} {toAsset}
-              </span>
+              <div className="flex flex-col items-center space-y-1">
+                <span className="text-[11px] font-mono text-neutral-300 bg-neutral-900/90 px-3 py-1 rounded-full border border-neutral-800 shadow-sm flex items-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>
+                    1 {ASSET_METADATA[fromAsset]?.symbol || fromAsset} ≈{' '}
+                    <strong className="text-amber-300 font-bold">
+                      {(fromPrice / toPrice).toLocaleString('en-US', { maximumFractionDigits: 6 })}
+                    </strong>{' '}
+                    {ASSET_METADATA[toAsset]?.symbol || toAsset}
+                  </span>
+                </span>
+                <span className="text-[10px] font-mono text-neutral-500">
+                  Market Valuation: {ASSET_METADATA[fromAsset]?.symbol} = ${fromPrice >= 1 ? fromPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : fromPrice.toFixed(4)} • {ASSET_METADATA[toAsset]?.symbol} = ${toPrice >= 1 ? toPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : toPrice.toFixed(4)}
+                </span>
+              </div>
             )}
           </div>
 

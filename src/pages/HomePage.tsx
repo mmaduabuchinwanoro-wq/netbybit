@@ -112,9 +112,17 @@ export const HomePage: React.FC = () => {
                     Live Crypto Market Prices
                   </span>
                 </div>
-                <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                  Live Feed
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{isPricesLive ? 'Live Feed' : 'Connecting'}</span>
+                  </span>
+                  {lastPriceUpdate && (
+                    <span className="text-[10px] font-mono text-neutral-500 hidden sm:inline">
+                      {new Date(lastPriceUpdate).toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {pricesLoading || prices.length === 0 ? (

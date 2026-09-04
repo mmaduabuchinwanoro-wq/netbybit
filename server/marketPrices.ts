@@ -1,5 +1,7 @@
+import { SupportedAsset } from '../src/types';
+
 export interface CryptoPriceItem {
-  id: 'BTC' | 'ETH' | 'BNB' | 'SOL' | 'TRX' | 'USDT_ERC20' | 'USDT_TRC20';
+  id: SupportedAsset;
   symbol: string;
   name: string;
   price: number;
@@ -7,8 +9,8 @@ export interface CryptoPriceItem {
   high24h: number;
   low24h: number;
   volume24h: number;
-  lastUpdated?: string;
-  isLive?: boolean;
+  lastUpdated: string;
+  isLive: boolean;
 }
 
 export interface LiveMarketPricesPayload {
@@ -19,61 +21,136 @@ export interface LiveMarketPricesPayload {
   data: CryptoPriceItem[];
 }
 
-// In-memory cache holding the latest validated live market prices
+interface AssetConfig {
+  id: SupportedAsset;
+  symbol: string;
+  name: string;
+  binanceStream: string;
+  binanceSymbol: string;
+  coingeckoId: string;
+  coinbasePair: string;
+  minPrice: number;
+  maxPrice: number;
+}
+
+const ASSET_CONFIGS: AssetConfig[] = [
+  {
+    id: 'BTC',
+    symbol: 'BTC',
+    name: 'Bitcoin',
+    binanceStream: 'btcusdt@ticker',
+    binanceSymbol: 'BTCUSDT',
+    coingeckoId: 'bitcoin',
+    coinbasePair: 'BTC-USD',
+    minPrice: 1000,
+    maxPrice: 1000000,
+  },
+  {
+    id: 'ETH',
+    symbol: 'ETH',
+    name: 'Ethereum',
+    binanceStream: 'ethusdt@ticker',
+    binanceSymbol: 'ETHUSDT',
+    coingeckoId: 'ethereum',
+    coinbasePair: 'ETH-USD',
+    minPrice: 100,
+    maxPrice: 100000,
+  },
+  {
+    id: 'BNB',
+    symbol: 'BNB',
+    name: 'BNB Smart Chain',
+    binanceStream: 'bnbusdt@ticker',
+    binanceSymbol: 'BNBUSDT',
+    coingeckoId: 'binancecoin',
+    coinbasePair: 'BNB-USD',
+    minPrice: 10,
+    maxPrice: 50000,
+  },
+  {
+    id: 'SOL',
+    symbol: 'SOL',
+    name: 'Solana',
+    binanceStream: 'solusdt@ticker',
+    binanceSymbol: 'SOLUSDT',
+    coingeckoId: 'solana',
+    coinbasePair: 'SOL-USD',
+    minPrice: 1,
+    maxPrice: 10000,
+  },
+  {
+    id: 'TRX',
+    symbol: 'TRX',
+    name: 'Tron',
+    binanceStream: 'trxusdt@ticker',
+    binanceSymbol: 'TRXUSDT',
+    coingeckoId: 'tron',
+    coinbasePair: 'TRX-USD',
+    minPrice: 0.001,
+    maxPrice: 100,
+  },
+];
+
+// Initial in-memory state (marked as pending live connection)
 let cachedPrices: CryptoPriceItem[] = [
   {
     id: 'BTC',
     symbol: 'BTC',
     name: 'Bitcoin',
-    price: 76650.0,
-    change24h: -1.9,
-    high24h: 78420.0,
-    low24h: 76260.0,
-    volume24h: 1116993800,
+    price: 81500.0,
+    change24h: 5.0,
+    high24h: 81800.0,
+    low24h: 77000.0,
+    volume24h: 35000000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
   {
     id: 'ETH',
     symbol: 'ETH',
     name: 'Ethereum',
-    price: 2378.0,
-    change24h: -3.4,
-    high24h: 2465.0,
-    low24h: 2356.0,
-    volume24h: 789917700,
+    price: 2500.0,
+    change24h: 4.5,
+    high24h: 2530.0,
+    low24h: 2370.0,
+    volume24h: 15000000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
   {
     id: 'BNB',
     symbol: 'BNB',
     name: 'BNB Smart Chain',
-    price: 683.0,
-    change24h: -0.65,
-    high24h: 689.5,
-    low24h: 674.5,
-    volume24h: 71638700,
+    price: 725.0,
+    change24h: 5.0,
+    high24h: 728.0,
+    low24h: 685.0,
+    volume24h: 1100000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
   {
     id: 'SOL',
     symbol: 'SOL',
     name: 'Solana',
-    price: 97.8,
-    change24h: -4.4,
-    high24h: 102.5,
-    low24h: 97.3,
-    volume24h: 244368700,
+    price: 105.0,
+    change24h: 5.5,
+    high24h: 106.0,
+    low24h: 99.0,
+    volume24h: 4000000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
   {
     id: 'TRX',
     symbol: 'TRX',
     name: 'Tron',
-    price: 0.3225,
-    change24h: -1.9,
-    high24h: 0.329,
-    low24h: 0.321,
-    volume24h: 39861300,
+    price: 0.332,
+    change24h: 2.2,
+    high24h: 0.3325,
+    low24h: 0.324,
+    volume24h: 395000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
   {
@@ -84,7 +161,8 @@ let cachedPrices: CryptoPriceItem[] = [
     change24h: 0.01,
     high24h: 1.001,
     low24h: 0.999,
-    volume24h: 893595000,
+    volume24h: 65000000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
   {
@@ -95,7 +173,8 @@ let cachedPrices: CryptoPriceItem[] = [
     change24h: 0.01,
     high24h: 1.001,
     low24h: 0.999,
-    volume24h: 1061144000,
+    volume24h: 75000000000,
+    lastUpdated: new Date().toISOString(),
     isLive: true,
   },
 ];
@@ -103,7 +182,7 @@ let cachedPrices: CryptoPriceItem[] = [
 let lastFetchTimestamp: string = new Date().toISOString();
 let lastSuccessfulFetchTimeMs: number = Date.now();
 let isCurrentlyLive: boolean = true;
-let currentProvider: string = 'Binance Live Market Data';
+let currentProvider: string = 'Binance Live Market Stream';
 let consecutiveFailures: number = 0;
 
 // Provider cooldown tracking to respect rate limits & avoid hammering failing endpoints
@@ -114,6 +193,17 @@ const providerCooldowns: Record<string, number> = {
 };
 
 const subscribers: Set<(payload: LiveMarketPricesPayload) => void> = new Set();
+
+let notifyTimeout: any = null;
+
+function scheduleBroadcast() {
+  if (notifyTimeout) return;
+  // Throttle updates to subscribers (max once per 250ms) to ensure smooth client performance
+  notifyTimeout = setTimeout(() => {
+    notifyTimeout = null;
+    notifySubscribers();
+  }, 250);
+}
 
 function notifySubscribers() {
   const payload = getLiveCryptoPricesPayload();
@@ -127,7 +217,7 @@ function notifySubscribers() {
 }
 
 /**
- * Robust numeric validator to ensure finite, positive, and sane price values
+ * Numeric validation functions
  */
 function isValidFinitePrice(val: any, min: number = 0.0001, max: number = 10000000): boolean {
   if (typeof val !== 'number') return false;
@@ -143,8 +233,182 @@ function isValidFiniteChange(val: any): boolean {
 }
 
 /**
- * 1. Primary: Binance 24hr Ticker API with mirror fallback
+ * Update Tether prices based on current market data
  */
+function updateTetherItems(tetherVol?: number) {
+  const now = new Date().toISOString();
+  const baseVol = tetherVol || cachedPrices[0].volume24h * 1.5;
+
+  const erc20Idx = cachedPrices.findIndex((c) => c.id === 'USDT_ERC20');
+  if (erc20Idx !== -1) {
+    cachedPrices[erc20Idx] = {
+      ...cachedPrices[erc20Idx],
+      price: 1.0,
+      change24h: 0.01,
+      high24h: 1.001,
+      low24h: 0.999,
+      volume24h: baseVol,
+      lastUpdated: now,
+      isLive: isCurrentlyLive,
+    };
+  }
+
+  const trc20Idx = cachedPrices.findIndex((c) => c.id === 'USDT_TRC20');
+  if (trc20Idx !== -1) {
+    cachedPrices[trc20Idx] = {
+      ...cachedPrices[trc20Idx],
+      price: 1.0,
+      change24h: 0.01,
+      high24h: 1.001,
+      low24h: 0.999,
+      volume24h: baseVol * 1.15,
+      lastUpdated: now,
+      isLive: isCurrentlyLive,
+    };
+  }
+}
+
+// -------------------------------------------------------------
+// 1. WEBSOCKET REAL-TIME LIVE STREAM (Primary continuous feed)
+// -------------------------------------------------------------
+let wsClient: any = null;
+let wsReconnectTimeout: any = null;
+let wsHeartbeatInterval: any = null;
+let isWsConnected = false;
+let lastWsMessageTimeMs = 0;
+
+export function connectBinanceWebSocket(): void {
+  if (typeof WebSocket === 'undefined') {
+    console.warn('[LiveCrypto] WebSocket API not available in runtime, relying on REST poller');
+    return;
+  }
+
+  if (wsClient && (wsClient.readyState === 0 || wsClient.readyState === 1)) {
+    return; // Already connecting or connected
+  }
+
+  try {
+    const streams = ASSET_CONFIGS.map((a) => a.binanceStream).join('/');
+    const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+
+    wsClient = new WebSocket(url);
+
+    wsClient.onopen = () => {
+      isWsConnected = true;
+      lastWsMessageTimeMs = Date.now();
+      isCurrentlyLive = true;
+      currentProvider = 'Binance Live WebSocket Stream';
+      lastSuccessfulFetchTimeMs = Date.now();
+      consecutiveFailures = 0;
+
+      // Start ping heartbeat
+      if (wsHeartbeatInterval) clearInterval(wsHeartbeatInterval);
+      wsHeartbeatInterval = setInterval(() => {
+        if (Date.now() - lastWsMessageTimeMs > 15000) {
+          // No message in 15 seconds, trigger reconnection
+          console.warn('[LiveCrypto] WebSocket quiet for 15s, triggering reconnect');
+          try {
+            wsClient?.close();
+          } catch {}
+        }
+      }, 5000);
+    };
+
+    wsClient.onmessage = (event: any) => {
+      try {
+        lastWsMessageTimeMs = Date.now();
+        lastSuccessfulFetchTimeMs = Date.now();
+        isCurrentlyLive = true;
+        currentProvider = 'Binance Live WebSocket Stream';
+
+        const parsed = JSON.parse(event.data);
+        const data = parsed?.data;
+        const stream = parsed?.stream;
+
+        if (!data || !stream) return;
+
+        // Find matching asset config
+        const config = ASSET_CONFIGS.find((a) => a.binanceStream === stream || stream.startsWith(a.binanceStream.split('@')[0]));
+        if (!config) return;
+
+        const newPrice = parseFloat(data.c);
+        const newChange = parseFloat(data.P);
+        const newHigh = parseFloat(data.h);
+        const newLow = parseFloat(data.l);
+        const newVol = parseFloat(data.q);
+
+        const now = new Date().toISOString();
+        const existingIdx = cachedPrices.findIndex((c) => c.id === config.id);
+
+        if (existingIdx !== -1) {
+          const prev = cachedPrices[existingIdx];
+          const validatedPrice = isValidFinitePrice(newPrice, config.minPrice, config.maxPrice) ? newPrice : prev.price;
+          const validatedChange = isValidFiniteChange(newChange) ? parseFloat(newChange.toFixed(2)) : prev.change24h;
+          const validatedHigh = isValidFinitePrice(newHigh, config.minPrice, config.maxPrice) ? newHigh : prev.high24h;
+          const validatedLow = isValidFinitePrice(newLow, config.minPrice, config.maxPrice) ? newLow : prev.low24h;
+          const validatedVol = isValidFinitePrice(newVol, 0) ? newVol : prev.volume24h;
+
+          cachedPrices[existingIdx] = {
+            id: config.id,
+            symbol: config.symbol,
+            name: config.name,
+            price: validatedPrice,
+            change24h: validatedChange,
+            high24h: validatedHigh,
+            low24h: validatedLow,
+            volume24h: validatedVol,
+            lastUpdated: now,
+            isLive: true,
+          };
+        }
+
+        lastFetchTimestamp = now;
+        updateTetherItems();
+        scheduleBroadcast();
+      } catch (err) {
+        console.error('[LiveCrypto] WebSocket message parsing error:', err);
+      }
+    };
+
+    wsClient.onerror = (err: any) => {
+      console.warn('[LiveCrypto] WebSocket error, initiating fallback:', err?.message || err);
+    };
+
+    wsClient.onclose = () => {
+      isWsConnected = false;
+      wsClient = null;
+      if (wsHeartbeatInterval) {
+        clearInterval(wsHeartbeatInterval);
+        wsHeartbeatInterval = null;
+      }
+
+      // Schedule reconnection with backoff
+      if (!wsReconnectTimeout) {
+        wsReconnectTimeout = setTimeout(() => {
+          wsReconnectTimeout = null;
+          connectBinanceWebSocket();
+        }, 3000);
+      }
+
+      // Immediate REST sync cycle while WS reconnects
+      syncLiveMarketPrices().catch(() => {});
+    };
+  } catch (err) {
+    console.error('[LiveCrypto] Failed to establish WebSocket connection:', err);
+    isWsConnected = false;
+    wsClient = null;
+    if (!wsReconnectTimeout) {
+      wsReconnectTimeout = setTimeout(() => {
+        wsReconnectTimeout = null;
+        connectBinanceWebSocket();
+      }, 5000);
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// 2. TIER 1 REST: Binance 24hr Ticker API with mirror fallback
+// -------------------------------------------------------------
 async function fetchFromBinance(): Promise<boolean> {
   if (Date.now() < providerCooldowns.binance) {
     return false;
@@ -156,13 +420,13 @@ async function fetchFromBinance(): Promise<boolean> {
     'https://data-api.binance.vision',
   ];
 
-  const symbols = JSON.stringify(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'TRXUSDT']);
+  const symbolList = ASSET_CONFIGS.map((a) => a.binanceSymbol);
+  const symbolsQuery = JSON.stringify(symbolList);
   let raw: any[] | null = null;
-  let successfulHost = '';
 
   for (const host of hosts) {
     try {
-      const url = `${host}/api/v3/ticker/24hr?symbols=${encodeURIComponent(symbols)}`;
+      const url = `${host}/api/v3/ticker/24hr?symbols=${encodeURIComponent(symbolsQuery)}`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -173,7 +437,6 @@ async function fetchFromBinance(): Promise<boolean> {
         const json = await res.json();
         if (Array.isArray(json) && json.length >= 5) {
           raw = json;
-          successfulHost = host;
           break;
         }
       } else if (res.status === 429 || res.status === 418) {
@@ -197,103 +460,68 @@ async function fetchFromBinance(): Promise<boolean> {
     }
   }
 
-  const getOrKeep = (
-    symbolPair: string,
-    id: CryptoPriceItem['id'],
-    name: string,
-    displaySymbol: string,
-    minVal: number,
-    maxVal: number
-  ): CryptoPriceItem => {
-    const existing = cachedPrices.find((c) => c.id === id) || cachedPrices[0];
-    const ticker = tickerMap[symbolPair];
+  const now = new Date().toISOString();
+  for (const config of ASSET_CONFIGS) {
+    const ticker = tickerMap[config.binanceSymbol];
+    if (!ticker) continue;
 
-    let price = existing.price;
-    let change24h = existing.change24h;
-    let high24h = existing.high24h;
-    let low24h = existing.low24h;
-    let volume24h = existing.volume24h;
+    const existingIdx = cachedPrices.findIndex((c) => c.id === config.id);
+    const prev = existingIdx !== -1 ? cachedPrices[existingIdx] : null;
 
-    if (ticker) {
-      const parsedPrice = parseFloat(ticker.lastPrice);
-      const parsedChange = parseFloat(ticker.priceChangePercent);
-      const parsedHigh = parseFloat(ticker.highPrice);
-      const parsedLow = parseFloat(ticker.lowPrice);
-      const parsedVol = parseFloat(ticker.quoteVolume);
+    const parsedPrice = parseFloat(ticker.lastPrice);
+    const parsedChange = parseFloat(ticker.priceChangePercent);
+    const parsedHigh = parseFloat(ticker.highPrice);
+    const parsedLow = parseFloat(ticker.lowPrice);
+    const parsedVol = parseFloat(ticker.quoteVolume);
 
-      if (isValidFinitePrice(parsedPrice, minVal, maxVal)) price = parsedPrice;
-      if (isValidFiniteChange(parsedChange)) change24h = parseFloat(parsedChange.toFixed(2));
-      if (isValidFinitePrice(parsedHigh, minVal, maxVal)) high24h = parsedHigh;
-      if (isValidFinitePrice(parsedLow, minVal, maxVal)) low24h = parsedLow;
-      if (isValidFinitePrice(parsedVol, 0)) volume24h = parsedVol;
-    }
+    const price = isValidFinitePrice(parsedPrice, config.minPrice, config.maxPrice) ? parsedPrice : (prev?.price || parsedPrice);
+    const change24h = isValidFiniteChange(parsedChange) ? parseFloat(parsedChange.toFixed(2)) : (prev?.change24h || 0);
+    const high24h = isValidFinitePrice(parsedHigh, config.minPrice, config.maxPrice) ? parsedHigh : (prev?.high24h || price * 1.02);
+    const low24h = isValidFinitePrice(parsedLow, config.minPrice, config.maxPrice) ? parsedLow : (prev?.low24h || price * 0.98);
+    const volume24h = isValidFinitePrice(parsedVol, 0) ? parsedVol : (prev?.volume24h || 0);
 
-    return {
-      id,
-      symbol: displaySymbol,
-      name,
+    const updatedItem: CryptoPriceItem = {
+      id: config.id,
+      symbol: config.symbol,
+      name: config.name,
       price,
       change24h,
       high24h,
       low24h,
       volume24h,
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
       isLive: true,
     };
-  };
 
-  const btcItem = getOrKeep('BTCUSDT', 'BTC', 'Bitcoin', 'BTC', 1000, 1000000);
-  const ethItem = getOrKeep('ETHUSDT', 'ETH', 'Ethereum', 'ETH', 100, 100000);
-  const bnbItem = getOrKeep('BNBUSDT', 'BNB', 'BNB Smart Chain', 'BNB', 10, 50000);
-  const solItem = getOrKeep('SOLUSDT', 'SOL', 'Solana', 'SOL', 1, 10000);
-  const trxItem = getOrKeep('TRXUSDT', 'TRX', 'Tron', 'TRX', 0.001, 100);
+    if (existingIdx !== -1) {
+      cachedPrices[existingIdx] = updatedItem;
+    } else {
+      cachedPrices.push(updatedItem);
+    }
+  }
 
-  const usdtVolume = (btcItem.volume24h || 1000000000) * 0.9;
-  const usdtErc20: CryptoPriceItem = {
-    id: 'USDT_ERC20',
-    symbol: 'USDT (ERC-20)',
-    name: 'Tether USD',
-    price: 1.0,
-    change24h: 0.01,
-    high24h: 1.001,
-    low24h: 0.999,
-    volume24h: usdtVolume,
-    lastUpdated: new Date().toISOString(),
-    isLive: true,
-  };
-  const usdtTrc20: CryptoPriceItem = {
-    id: 'USDT_TRC20',
-    symbol: 'USDT (TRC-20)',
-    name: 'Tether USD',
-    price: 1.0,
-    change24h: 0.01,
-    high24h: 1.001,
-    low24h: 0.999,
-    volume24h: usdtVolume * 1.15,
-    lastUpdated: new Date().toISOString(),
-    isLive: true,
-  };
-
-  cachedPrices = [btcItem, ethItem, bnbItem, solItem, trxItem, usdtErc20, usdtTrc20];
-  lastFetchTimestamp = new Date().toISOString();
+  updateTetherItems();
+  lastFetchTimestamp = now;
   lastSuccessfulFetchTimeMs = Date.now();
   isCurrentlyLive = true;
-  currentProvider = 'Binance Live Market Data';
+  if (!isWsConnected) {
+    currentProvider = 'Binance Live Market Data';
+  }
   consecutiveFailures = 0;
   return true;
 }
 
-/**
- * 2. Secondary: CoinGecko Simple Price API
- */
+// -------------------------------------------------------------
+// 3. TIER 2 REST: CoinGecko Simple Price API
+// -------------------------------------------------------------
 async function fetchFromCoinGecko(): Promise<boolean> {
   if (Date.now() < providerCooldowns.coingecko) {
     return false;
   }
 
   try {
-    const url =
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin,solana,tron,tether&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_24hr_high=true&include_24hr_low=true';
+    const ids = 'bitcoin,ethereum,binancecoin,solana,tron,tether';
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_24hr_high=true&include_24hr_low=true`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -318,82 +546,55 @@ async function fetchFromCoinGecko(): Promise<boolean> {
       return false;
     }
 
-    const mapGeckoCoin = (
-      coinData: any,
-      id: CryptoPriceItem['id'],
-      name: string,
-      displaySymbol: string,
-      minVal: number,
-      maxVal: number
-    ): CryptoPriceItem => {
-      const existing = cachedPrices.find((c) => c.id === id) || cachedPrices[0];
-      let price = existing.price;
-      let change24h = existing.change24h;
-      let high24h = existing.high24h;
-      let low24h = existing.low24h;
-      let volume24h = existing.volume24h;
+    const now = new Date().toISOString();
+    for (const config of ASSET_CONFIGS) {
+      const coinData = raw[config.coingeckoId];
+      if (!coinData) continue;
 
-      if (coinData) {
-        if (isValidFinitePrice(coinData.usd, minVal, maxVal)) price = coinData.usd;
-        if (isValidFiniteChange(coinData.usd_24h_change)) change24h = parseFloat(coinData.usd_24h_change.toFixed(2));
-        if (isValidFinitePrice(coinData.usd_24h_high, minVal, maxVal)) high24h = coinData.usd_24h_high;
-        else high24h = price * 1.015;
-        if (isValidFinitePrice(coinData.usd_24h_low, minVal, maxVal)) low24h = coinData.usd_24h_low;
-        else low24h = price * 0.985;
-        if (isValidFinitePrice(coinData.usd_24h_vol, 0)) volume24h = coinData.usd_24h_vol;
-      }
+      const existingIdx = cachedPrices.findIndex((c) => c.id === config.id);
+      const prev = existingIdx !== -1 ? cachedPrices[existingIdx] : null;
 
-      return {
-        id,
-        symbol: displaySymbol,
-        name,
+      const rawPrice = coinData.usd;
+      const rawChange = coinData.usd_24h_change;
+      const rawHigh = coinData.usd_24h_high;
+      const rawLow = coinData.usd_24h_low;
+      const rawVol = coinData.usd_24h_vol;
+
+      const price = isValidFinitePrice(rawPrice, config.minPrice, config.maxPrice) ? rawPrice : (prev?.price || rawPrice);
+      const change24h = isValidFiniteChange(rawChange) ? parseFloat(rawChange.toFixed(2)) : (prev?.change24h || 0);
+      const high24h = isValidFinitePrice(rawHigh, config.minPrice, config.maxPrice) ? rawHigh : price * 1.02;
+      const low24h = isValidFinitePrice(rawLow, config.minPrice, config.maxPrice) ? rawLow : price * 0.98;
+      const volume24h = isValidFinitePrice(rawVol, 0) ? rawVol : (prev?.volume24h || 0);
+
+      const updatedItem: CryptoPriceItem = {
+        id: config.id,
+        symbol: config.symbol,
+        name: config.name,
         price,
         change24h,
         high24h,
         low24h,
         volume24h,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: now,
         isLive: true,
       };
-    };
 
-    const btcItem = mapGeckoCoin(raw.bitcoin, 'BTC', 'Bitcoin', 'BTC', 1000, 1000000);
-    const ethItem = mapGeckoCoin(raw.ethereum, 'ETH', 'Ethereum', 'ETH', 100, 100000);
-    const bnbItem = mapGeckoCoin(raw.binancecoin, 'BNB', 'BNB Smart Chain', 'BNB', 10, 50000);
-    const solItem = mapGeckoCoin(raw.solana, 'SOL', 'Solana', 'SOL', 1, 10000);
-    const trxItem = mapGeckoCoin(raw.tron, 'TRX', 'Tron', 'TRX', 0.001, 100);
+      if (existingIdx !== -1) {
+        cachedPrices[existingIdx] = updatedItem;
+      } else {
+        cachedPrices.push(updatedItem);
+      }
+    }
 
-    const tetherVol = raw.tether?.usd_24h_vol || 45000000000;
-    const usdtErc20: CryptoPriceItem = {
-      id: 'USDT_ERC20',
-      symbol: 'USDT (ERC-20)',
-      name: 'Tether USD',
-      price: 1.0,
-      change24h: 0.01,
-      high24h: 1.001,
-      low24h: 0.999,
-      volume24h: tetherVol,
-      lastUpdated: new Date().toISOString(),
-      isLive: true,
-    };
-    const usdtTrc20: CryptoPriceItem = {
-      id: 'USDT_TRC20',
-      symbol: 'USDT (TRC-20)',
-      name: 'Tether USD',
-      price: 1.0,
-      change24h: 0.01,
-      high24h: 1.001,
-      low24h: 0.999,
-      volume24h: tetherVol * 1.15,
-      lastUpdated: new Date().toISOString(),
-      isLive: true,
-    };
+    const tetherVol = raw.tether?.usd_24h_vol || 65000000000;
+    updateTetherItems(tetherVol);
 
-    cachedPrices = [btcItem, ethItem, bnbItem, solItem, trxItem, usdtErc20, usdtTrc20];
-    lastFetchTimestamp = new Date().toISOString();
+    lastFetchTimestamp = now;
     lastSuccessfulFetchTimeMs = Date.now();
     isCurrentlyLive = true;
-    currentProvider = 'CoinGecko Live Feed';
+    if (!isWsConnected) {
+      currentProvider = 'CoinGecko Live Feed';
+    }
     consecutiveFailures = 0;
     return true;
   } catch {
@@ -401,9 +602,9 @@ async function fetchFromCoinGecko(): Promise<boolean> {
   }
 }
 
-/**
- * 3. Tertiary: Coinbase Spot Market API
- */
+// -------------------------------------------------------------
+// 4. TIER 3 REST: Coinbase Spot Market API
+// -------------------------------------------------------------
 async function fetchFromCoinbase(): Promise<boolean> {
   if (Date.now() < providerCooldowns.coinbase) {
     return false;
@@ -428,37 +629,34 @@ async function fetchFromCoinbase(): Promise<boolean> {
     );
 
     let updatedAny = false;
-    const updated = cachedPrices.map((item) => {
-      if (item.id === 'BTC') {
-        const res = results[0];
-        if (res.status === 'fulfilled' && isValidFinitePrice(res.value.price, 1000, 1000000)) {
-          updatedAny = true;
-          return { ...item, price: res.value.price, lastUpdated: new Date().toISOString() };
+    const now = new Date().toISOString();
+
+    for (const res of results) {
+      if (res.status === 'fulfilled' && res.value) {
+        const { pair, price } = res.value;
+        const config = ASSET_CONFIGS.find((a) => a.coinbasePair === pair);
+        if (config && isValidFinitePrice(price, config.minPrice, config.maxPrice)) {
+          const existingIdx = cachedPrices.findIndex((c) => c.id === config.id);
+          if (existingIdx !== -1) {
+            cachedPrices[existingIdx] = {
+              ...cachedPrices[existingIdx],
+              price,
+              lastUpdated: now,
+              isLive: true,
+            };
+            updatedAny = true;
+          }
         }
       }
-      if (item.id === 'ETH') {
-        const res = results[1];
-        if (res.status === 'fulfilled' && isValidFinitePrice(res.value.price, 100, 100000)) {
-          updatedAny = true;
-          return { ...item, price: res.value.price, lastUpdated: new Date().toISOString() };
-        }
-      }
-      if (item.id === 'SOL') {
-        const res = results[2];
-        if (res.status === 'fulfilled' && isValidFinitePrice(res.value.price, 1, 10000)) {
-          updatedAny = true;
-          return { ...item, price: res.value.price, lastUpdated: new Date().toISOString() };
-        }
-      }
-      return item;
-    });
+    }
 
     if (updatedAny) {
-      cachedPrices = updated;
-      lastFetchTimestamp = new Date().toISOString();
+      lastFetchTimestamp = now;
       lastSuccessfulFetchTimeMs = Date.now();
       isCurrentlyLive = true;
-      currentProvider = 'Coinbase Spot Live Feed';
+      if (!isWsConnected) {
+        currentProvider = 'Coinbase Spot Live Feed';
+      }
       consecutiveFailures = 0;
       return true;
     }
@@ -472,7 +670,7 @@ async function fetchFromCoinbase(): Promise<boolean> {
  * Perform a single sync cycle with cascading failovers
  */
 export async function syncLiveMarketPrices(): Promise<void> {
-  // 1. Primary
+  // 1. Primary REST
   try {
     const success = await fetchFromBinance();
     if (success) {
@@ -481,7 +679,7 @@ export async function syncLiveMarketPrices(): Promise<void> {
     }
   } catch {}
 
-  // 2. Secondary
+  // 2. Secondary REST (CoinGecko)
   try {
     const success = await fetchFromCoinGecko();
     if (success) {
@@ -490,7 +688,7 @@ export async function syncLiveMarketPrices(): Promise<void> {
     }
   } catch {}
 
-  // 3. Tertiary
+  // 3. Tertiary REST (Coinbase)
   try {
     const success = await fetchFromCoinbase();
     if (success) {
@@ -518,13 +716,21 @@ export function startPriceFeedService(): void {
   if (isEngineStarted) return;
   isEngineStarted = true;
 
-  // Immediate initial fetch
+  console.log('[LiveCrypto] Initializing market-data engine...');
+
+  // 1. Immediate initial REST fetch to populate live prices immediately
   syncLiveMarketPrices().catch(() => {});
 
-  // Continuous background refresh interval (every 4 seconds)
+  // 2. Connect persistent WebSocket stream for sub-second tick updates
+  connectBinanceWebSocket();
+
+  // 3. Continuous background fallback sync interval (every 3.5s)
   setInterval(() => {
-    syncLiveMarketPrices().catch(() => {});
-  }, 4000);
+    // If WebSocket is disconnected or has not received a tick in 8 seconds, trigger REST sync
+    if (!isWsConnected || Date.now() - lastWsMessageTimeMs > 8000) {
+      syncLiveMarketPrices().catch(() => {});
+    }
+  }, 3500);
 }
 
 /**

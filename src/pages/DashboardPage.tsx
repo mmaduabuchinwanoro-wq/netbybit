@@ -762,6 +762,33 @@ export const DashboardPage: React.FC = () => {
             </button>
           </div>
 
+          {/* Dynamic Conversions calculated directly from live market data */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 border-y border-neutral-850">
+            <span className="text-[10px] font-mono font-bold text-neutral-400 uppercase tracking-wider shrink-0 flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block mr-1" />
+              <span>Live Rates:</span>
+            </span>
+            {prices.map((p) => {
+              const usdStr = p.price >= 1 ? `$${p.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${p.price.toFixed(4)}`;
+              const fiatInfo = formatFiat(p.price);
+              return (
+                <span
+                  key={`conv-${p.id}`}
+                  className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-neutral-950/80 border border-neutral-800 text-[11px] font-mono text-neutral-300 shrink-0 shadow-sm"
+                >
+                  <span className="font-bold text-neutral-200">1 {p.id.startsWith('USDT') ? 'USDT' : p.symbol}</span>
+                  <span className="text-neutral-500">=</span>
+                  <span className="font-bold text-amber-300">{usdStr}</span>
+                  {selectedCurrency !== 'USD' && (
+                    <span className="text-[10px] text-neutral-400 font-medium">
+                      ({fiatInfo.formatted})
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {prices.map((p) => {
               const priceFiat = formatFiat(p.price);

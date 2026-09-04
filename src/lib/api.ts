@@ -206,36 +206,30 @@ export const api = {
 
         if (validatedList.length > 0) {
           try {
-            localStorage.setItem('netbybit_cached_prices', JSON.stringify(validatedList));
+            localStorage.setItem('netbybit_cached_prices', JSON.stringify({ data: validatedList, cachedAt: Date.now() }));
           } catch {}
           return validatedList;
         }
       }
     } catch (err) {
-      console.warn('Live price fetch warning, using fallback cache:', err);
+      console.warn('Live price fetch warning, checking memory cache:', err);
     }
 
-    // Attempt to read cached prices
+    // Attempt to read recently cached real prices (no hard-coded numbers)
     try {
       const cached = localStorage.getItem('netbybit_cached_prices');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter((item) => item && typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0);
+        const list = Array.isArray(parsed) ? parsed : parsed?.data;
+        if (Array.isArray(list) && list.length > 0) {
+          return list
+            .filter((item) => item && typeof item.price === 'number' && Number.isFinite(item.price) && item.price > 0)
+            .map((item) => ({ ...item, isLive: false }));
         }
       }
     } catch {}
 
-    // Fallback if initial fetch fails
-    return [
-      { id: 'BTC', symbol: 'BTC', name: 'Bitcoin', price: 76650.0, change24h: -1.9, high24h: 78420, low24h: 76260, volume24h: 1116993800, isLive: false },
-      { id: 'ETH', symbol: 'ETH', name: 'Ethereum', price: 2378.0, change24h: -3.4, high24h: 2465, low24h: 2356, volume24h: 789917700, isLive: false },
-      { id: 'BNB', symbol: 'BNB', name: 'BNB Smart Chain', price: 683.0, change24h: -0.65, high24h: 689.5, low24h: 674.5, volume24h: 71638700, isLive: false },
-      { id: 'SOL', symbol: 'SOL', name: 'Solana', price: 97.8, change24h: -4.4, high24h: 102.5, low24h: 97.3, volume24h: 244368700, isLive: false },
-      { id: 'TRX', symbol: 'TRX', name: 'Tron', price: 0.3225, change24h: -1.9, high24h: 0.329, low24h: 0.321, volume24h: 39861300, isLive: false },
-      { id: 'USDT_ERC20', symbol: 'USDT (ERC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 893595000, isLive: false },
-      { id: 'USDT_TRC20', symbol: 'USDT (TRC-20)', name: 'Tether USD', price: 1.0, change24h: 0.01, high24h: 1.001, low24h: 0.999, volume24h: 1061144000, isLive: false },
-    ];
+    return [];
   },
 
   subscribeToLivePrices: (
@@ -253,22 +247,26 @@ export const api = {
       );
       if (valid.length > 0) {
         try {
-          localStorage.setItem('netbybit_cached_prices', JSON.stringify(valid));
+          localStorage.setItem('netbybit_cached_prices', JSON.stringify({ data: valid, cachedAt: Date.now() }));
         } catch {}
         callback(valid, meta);
       }
     };
 
+    const runPoll = async () => {
+      if (isClosed) return;
+      try {
+        const prices = await api.getPrices();
+        if (!isClosed && prices && prices.length > 0) {
+          callback(prices, { isLive: true, provider: 'Live Market Poller', lastUpdated: new Date().toISOString() });
+        }
+      } catch {}
+    };
+
     const startPollingFallback = () => {
       if (fallbackInterval || isClosed) return;
-      fallbackInterval = setInterval(async () => {
-        try {
-          const prices = await api.getPrices();
-          if (!isClosed && prices && prices.length > 0) {
-            callback(prices, { isLive: true, provider: 'Live Market Poller', lastUpdated: new Date().toISOString() });
-          }
-        } catch {}
-      }, 4000);
+      runPoll();
+      fallbackInterval = setInterval(runPoll, 3000);
     };
 
     const connectSSE = () => {
@@ -303,12 +301,12 @@ export const api = {
             }
             startPollingFallback();
 
-            // Exponential backoff reconnect
+            // Quick reconnect with backoff
             if (!isClosed && !reconnectTimeout) {
               reconnectTimeout = setTimeout(() => {
                 reconnectTimeout = null;
                 connectSSE();
-              }, 8000);
+              }, 3000);
             }
           };
         } else {

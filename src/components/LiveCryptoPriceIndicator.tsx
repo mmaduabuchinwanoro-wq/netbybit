@@ -15,7 +15,7 @@ export const LiveCryptoPriceIndicator: React.FC<LiveCryptoPriceIndicatorProps> =
   showAll = false,
 }) => {
   const { prices, isPricesLive, lastPriceUpdate, priceProvider, refreshPrices } = useAuth();
-  const [prevPrices, setPrevPrices] = useState<Record<string, number>>({});
+  const prevPricesRef = useRef<Record<string, number>>({});
   const [flashMap, setFlashMap] = useState<Record<string, 'up' | 'down'>>({});
   const [isHovered, setIsHovered] = useState(false);
 
@@ -24,17 +24,14 @@ export const LiveCryptoPriceIndicator: React.FC<LiveCryptoPriceIndicatorProps> =
     if (!prices || prices.length === 0) return;
 
     const newFlashes: Record<string, 'up' | 'down'> = {};
-    const newPrev: Record<string, number> = { ...prevPrices };
 
     prices.forEach((p) => {
-      const oldPrice = prevPrices[p.id];
+      const oldPrice = prevPricesRef.current[p.id];
       if (oldPrice !== undefined && oldPrice !== p.price) {
         newFlashes[p.id] = p.price > oldPrice ? 'up' : 'down';
       }
-      newPrev[p.id] = p.price;
+      prevPricesRef.current[p.id] = p.price;
     });
-
-    setPrevPrices(newPrev);
 
     if (Object.keys(newFlashes).length > 0) {
       setFlashMap(newFlashes);
