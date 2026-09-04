@@ -9,7 +9,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export const SwapPage: React.FC = () => {
-  const { user, prices, refreshUser } = useAuth();
+  const { user, prices, getValidAssetPrice, refreshUser } = useAuth();
   const [fromAsset, setFromAsset] = useState<SupportedAsset>('BTC');
   const [toAsset, setToAsset] = useState<SupportedAsset>('USDT_ERC20');
   const [fromAmount, setFromAmount] = useState('');
@@ -18,8 +18,8 @@ export const SwapPage: React.FC = () => {
 
   if (!user) return null;
 
-  const fromPrice = prices.find((p) => p.id === fromAsset)?.price || 0;
-  const toPrice = prices.find((p) => p.id === toAsset)?.price || 1;
+  const fromPrice = getValidAssetPrice(fromAsset);
+  const toPrice = getValidAssetPrice(toAsset) || 1;
 
   const parsedFrom = parseFloat(fromAmount) || 0;
   const estimatedToAmount = toPrice > 0 ? (parsedFrom * fromPrice) / toPrice : 0;

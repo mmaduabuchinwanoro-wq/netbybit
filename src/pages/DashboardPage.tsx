@@ -67,6 +67,7 @@ export const DashboardPage: React.FC = () => {
     priceProvider,
     refreshPrices,
     calculateTotalUsdBalance,
+    getValidAssetPrice,
     setActivePage,
     selectedCurrency,
     formatFiat,
@@ -108,9 +109,8 @@ export const DashboardPage: React.FC = () => {
   const totalUsd = calculateTotalUsdBalance();
   const formattedTotalFiat = formatFiat(totalUsd);
 
-  // Estimate BTC valuation
-  const btcPriceObj = prices.find((p) => p.id === 'BTC');
-  const btcPrice = btcPriceObj?.price || 68450;
+  // Estimate BTC valuation using resilient price resolution
+  const btcPrice = getValidAssetPrice('BTC');
   const btcValuation = btcPrice > 0 ? (totalUsd / btcPrice).toFixed(4) : '0.0000';
 
   // 24h PnL estimate (e.g., +2.4%)
@@ -128,11 +128,11 @@ export const DashboardPage: React.FC = () => {
     { time: 'Now', value: formattedTotalFiat.amount },
   ];
 
-  // Allocation donut data
+  // Allocation donut data using getValidAssetPrice to avoid 0 valuation drops
   const allocationData = Object.values(ASSET_METADATA)
     .map((asset) => {
       const amount = user.balances[asset.id] || 0;
-      const price = prices.find((p) => p.id === asset.id)?.price || 0;
+      const price = getValidAssetPrice(asset.id);
       const usdVal = amount * price;
       const fiatVal = formatFiat(usdVal).amount;
       return {
@@ -210,6 +210,14 @@ export const DashboardPage: React.FC = () => {
 
                 {/* Interactive Currency Switcher */}
                 <CurrencySwitcher variant="hero" />
+
+                {/* Updating State Indicator: Keeps valid portfolio valuation fully visible while fetching updated live rates */}
+                {(pricesLoading || isManualRefreshing) && (
+                  <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono text-[11px] animate-pulse">
+                    <RefreshCw className="w-3 h-3 animate-spin text-amber-400" />
+                    <span>Updating rates...</span>
+                  </span>
+                )}
               </div>
 
               {/* Sub-estimates: BTC & 24h PnL */}
@@ -423,7 +431,7 @@ export const DashboardPage: React.FC = () => {
                 filteredAssets.map((asset) => {
                   const balance = user.balances[asset.id] || 0;
                   const priceObj = prices.find((p) => p.id === asset.id);
-                  const priceUsd = priceObj?.price || 0;
+                  const priceUsd = priceObj?.price || getValidAssetPrice(asset.id);
                   const change24h = priceObj?.change24h || 0;
 
                   const balanceUsd = balance * priceUsd;
@@ -540,7 +548,7 @@ export const DashboardPage: React.FC = () => {
                     {filteredAssets.map((asset) => {
                       const balance = user.balances[asset.id] || 0;
                       const priceObj = prices.find((p) => p.id === asset.id);
-                      const priceUsd = priceObj?.price || 0;
+                      const priceUsd = priceObj?.price || getValidAssetPrice(asset.id);
                       const change24h = priceObj?.change24h || 0;
 
                       const balanceUsd = balance * priceUsd;
@@ -953,7 +961,7 @@ export const DashboardPage: React.FC = () => {
                 <tbody className="divide-y divide-neutral-900 text-xs text-neutral-200 font-mono">
                   {recentTxs.map((tx) => {
                     const priceObj = prices.find((p) => p.id === tx.asset);
-                    const priceUsd = priceObj?.price || 1;
+                    const priceUsd = priceObj?.price || getValidAssetPrice(tx.asset);
                     const fiatVal = formatFiat(tx.amount * priceUsd);
 
                     return (

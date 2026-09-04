@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { api, getAuthToken, removeAuthToken, setAuthToken } from '../lib/api';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { api, getAuthToken, removeAuthToken, setAuthToken, getLastKnownPrices, DEFAULT_MARKET_PRICES } from '../lib/api';
 import { CryptoPrice, DepositAddresses, Notification, User } from '../types';
 import { fetchLiveFiatRates, formatFiatValue, convertUsdToFiat, SUPPORTED_FIAT_CURRENCIES } from '../lib/currencies';
 import { db } from '../lib/firebase';
@@ -43,9 +43,11 @@ interface AuthContextType {
   logout: () => void;
   refreshUser: () => Promise<void>;
   refreshDepositAddresses: () => Promise<void>;
-  refreshPrices: () => Promise<void>;
+  refreshPrices: (isBackground?: boolean) => Promise<void>;
   refreshNotifications: () => Promise<void>;
   calculateTotalUsdBalance: (userBalances?: Record<string, number>) => number;
+  getValidAssetPrice: (assetId: string) => number;
+  lastValidTotalUsd: number;
 }
 
 const DEFAULT_DEPOSIT: DepositAddresses = {
@@ -61,20 +63,123 @@ const DEFAULT_DEPOSIT: DepositAddresses = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === 'object' && parsed.id) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const [depositAddresses, setDepositAddresses] = useState<DepositAddresses>(DEFAULT_DEPOSIT);
-  const [prices, setPrices] = useState<CryptoPrice[]>([]);
+  const [prices, setPrices] = useState<CryptoPrice[]>(() => {
+    return getLastKnownPrices();
+  });
   const [isPricesLive, setIsPricesLive] = useState<boolean>(true);
   const [lastPriceUpdate, setLastPriceUpdate] = useState<string | null>(null);
   const [priceProvider, setPriceProvider] = useState<string>('Live Market Feed');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pricesLoading, setPricesLoading] = useState(true);
+  const [pricesLoading, setPricesLoading] = useState(false);
   const [marketDataUnavailable, setMarketDataUnavailable] = useState(false);
   const [pageHistory, setPageHistory] = useState<string[]>([]);
   const [activePage, setActivePageState] = useState<string>(() => {
     return localStorage.getItem('netbybit_active_page') || 'home';
   });
+
+  // State-management resilience refs to eliminate $0.00 flashes and race conditions
+  const lastValidPricesRef = useRef<Map<string, number>>(new Map());
+  const lastValidPortfolioUsdRef = useRef<number>(() => {
+    try {
+      const cached = Number(localStorage.getItem('netbybit_last_valid_portfolio_usd'));
+      if (Number.isFinite(cached) && cached > 0) {
+        return cached;
+      }
+    } catch {}
+    return 0;
+  });
+  const latestPriceUpdateTimestampRef = useRef<number>(0);
+  const priceRequestIdRef = useRef<number>(0);
+
+  // Pre-seed last valid prices map
+  useEffect(() => {
+    prices.forEach((p) => {
+      if (typeof p.price === 'number' && Number.isFinite(p.price) && p.price > 0) {
+        lastValidPricesRef.current.set(p.id, p.price);
+      }
+    });
+  }, [prices]);
+
+  const getValidAssetPrice = (assetId: string): number => {
+    const fromPrices = prices.find((p) => p.id === assetId);
+    if (fromPrices && typeof fromPrices.price === 'number' && Number.isFinite(fromPrices.price) && fromPrices.price > 0) {
+      return fromPrices.price;
+    }
+    const fromRef = lastValidPricesRef.current.get(assetId);
+    if (typeof fromRef === 'number' && Number.isFinite(fromRef) && fromRef > 0) {
+      return fromRef;
+    }
+    const fromDefault = DEFAULT_MARKET_PRICES.find((p) => p.id === assetId);
+    return fromDefault?.price || 1.0;
+  };
+
+  const updatePricesAtomically = (
+    newPrices: CryptoPrice[],
+    meta?: { isLive?: boolean; provider?: string; lastUpdated?: string; requestSeq?: number; timestamp?: number }
+  ) => {
+    if (!Array.isArray(newPrices) || newPrices.length === 0) return;
+
+    // Race condition prevention: check timestamp and sequence number
+    const msgTimestamp = meta?.timestamp || (meta?.lastUpdated ? new Date(meta.lastUpdated).getTime() : Date.now());
+    if (meta?.requestSeq !== undefined) {
+      if (meta.requestSeq < priceRequestIdRef.current) {
+        return; // Discard older/superseded response
+      }
+    } else if (msgTimestamp < latestPriceUpdateTimestampRef.current) {
+      return; // Discard older timestamp
+    }
+    latestPriceUpdateTimestampRef.current = msgTimestamp;
+
+    // Verify valid positive finite numbers
+    const validIncoming = newPrices.filter(
+      (p) => p && typeof p === 'object' && p.id && typeof p.price === 'number' && Number.isFinite(p.price) && p.price > 0
+    );
+    if (validIncoming.length === 0) return;
+
+    // Atomically merge prices with existing valid prices
+    setPrices((prevPrices) => {
+      const priceMap = new Map<string, CryptoPrice>();
+      // Baseline fallback
+      DEFAULT_MARKET_PRICES.forEach((p) => priceMap.set(p.id, p));
+      // Previous verified prices
+      prevPrices.forEach((p) => priceMap.set(p.id, p));
+      // Incoming verified prices
+      validIncoming.forEach((p) => {
+        priceMap.set(p.id, {
+          ...p,
+          price: Number(p.price),
+          isLive: meta?.isLive ?? p.isLive ?? true,
+          lastUpdated: meta?.lastUpdated || new Date().toISOString(),
+        });
+        lastValidPricesRef.current.set(p.id, Number(p.price));
+      });
+
+      const merged = Array.from(priceMap.values());
+      try {
+        localStorage.setItem('netbybit_cached_prices', JSON.stringify({ data: merged, cachedAt: Date.now() }));
+      } catch {}
+      return merged;
+    });
+
+    if (meta?.isLive !== undefined) setIsPricesLive(meta.isLive);
+    if (meta?.lastUpdated) setLastPriceUpdate(meta.lastUpdated);
+    if (meta?.provider) setPriceProvider(meta.provider);
+    setMarketDataUnavailable(false);
+  };
 
   const setActivePage = (page: string) => {
     setActivePageState((prev) => {
@@ -134,22 +239,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshPrices = async (isBackground = false) => {
+    const thisRequestId = ++priceRequestIdRef.current;
     if (!isBackground) {
       setPricesLoading(true);
     }
     try {
       const res = await api.forceRefreshPrices();
+      if (thisRequestId < priceRequestIdRef.current) return;
+
       if (res.data && res.data.length > 0) {
-        setPrices(res.data);
-        setIsPricesLive(res.isLive);
-        setLastPriceUpdate(res.lastUpdated);
-        setPriceProvider(res.provider);
-        setMarketDataUnavailable(false);
+        updatePricesAtomically(res.data, {
+          isLive: res.isLive,
+          lastUpdated: res.lastUpdated,
+          provider: res.provider,
+          requestSeq: thisRequestId,
+        });
       } else {
+        // DO NOT reset existing valid prices or balances to zero!
+        setIsPricesLive(false);
         setMarketDataUnavailable(true);
       }
     } catch (err) {
       console.warn('Crypto prices refresh notice:', err);
+      // Retain last known prices, mark live status
+      setIsPricesLive(false);
       setMarketDataUnavailable(true);
     } finally {
       if (!isBackground) {
@@ -234,13 +347,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPricesLoading(false);
 
       if (newPrices && newPrices.length > 0) {
-        setPrices(newPrices);
-        setIsPricesLive(meta?.isLive ?? true);
-        if (meta?.lastUpdated) setLastPriceUpdate(meta.lastUpdated);
-        if (meta?.provider) setPriceProvider(meta.provider);
-        setMarketDataUnavailable(false);
+        updatePricesAtomically(newPrices, meta);
       } else {
-        // Explicit unavailable or empty tick
         if (meta?.isLive === false) {
           setIsPricesLive(false);
         }
@@ -439,12 +547,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('token');
       localStorage.removeItem('netbybit_token');
       localStorage.removeItem('netbybit_cached_user');
+      localStorage.removeItem('netbybit_last_valid_portfolio_usd');
       localStorage.removeItem('netbybit_guest_ticket_id');
       localStorage.removeItem('netbybit_guest_email');
       localStorage.removeItem('netbybit_guest_name');
       localStorage.removeItem('netbybit_user_transactions');
       localStorage.removeItem('netbybit_wallet_requests');
     } catch {}
+    lastValidPortfolioUsdRef.current = 0;
     setUser(null);
     setNotifications([]);
     setIsLiveChatOpen(false);
@@ -456,15 +566,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const calculateTotalUsdBalance = (userBalances?: Record<string, number>): number => {
     const b = userBalances || user?.balances;
-    if (!b) return 0;
+    if (!b) {
+      if (lastValidPortfolioUsdRef.current > 0) {
+        return lastValidPortfolioUsdRef.current;
+      }
+      try {
+        const stored = Number(localStorage.getItem('netbybit_last_valid_portfolio_usd'));
+        if (Number.isFinite(stored) && stored > 0) {
+          lastValidPortfolioUsdRef.current = stored;
+          return stored;
+        }
+      } catch {}
+      return 0;
+    }
+
+    const balanceEntries = Object.entries(b);
+    // Genuine $0.00 verification: ONLY display $0.00 when the actual verified asset quantity is genuinely zero
+    const isAllAuthoritativeZero =
+      balanceEntries.length > 0 &&
+      balanceEntries.every(([_, amount]) => typeof amount === 'number' && amount <= 0);
+
+    if (isAllAuthoritativeZero) {
+      lastValidPortfolioUsdRef.current = 0;
+      try {
+        localStorage.setItem('netbybit_last_valid_portfolio_usd', '0');
+      } catch {}
+      return 0;
+    }
+
+    const hasNonZeroAssets = balanceEntries.some(([_, amount]) => typeof amount === 'number' && amount > 0);
 
     let total = 0;
-    prices.forEach((p) => {
-      const amount = b[p.id] || 0;
-      total += amount * p.price;
-    });
+    let hasCalculatedAny = false;
 
-    return Number(total.toFixed(2));
+    for (const [assetId, amount] of balanceEntries) {
+      if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
+        const price = getValidAssetPrice(assetId);
+        if (price > 0) {
+          total += amount * price;
+          hasCalculatedAny = true;
+        }
+      }
+    }
+
+    if (hasCalculatedAny && total > 0) {
+      const rounded = Number(total.toFixed(2));
+      lastValidPortfolioUsdRef.current = rounded;
+      try {
+        localStorage.setItem('netbybit_last_valid_portfolio_usd', String(rounded));
+      } catch {}
+      return rounded;
+    }
+
+    // If user has non-zero asset quantities but computed total was 0,
+    // NEVER flash $0.00! Keep the last valid calculated portfolio valuation!
+    if (hasNonZeroAssets) {
+      if (lastValidPortfolioUsdRef.current > 0) {
+        return lastValidPortfolioUsdRef.current;
+      }
+      try {
+        const stored = Number(localStorage.getItem('netbybit_last_valid_portfolio_usd'));
+        if (Number.isFinite(stored) && stored > 0) {
+          lastValidPortfolioUsdRef.current = stored;
+          return stored;
+        }
+      } catch {}
+    }
+
+    return 0;
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -509,6 +678,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshPrices,
         refreshNotifications,
         calculateTotalUsdBalance,
+        getValidAssetPrice,
+        lastValidTotalUsd: lastValidPortfolioUsdRef.current,
       }}
     >
       {children}
