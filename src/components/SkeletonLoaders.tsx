@@ -1,11 +1,30 @@
-import React from 'react';
-import { TrendingUp, PieChart as PieIcon, RefreshCw, BarChart2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, PieChart as PieIcon, RefreshCw, BarChart2, AlertCircle } from 'lucide-react';
 
-export const SkeletonAreaChart: React.FC<{ title?: string }> = ({
+export const SkeletonAreaChart: React.FC<{
+  title?: string;
+  isUnavailable?: boolean;
+  onRetry?: () => void;
+}> = ({
   title = 'Portfolio Analytics (24h Trend)',
+  isUnavailable = false,
+  onRetry,
 }) => {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    // Failsafe timeout: Never remain in the "Fetching Live Market Trends..." state for more than 2.5 seconds
+    const timer = setTimeout(() => {
+      setTimedOut(true);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const showUnavailable = isUnavailable || timedOut;
+
   return (
-    <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4 animate-pulse">
+    <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
       {/* Header Skeleton */}
       <div className="flex justify-between items-center border-b border-neutral-800/80 pb-3">
         <div className="flex items-center space-x-2">
@@ -13,8 +32,10 @@ export const SkeletonAreaChart: React.FC<{ title?: string }> = ({
           <div className="h-4 w-44 bg-neutral-800 rounded-md" />
         </div>
         <div className="flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-amber-500/40 animate-ping" />
-          <div className="h-4 w-24 bg-neutral-800/80 rounded border border-neutral-800" />
+          <span className={`w-2 h-2 rounded-full ${showUnavailable ? 'bg-amber-500/80' : 'bg-amber-500/40 animate-ping'}`} />
+          <span className="text-[10px] font-mono text-neutral-400">
+            {showUnavailable ? 'Offline' : 'Connecting'}
+          </span>
         </div>
       </div>
 
@@ -41,7 +62,7 @@ export const SkeletonAreaChart: React.FC<{ title?: string }> = ({
           <svg className="w-full h-full" viewBox="0 0 500 150" preserveAspectRatio="none">
             <defs>
               <linearGradient id="skeletonGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.15" />
                 <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
               </linearGradient>
             </defs>
@@ -53,8 +74,8 @@ export const SkeletonAreaChart: React.FC<{ title?: string }> = ({
               d="M0,120 Q60,40 120,80 T240,50 T360,90 T500,30"
               fill="none"
               stroke="#f59e0b"
-              strokeWidth="2.5"
-              strokeOpacity="0.4"
+              strokeWidth="2"
+              strokeOpacity="0.3"
               strokeDasharray="6 4"
             />
           </svg>
@@ -71,12 +92,27 @@ export const SkeletonAreaChart: React.FC<{ title?: string }> = ({
           <div className="h-2.5 w-8 bg-neutral-800 rounded" />
         </div>
 
-        {/* Loading overlay badge */}
-        <div className="absolute inset-0 flex items-center justify-center bg-neutral-950/40 backdrop-blur-[1px]">
-          <div className="px-3 py-1.5 rounded-lg bg-neutral-900/90 border border-amber-500/30 text-amber-400 text-xs font-mono font-semibold flex items-center space-x-2 shadow-xl">
-            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            <span>Fetching Live Market Trends...</span>
-          </div>
+        {/* Loading / Status overlay badge */}
+        <div className="absolute inset-0 flex items-center justify-center bg-neutral-950/60 backdrop-blur-[1px]">
+          {showUnavailable ? (
+            <div className="px-3.5 py-2 rounded-lg bg-neutral-900/95 border border-amber-500/40 text-amber-400 text-xs font-mono font-medium flex items-center space-x-2 shadow-2xl max-w-sm text-center">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Live market data temporarily unavailable. Retrying…</span>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="ml-2 underline text-amber-300 hover:text-amber-200 font-bold"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="px-3 py-1.5 rounded-lg bg-neutral-900/90 border border-amber-500/30 text-amber-400 text-xs font-mono font-semibold flex items-center space-x-2 shadow-xl">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>Fetching Live Market Trends...</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

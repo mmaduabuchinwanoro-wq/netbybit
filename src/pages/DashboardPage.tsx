@@ -45,6 +45,7 @@ import {
   ArrowRight,
   TrendingDown,
   Layers,
+  AlertCircle,
 } from 'lucide-react';
 import { BuyCryptoModal } from '../components/BuyCryptoModal';
 import {
@@ -61,6 +62,7 @@ export const DashboardPage: React.FC = () => {
     prices,
     pricesLoading,
     isPricesLive,
+    marketDataUnavailable,
     lastPriceUpdate,
     priceProvider,
     refreshPrices,
@@ -100,7 +102,8 @@ export const DashboardPage: React.FC = () => {
     }, 800);
   };
 
-  const showSkeletons = pricesLoading || prices.length === 0 || isManualRefreshing;
+  const isInitialLoading = pricesLoading && prices.length === 0;
+  const isMarketOffline = marketDataUnavailable || (!isPricesLive && prices.length === 0);
 
   const totalUsd = calculateTotalUsdBalance();
   const formattedTotalFiat = formatFiat(totalUsd);
@@ -158,42 +161,46 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-8 pb-16">
       {/* Top Banner / Total Balance Hero - Bybit Web3 Style */}
-      {showSkeletons ? (
-        <SkeletonHeroBalance />
-      ) : (
-        <div className="bg-gradient-to-br from-[#121318] via-[#161822] to-[#0c0d12] border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
-          {/* Ambient Glowing Orb Effects */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="bg-gradient-to-br from-[#121318] via-[#161822] to-[#0c0d12] border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+        {/* Ambient Glowing Orb Effects */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-            {/* Left Balance Display */}
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400">
-                <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>NETBYBIT Custody Vault</span>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          {/* Left Balance Display */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-400">
+              <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>NETBYBIT Custody Vault</span>
+              </span>
+
+              {isMarketOffline && (
+                <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[11px]">
+                  <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span>Live market data temporarily unavailable. Retrying…</span>
                 </span>
+              )}
 
-                <button
-                  onClick={() => setHideBalances((prev) => !prev)}
-                  className="p-1.5 rounded-lg bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-amber-400 transition-all flex items-center space-x-1"
-                  title={hideBalances ? 'Show Balances' : 'Hide Balances'}
-                >
-                  {hideBalances ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  <span className="text-[11px] font-mono">{hideBalances ? 'Hidden' : 'Visible'}</span>
-                </button>
+              <button
+                onClick={() => setHideBalances((prev) => !prev)}
+                className="p-1.5 rounded-lg bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-amber-400 transition-all flex items-center space-x-1"
+                title={hideBalances ? 'Show Balances' : 'Hide Balances'}
+              >
+                {hideBalances ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span className="text-[11px] font-mono">{hideBalances ? 'Hidden' : 'Visible'}</span>
+              </button>
 
-                <button
-                  onClick={handleRefreshMarketData}
-                  disabled={showSkeletons}
-                  className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg text-[11px] font-semibold flex items-center space-x-1.5 transition-all"
-                  title="Refresh Live Exchange Rates"
-                >
-                  <RefreshCw className={`w-3 h-3 ${showSkeletons ? 'animate-spin text-amber-400' : ''}`} />
-                  <span>Refresh Rates</span>
-                </button>
-              </div>
+              <button
+                onClick={handleRefreshMarketData}
+                disabled={isManualRefreshing}
+                className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-lg text-[11px] font-semibold flex items-center space-x-1.5 transition-all"
+                title="Refresh Live Exchange Rates"
+              >
+                <RefreshCw className={`w-3 h-3 ${isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
+                <span>Refresh Rates</span>
+              </button>
+            </div>
 
               {/* Balance & Currency Switcher Row */}
               <div className="flex flex-wrap items-baseline gap-3">
@@ -282,7 +289,6 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
 
       {/* Main Dashboard Navigation Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-neutral-800 pb-3 gap-4">
@@ -400,16 +406,7 @@ export const DashboardPage: React.FC = () => {
           {/* Grid View Mode */}
           {viewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {showSkeletons ? (
-                <>
-                  <SkeletonAssetCard />
-                  <SkeletonAssetCard />
-                  <SkeletonAssetCard />
-                  <SkeletonAssetCard />
-                  <SkeletonAssetCard />
-                  <SkeletonAssetCard />
-                </>
-              ) : filteredAssets.length === 0 ? (
+              {filteredAssets.length === 0 ? (
                 <div className="col-span-full py-12 text-center space-y-2 bg-neutral-900/40 rounded-2xl border border-neutral-800">
                   <p className="text-xs text-neutral-400">No crypto assets match your criteria</p>
                   <button
@@ -452,18 +449,24 @@ export const DashboardPage: React.FC = () => {
 
                         <div className="text-right">
                           <span className="text-xs font-mono font-bold text-neutral-200 block">
-                            {priceFiat.formatted}
+                            {priceObj ? priceFiat.formatted : <span className="text-neutral-500 text-xs">Syncing...</span>}
                           </span>
-                          <span
-                            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border inline-block mt-0.5 ${
-                              change24h >= 0
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : 'bg-red-500/10 text-red-400 border-red-500/20'
-                            }`}
-                          >
-                            {change24h >= 0 ? '+' : ''}
-                            {change24h.toFixed(2)}%
-                          </span>
+                          {priceObj ? (
+                            <span
+                              className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border inline-block mt-0.5 ${
+                                change24h >= 0
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : 'bg-red-500/10 text-red-400 border-red-500/20'
+                              }`}
+                            >
+                              {change24h >= 0 ? '+' : ''}
+                              {change24h.toFixed(2)}%
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-neutral-500 px-1.5 py-0.5 rounded border border-neutral-800 inline-block mt-0.5">
+                              --
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -479,7 +482,11 @@ export const DashboardPage: React.FC = () => {
                         <div className="flex justify-between items-center text-xs pt-1.5 border-t border-neutral-900">
                           <span className="text-neutral-500 text-[11px]">Estimated Fiat Value:</span>
                           <span className="font-mono font-extrabold text-amber-400">
-                            {hideBalances ? '••••••••' : balanceFiat.formatted}
+                            {hideBalances
+                              ? '••••••••'
+                              : balance > 0
+                              ? (priceObj ? balanceFiat.formatted : <span className="text-neutral-500 text-xs">Syncing...</span>)
+                              : '$0.00'}
                           </span>
                         </div>
                       </div>
@@ -557,25 +564,35 @@ export const DashboardPage: React.FC = () => {
                             {asset.network}
                           </td>
                           <td className="py-3.5 px-4 font-bold text-neutral-200">
-                            {priceFiat.formatted}
+                            {priceObj ? priceFiat.formatted : <span className="text-neutral-500 font-mono text-xs">Syncing...</span>}
                           </td>
                           <td className="py-3.5 px-4">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                change24h >= 0
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                              }`}
-                            >
-                              {change24h >= 0 ? '+' : ''}
-                              {change24h.toFixed(2)}%
-                            </span>
+                            {priceObj ? (
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  change24h >= 0
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                }`}
+                              >
+                                {change24h >= 0 ? '+' : ''}
+                                {change24h.toFixed(2)}%
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold text-neutral-500 border border-neutral-800">
+                                --
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 font-bold text-neutral-100">
                             {hideBalances ? '••••••••' : `${balance.toFixed(4)} ${asset.symbol}`}
                           </td>
                           <td className="py-3.5 px-4 font-bold text-amber-400">
-                            {hideBalances ? '••••••••' : balanceFiat.formatted}
+                            {hideBalances
+                              ? '••••••••'
+                              : balance > 0
+                              ? (priceObj ? balanceFiat.formatted : <span className="text-neutral-500 font-mono text-xs">Syncing...</span>)
+                              : '$0.00'}
                           </td>
                           <td className="py-3.5 px-4 text-right space-x-2 font-sans">
                             <button
@@ -605,7 +622,7 @@ export const DashboardPage: React.FC = () => {
       {/* TAB 2: PORTFOLIO ANALYTICS */}
       {activeTab === 'analytics' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {showSkeletons ? (
+          {isInitialLoading ? (
             <>
               <div className="lg:col-span-8">
                 <SkeletonAreaChart title={`Portfolio Performance (${selectedCurrency})`} />
@@ -616,6 +633,24 @@ export const DashboardPage: React.FC = () => {
             </>
           ) : (
             <>
+              {isMarketOffline && (
+                <div className="lg:col-span-12 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4">
+                  <div className="flex items-center space-x-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-xs text-amber-300 font-medium">
+                      Live market data temporarily unavailable. Retrying…
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleRefreshMarketData}
+                    disabled={isManualRefreshing}
+                    className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg text-xs font-bold shrink-0 transition-all flex items-center space-x-1.5"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isManualRefreshing ? 'animate-spin' : ''}`} />
+                    <span>Retry</span>
+                  </button>
+                </div>
+              )}
               {/* Performance Curve */}
               <div className="lg:col-span-8 p-6 rounded-3xl bg-[#121318] border border-neutral-800 space-y-4 shadow-xl">
                 <div className="flex justify-between items-center border-b border-neutral-800 pb-3">
@@ -788,6 +823,28 @@ export const DashboardPage: React.FC = () => {
               );
             })}
           </div>
+
+          {prices.length === 0 && (
+            <div className="py-12 px-4 text-center space-y-3 bg-neutral-950/60 rounded-2xl border border-neutral-800">
+              <div className="inline-flex p-3 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-bold text-neutral-200">
+                Live market data temporarily unavailable. Retrying…
+              </p>
+              <p className="text-[11px] text-neutral-500 max-w-sm mx-auto">
+                Reconnecting to live crypto market feeds. Balances and custodial functions remain fully operational.
+              </p>
+              <button
+                onClick={handleRefreshMarketData}
+                disabled={isManualRefreshing}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 inline-flex items-center space-x-1.5 transition-colors"
+              >
+                <RefreshCw className={`w-3 h-3 ${isManualRefreshing ? 'animate-spin' : ''}`} />
+                <span>Retry Connection</span>
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {prices.map((p) => {

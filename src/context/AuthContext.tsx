@@ -14,6 +14,7 @@ interface AuthContextType {
   loading: boolean;
   pricesLoading: boolean;
   isPricesLive: boolean;
+  marketDataUnavailable: boolean;
   lastPriceUpdate: string | null;
   priceProvider: string;
   activePage: string;
@@ -69,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [pricesLoading, setPricesLoading] = useState(true);
+  const [marketDataUnavailable, setMarketDataUnavailable] = useState(false);
   const [pageHistory, setPageHistory] = useState<string[]>([]);
   const [activePage, setActivePageState] = useState<string>(() => {
     return localStorage.getItem('netbybit_active_page') || 'home';
@@ -142,9 +144,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsPricesLive(res.isLive);
         setLastPriceUpdate(res.lastUpdated);
         setPriceProvider(res.provider);
+        setMarketDataUnavailable(false);
+      } else {
+        setMarketDataUnavailable(true);
       }
     } catch (err) {
-      console.error('Failed to load crypto prices', err);
+      console.warn('Crypto prices refresh notice:', err);
+      setMarketDataUnavailable(true);
     } finally {
       if (!isBackground) {
         setPricesLoading(false);
@@ -212,25 +218,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    refreshPrices();
+    // Failsafe timeout: Market data MUST NEVER block the application. Force loading to false after at most 1500ms
+    const safetyTimer = setTimeout(() => {
+      setPricesLoading(false);
+    }, 1500);
+
+    refreshPrices(true);
     refreshFiatRates();
     refreshDepositAddresses();
     refreshUser();
 
-    // Real-time market price subscription via SSE with automatic polling fallback
+    // Real-time market price subscription with automatic non-blocking poller fallback
     const unsubscribeLivePrices = api.subscribeToLivePrices((newPrices, meta) => {
+      // Unblock loading state immediately on first response
+      setPricesLoading(false);
+
       if (newPrices && newPrices.length > 0) {
         setPrices(newPrices);
         setIsPricesLive(meta?.isLive ?? true);
         if (meta?.lastUpdated) setLastPriceUpdate(meta.lastUpdated);
         if (meta?.provider) setPriceProvider(meta.provider);
-        setPricesLoading(false);
+        setMarketDataUnavailable(false);
+      } else {
+        // Explicit unavailable or empty tick
+        if (meta?.isLive === false) {
+          setIsPricesLive(false);
+        }
+        setMarketDataUnavailable((prev) => prev || (prices.length === 0));
       }
     });
 
     // Refresh fiat rates every 5 mins
     const fiatInterval = setInterval(refreshFiatRates, 300000);
     return () => {
+      clearTimeout(safetyTimer);
       unsubscribeLivePrices();
       clearInterval(fiatInterval);
     };
@@ -459,6 +480,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         pricesLoading,
         isPricesLive,
+        marketDataUnavailable,
         lastPriceUpdate,
         priceProvider,
         activePage,

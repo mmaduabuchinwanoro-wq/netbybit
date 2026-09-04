@@ -233,7 +233,7 @@ export interface Notification {
 }
 
 export interface CryptoPrice {
-  id: SupportedAsset;
+  id: SupportedAsset | 'USDT' | string;
   symbol: string;
   name: string;
   price: number;
