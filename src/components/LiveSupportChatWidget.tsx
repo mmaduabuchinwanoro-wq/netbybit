@@ -100,9 +100,14 @@ export const SupportAvatar: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: st
 };
 
 export const LiveSupportChatWidget: React.FC = () => {
-  const { user, isLiveChatOpen, setIsLiveChatOpen, openSupportChoice } = useAuth();
+  const { user, isLiveChatOpen, setIsLiveChatOpen, openSupportChoice, activePage } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Do not show the visitor live support floating widget when managing the Administrator Console
+  if (activePage === 'admin') {
+    return null;
+  }
 
   // Sync external open request from AuthContext
   useEffect(() => {
@@ -502,7 +507,7 @@ export const LiveSupportChatWidget: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 font-sans">
+    <div className="fixed bottom-5 right-5 z-50 font-sans pointer-events-none">
       {/* 1. FLOATING SUPPORT BUBBLE TRIGGER (When Chat is Closed) */}
       {!isOpen && (
         <button
@@ -510,7 +515,7 @@ export const LiveSupportChatWidget: React.FC = () => {
             setIsOpen(true);
             setIsMinimized(false);
           }}
-          className="group relative flex items-center space-x-2.5 px-4 py-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-neutral-950 font-black rounded-full shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 border border-amber-300/40 cursor-pointer"
+          className="group relative flex items-center space-x-2.5 px-4 py-3 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-neutral-950 font-black rounded-full shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all duration-300 border border-amber-300/40 cursor-pointer pointer-events-auto"
           title="Open NetbyBit Live Support"
         >
           <div className="relative">
@@ -527,7 +532,7 @@ export const LiveSupportChatWidget: React.FC = () => {
       {/* 2. CHAT WINDOW (When Open) */}
       {isOpen && (
         <div
-          className={`w-[94vw] sm:w-[400px] bg-neutral-900 border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${
+          className={`w-[94vw] sm:w-[400px] bg-neutral-900 border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 pointer-events-auto ${
             isMinimized ? 'h-16' : 'h-[580px] max-h-[85vh]'
           }`}
         >

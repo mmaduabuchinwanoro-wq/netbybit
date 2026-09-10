@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ASSET_METADATA, SupportedAsset, User, SupportTicket, TicketReply, DepositAddresses, AuditLogEntry, EmailNotificationPreview, Transaction, EmailLogRecord, SmsLogRecord, WalletRequest } from '../types';
 import { CryptoIcon } from '../components/CryptoIcon';
@@ -81,6 +81,28 @@ export const AdminPanelPage: React.FC = () => {
     tx: any;
     loading: boolean;
   } | null>(null);
+
+  // --- Diagnostic Click State (Isolates Frontend Touch/Click Event Layer) ---
+  const [diagnosticClickStatus, setDiagnosticClickStatus] = useState<{
+    action: 'approve' | 'cancel';
+    txId: string;
+    timestamp: string;
+    message: string;
+    details?: any;
+  } | null>(null);
+
+  const lastTouchHandledRef = useRef<number>(0);
+  const isExecutingRef = useRef<boolean>(false);
+  const [processingTxId, setProcessingTxId] = useState<string | null>(null);
+
+  const matchSwapStatus = (txStatus: string | undefined, filter: 'pending' | 'completed' | 'failed' | 'all') => {
+    if (filter === 'all') return true;
+    const st = (txStatus || 'pending').toLowerCase();
+    if (filter === 'pending') return st === 'pending' || st === 'processing';
+    if (filter === 'completed') return st === 'completed' || st === 'approved' || st === 'success' || st === 'successful';
+    if (filter === 'failed') return st === 'failed' || st === 'declined' || st === 'cancelled' || st === 'rejected';
+    return st === filter;
+  };
 
   // --- Swap Approvals State ---
   const [firestoreSwaps, setFirestoreSwaps] = useState<any[]>([]);
@@ -550,23 +572,117 @@ export const AdminPanelPage: React.FC = () => {
     });
   };
 
+  const handleApproveButtonClick = (e: React.MouseEvent | React.TouchEvent, tx: any) => {
+    e.stopPropagation();
+    if (isExecutingRef.current || processingTxId === tx.id) return;
+    const now = Date.now();
+    if (e.type === 'touchend') {
+      lastTouchHandledRef.current = now;
+    } else if (e.type === 'click' && now - lastTouchHandledRef.current < 500) {
+      return;
+    }
+
+    console.log('Approve button clicked', {
+      transactionId: tx.id,
+      currentTransactionStatus: tx.status,
+      authenticatedAdminId: currentUser?.id,
+      authenticatedAdminRole: currentUser?.role,
+      handlerEntry: 'handleApproveButtonClick',
+      timestamp: new Date().toISOString(),
+      amount: tx.amount,
+      asset: tx.fromAsset || tx.asset,
+    });
+
+    setDiagnosticClickStatus({
+      action: 'approve',
+      txId: tx.id,
+      timestamp: new Date().toLocaleTimeString(),
+      message: 'APPROVE BUTTON CLICK DETECTED',
+      details: { tx },
+    });
+
+    openConfirmModal(tx, 'approve', 'swap');
+  };
+
+  const handleCancelButtonClick = (e: React.MouseEvent | React.TouchEvent, tx: any) => {
+    e.stopPropagation();
+    if (isExecutingRef.current || processingTxId === tx.id) return;
+    const now = Date.now();
+    if (e.type === 'touchend') {
+      lastTouchHandledRef.current = now;
+    } else if (e.type === 'click' && now - lastTouchHandledRef.current < 500) {
+      return;
+    }
+
+    console.log('Cancel / Refund button clicked', {
+      transactionId: tx.id,
+      currentTransactionStatus: tx.status,
+      authenticatedAdminId: currentUser?.id,
+      authenticatedAdminRole: currentUser?.role,
+      handlerEntry: 'handleCancelButtonClick',
+      timestamp: new Date().toISOString(),
+      amount: tx.amount,
+      asset: tx.fromAsset || tx.asset,
+    });
+
+    setDiagnosticClickStatus({
+      action: 'cancel',
+      txId: tx.id,
+      timestamp: new Date().toLocaleTimeString(),
+      message: 'CANCEL BUTTON CLICK DETECTED',
+      details: { tx },
+    });
+
+    openConfirmModal(tx, 'cancel', 'swap');
+  };
+
   const executeConfirmedStatusChange = async () => {
+    if (isExecutingRef.current) return;
     if (!confirmActionModal || !confirmActionModal.tx) return;
+    if (confirmActionModal.loading) return;
+
     const { tx, type, txType } = confirmActionModal;
     const canonicalStatus = type === 'approve' ? 'completed' : 'cancelled';
 
+    isExecutingRef.current = true;
+    setProcessingTxId(tx.id);
     setConfirmActionModal((prev) => (prev ? { ...prev, loading: true } : null));
 
+    console.log('API request starting', {
+      transactionId: tx.id,
+      action: type,
+      txType,
+      canonicalStatus,
+      authenticatedAdminId: currentUser?.id,
+      authenticatedAdminRole: currentUser?.role,
+      timestamp: new Date().toISOString(),
+    });
+
     try {
+      let res: any;
       if (txType === 'withdrawal') {
-        await handleWithdrawalStatus(tx.id, canonicalStatus, tx);
+        res = await handleWithdrawalStatus(tx.id, canonicalStatus, tx);
       } else {
-        await handleSwapStatus(tx.id, canonicalStatus, tx);
+        res = await handleSwapStatus(tx.id, canonicalStatus, tx);
       }
+      console.log('API response', res);
+      console.log('database update result', res?.message || 'Status updated successfully');
+      console.log('balance update result', res?.userBalances || res?.wallet || 'Balances synchronized');
+      console.log('final UI state', {
+        transactionId: tx.id,
+        newStatus: canonicalStatus,
+        isRefunded: canonicalStatus === 'cancelled',
+        timestamp: new Date().toISOString(),
+      });
       setConfirmActionModal(null);
+      setDiagnosticClickStatus(null);
     } catch (err: any) {
+      console.error('API request error', err);
       alert(err.message || 'Failed to update transaction status');
       setConfirmActionModal((prev) => (prev ? { ...prev, loading: false } : null));
+    } finally {
+      isExecutingRef.current = false;
+      setProcessingTxId(null);
     }
   };
 
@@ -594,6 +710,7 @@ export const AdminPanelPage: React.FC = () => {
       await loadAdminTransactions();
       await loadAuditLogs();
       await loadAllUsers();
+      return res;
     } catch (err: any) {
       alert(err.message || 'Failed to update withdrawal status');
       throw err;
@@ -679,6 +796,7 @@ export const AdminPanelPage: React.FC = () => {
       await loadAdminTransactions();
       await loadAuditLogs();
       await loadAllUsers();
+      return res;
     } catch (err: any) {
       alert(err.message || 'Failed to update swap status');
       throw err;
@@ -1024,7 +1142,7 @@ export const AdminPanelPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-36">
       {/* Navigation Back Button */}
       <div className="flex items-center justify-between">
         <button
@@ -1927,12 +2045,12 @@ export const AdminPanelPage: React.FC = () => {
           <div className="flex flex-wrap gap-2 justify-between items-center bg-neutral-900 p-4 border border-neutral-800 rounded-2xl">
             <div className="flex space-x-2 overflow-x-auto">
               {(['pending', 'completed', 'failed', 'all'] as const).map((st) => {
-                const count = combinedSwaps.filter((t) => st === 'all' || t.status === st).length;
+                const count = combinedSwaps.filter((t) => matchSwapStatus(t.status, st)).length;
                 return (
                   <button
                     key={st}
                     onClick={() => setSwapFilter(st)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all shrink-0 ${
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all shrink-0 cursor-pointer ${
                       swapFilter === st
                         ? 'bg-purple-500 text-neutral-950 shadow-md shadow-purple-500/20'
                         : 'bg-neutral-950 text-neutral-400 border border-neutral-800 hover:text-neutral-200'
@@ -1946,24 +2064,62 @@ export const AdminPanelPage: React.FC = () => {
 
             <button
               onClick={loadAdminTransactions}
-              className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-purple-400 rounded-xl text-xs font-semibold flex items-center space-x-1"
+              className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-purple-400 rounded-xl text-xs font-semibold flex items-center space-x-1 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Refresh Queue</span>
             </button>
           </div>
 
+          {/* Diagnostic Click Status Indicator (Proves frontend touch/click event registration) */}
+          {diagnosticClickStatus && (
+            <div
+              id="swap-diagnostic-indicator"
+              className="p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fadeIn text-xs shadow-lg"
+            >
+              <div className="flex items-center space-x-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+                <div>
+                  <span className="font-extrabold text-amber-300 mr-2">
+                    {diagnosticClickStatus.message}
+                  </span>
+                  <span className="text-neutral-300 font-mono text-[11px]">
+                    [Tx #{(diagnosticClickStatus.txId || '').slice(0, 12)}... at {diagnosticClickStatus.timestamp}]
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  id="btn-reopen-swap-confirm"
+                  onClick={() => openConfirmModal(diagnosticClickStatus.details?.tx, diagnosticClickStatus.action, 'swap')}
+                  className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                >
+                  Open Action Modal
+                </button>
+                <button
+                  type="button"
+                  id="btn-dismiss-swap-diagnostic"
+                  onClick={() => setDiagnosticClickStatus(null)}
+                  className="px-3 py-1 bg-neutral-800 text-neutral-400 hover:text-neutral-200 rounded-lg text-xs transition-colors cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Table */}
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
             {txsLoading && combinedSwaps.length === 0 ? (
               <p className="text-xs text-neutral-400 text-center py-8">Loading swap queue...</p>
-            ) : combinedSwaps.filter((t) => swapFilter === 'all' || t.status === swapFilter).length === 0 ? (
+            ) : combinedSwaps.filter((t) => matchSwapStatus(t.status, swapFilter)).length === 0 ? (
               <div className="text-center py-12 space-y-1">
                 <p className="text-xs text-neutral-400 font-bold">No swap requests found</p>
                 <p className="text-[11px] text-neutral-500">There are no {swapFilter === 'all' ? '' : swapFilter} crypto swap requests recorded.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -webkit-overflow-scrolling-touch touch-pan-x">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-neutral-800 bg-neutral-950/60 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
@@ -1978,74 +2134,88 @@ export const AdminPanelPage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-neutral-950 text-neutral-200 font-mono">
                     {combinedSwaps
-                      .filter((t) => swapFilter === 'all' || t.status === swapFilter)
-                      .map((tx) => (
-                        <tr key={tx.id} className="hover:bg-neutral-950/40 transition-colors">
-                          <td className="py-3.5 px-4 font-sans text-neutral-100 font-semibold">{tx.userEmail || tx.userId}</td>
-                          <td className="py-3.5 px-4 font-bold text-amber-300">
-                            <div className="flex items-center space-x-1.5 text-xs">
-                              <CryptoIcon asset={tx.fromAsset || tx.asset} size="xs" />
-                              <span>{tx.fromAsset || tx.asset}</span>
-                              <span className="text-neutral-500 font-bold">➔</span>
-                              <CryptoIcon asset={tx.toAsset || 'USDT_TRC20'} size="xs" />
-                              <span className="text-emerald-400">{tx.toAsset}</span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-amber-300 font-sans">
-                            {tx.amount} {tx.fromAsset || tx.asset}
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-emerald-400 font-sans">
-                            {tx.usdtEquivalent} {tx.toAsset}
-                          </td>
-                          <td className="py-3.5 px-4 text-neutral-400 text-[11px] font-sans">
-                            {new Date(tx.date).toLocaleString()}
-                          </td>
-                          <td className="py-3.5 px-4 font-sans">
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 border ${
-                                tx.status === 'pending'
-                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
-                                  : tx.status === 'completed'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                                  : 'bg-red-500/10 text-red-400 border-red-500/30'
-                              }`}
-                            >
-                              {tx.status === 'pending' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
-                              <span>
-                                {tx.status === 'pending'
-                                  ? 'Pending Approval'
-                                  : tx.status === 'completed'
-                                  ? 'Successful'
-                                  : 'Cancelled & Refunded'}
-                              </span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 font-sans">
-                            {tx.status === 'pending' ? (
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => openConfirmModal(tx, 'approve', 'swap')}
-                                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1"
-                                >
-                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>Approve</span>
-                                </button>
-                                <button
-                                  onClick={() => openConfirmModal(tx, 'cancel', 'swap')}
-                                  className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold text-xs transition-all flex items-center space-x-1"
-                                >
-                                  <X className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>Cancel / Refund</span>
-                                </button>
+                      .filter((t) => matchSwapStatus(t.status, swapFilter))
+                      .map((tx) => {
+                        const isPending = matchSwapStatus(tx.status, 'pending');
+                        const isCompleted = matchSwapStatus(tx.status, 'completed');
+                        const isRowBusy = isExecutingRef.current || processingTxId === tx.id || (confirmActionModal?.loading && confirmActionModal.tx?.id === tx.id);
+
+                        return (
+                          <tr key={tx.id} className="hover:bg-neutral-950/40 transition-colors">
+                            <td className="py-3.5 px-4 font-sans text-neutral-100 font-semibold">{tx.userEmail || tx.userId}</td>
+                            <td className="py-3.5 px-4 font-bold text-amber-300">
+                              <div className="flex items-center space-x-1.5 text-xs">
+                                <CryptoIcon asset={tx.fromAsset || tx.asset} size="xs" />
+                                <span>{tx.fromAsset || tx.asset}</span>
+                                <span className="text-neutral-500 font-bold">➔</span>
+                                <CryptoIcon asset={tx.toAsset || 'USDT_TRC20'} size="xs" />
+                                <span className="text-emerald-400">{tx.toAsset}</span>
                               </div>
-                            ) : (
-                              <span className="text-[11px] text-neutral-500 font-mono">
-                                {tx.status === 'completed' ? 'Swapped & Credited' : 'Refunded to Balance'}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-amber-300 font-sans">
+                              {tx.amount} {tx.fromAsset || tx.asset}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-emerald-400 font-sans">
+                              {tx.usdtEquivalent} {tx.toAsset}
+                            </td>
+                            <td className="py-3.5 px-4 text-neutral-400 text-[11px] font-sans">
+                              {new Date(tx.date).toLocaleString()}
+                            </td>
+                            <td className="py-3.5 px-4 font-sans">
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-flex items-center space-x-1 border ${
+                                  isPending
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse'
+                                    : isCompleted
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/30'
+                                }`}
+                              >
+                                {isPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />}
+                                <span>
+                                  {isPending
+                                    ? 'Pending Approval'
+                                    : isCompleted
+                                    ? 'Successful'
+                                    : 'Cancelled & Refunded'}
+                                </span>
                               </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="py-3.5 px-4 font-sans whitespace-nowrap">
+                              {isPending ? (
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    type="button"
+                                    id={`admin-btn-approve-swap-${tx.id}`}
+                                    disabled={isRowBusy}
+                                    onClick={(e) => handleApproveButtonClick(e, tx)}
+                                    onTouchEnd={(e) => handleApproveButtonClick(e, tx)}
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-neutral-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center space-x-1 cursor-pointer select-none touch-manipulation relative z-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <Check className="w-3.5 h-3.5 stroke-[3] pointer-events-none" />
+                                    <span className="pointer-events-none">{isRowBusy ? 'Processing...' : 'Approve'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    id={`admin-btn-cancel-swap-${tx.id}`}
+                                    disabled={isRowBusy}
+                                    onClick={(e) => handleCancelButtonClick(e, tx)}
+                                    onTouchEnd={(e) => handleCancelButtonClick(e, tx)}
+                                    className="px-3 py-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 active:bg-red-500/40 text-red-400 border border-red-500/30 font-bold text-xs transition-all flex items-center space-x-1 cursor-pointer select-none touch-manipulation relative z-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <X className="w-3.5 h-3.5 stroke-[3] pointer-events-none" />
+                                    <span className="pointer-events-none">Cancel / Refund</span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-neutral-500 font-mono">
+                                  {isCompleted ? 'Swapped & Credited' : 'Refunded to Balance'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -3872,32 +4042,53 @@ export const AdminPanelPage: React.FC = () => {
 
       {/* Universal Action Confirmation Modal (Swaps & Withdrawals) */}
       {confirmActionModal && confirmActionModal.isOpen && (
-        <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div
+          id="admin-universal-confirm-modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !confirmActionModal.loading && !isExecutingRef.current) {
+              setConfirmActionModal(null);
+            }
+          }}
+          className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+        >
           <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-fadeIn">
-            <div className="flex items-center space-x-3">
-              <div
-                className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                  confirmActionModal.type === 'approve'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                }`}
+            <div className="flex items-center justify-between border-b border-neutral-800/80 pb-3">
+              <div className="flex items-center space-x-3">
+                <div
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                    confirmActionModal.type === 'approve'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }`}
+                >
+                  {confirmActionModal.type === 'approve' ? (
+                    <Check className="w-5 h-5 stroke-[2.5]" />
+                  ) : (
+                    <X className="w-5 h-5 stroke-[2.5]" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-neutral-100">
+                    {confirmActionModal.type === 'approve'
+                      ? `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Crypto Swap'} Approval`
+                      : `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Crypto Swap'} Cancellation`}
+                  </h3>
+                  <p className="text-xs text-neutral-400 font-mono">
+                    Transaction #{confirmActionModal.tx.id}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="btn-close-confirm-modal"
+                disabled={confirmActionModal.loading || isExecutingRef.current}
+                onClick={() => setConfirmActionModal(null)}
+                className="text-neutral-400 hover:text-neutral-100 p-1.5 rounded-xl hover:bg-neutral-800 transition-colors cursor-pointer disabled:opacity-30"
+                title="Close modal"
               >
-                {confirmActionModal.type === 'approve' ? (
-                  <Check className="w-5 h-5 stroke-[2.5]" />
-                ) : (
-                  <X className="w-5 h-5 stroke-[2.5]" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-neutral-100">
-                  {confirmActionModal.type === 'approve'
-                    ? `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Crypto Swap'} Approval`
-                    : `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Crypto Swap'} Cancellation`}
-                </h3>
-                <p className="text-xs text-neutral-400 font-mono">
-                  Transaction #{confirmActionModal.tx.id}
-                </p>
-              </div>
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 space-y-2 text-xs">
@@ -3996,35 +4187,39 @@ export const AdminPanelPage: React.FC = () => {
 
             <div className="flex space-x-3 pt-2">
               <button
-                disabled={confirmActionModal.loading}
+                type="button"
+                id="btn-confirm-keep-pending"
+                disabled={confirmActionModal.loading || isExecutingRef.current}
                 onClick={() => setConfirmActionModal(null)}
-                className="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer touch-manipulation select-none"
               >
                 Keep Pending
               </button>
               <button
-                disabled={confirmActionModal.loading}
+                type="button"
+                id="btn-confirm-execute-action"
+                disabled={confirmActionModal.loading || isExecutingRef.current}
                 onClick={executeConfirmedStatusChange}
-                className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-lg ${
+                className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-lg cursor-pointer touch-manipulation select-none ${
                   confirmActionModal.type === 'approve'
                     ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-emerald-500/20'
                     : 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/20'
-                } disabled:opacity-50`}
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {confirmActionModal.loading ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Processing...</span>
+                    <RefreshCw className="w-4 h-4 animate-spin pointer-events-none" />
+                    <span className="pointer-events-none">Processing...</span>
                   </>
                 ) : confirmActionModal.type === 'approve' ? (
                   <>
-                    <Check className="w-4 h-4 stroke-[3]" />
-                    <span>{confirmActionModal.txType === 'swap' ? 'Approve Swap' : 'Approve Payout'}</span>
+                    <Check className="w-4 h-4 stroke-[3] pointer-events-none" />
+                    <span className="pointer-events-none">{confirmActionModal.txType === 'swap' ? 'Approve Swap' : 'Approve Payout'}</span>
                   </>
                 ) : (
                   <>
-                    <X className="w-4 h-4 stroke-[3]" />
-                    <span>{confirmActionModal.txType === 'swap' ? 'Cancel & Refund Swap' : 'Cancel & Refund'}</span>
+                    <X className="w-4 h-4 stroke-[3] pointer-events-none" />
+                    <span className="pointer-events-none">{confirmActionModal.txType === 'swap' ? 'Cancel & Refund Swap' : 'Cancel & Refund'}</span>
                   </>
                 )}
               </button>
