@@ -1910,7 +1910,7 @@ export const api = {
     return u;
   },
 
-  updateTransactionStatus: async (txId: string, status: 'completed' | 'pending' | 'failed' | 'cancelled' | 'approved' | 'declined') => {
+  updateTransactionStatus: async (txId: string, status: 'completed' | 'pending' | 'failed' | 'cancelled' | 'approved' | 'declined', txMetadata?: Partial<Transaction>) => {
     let txData: Transaction | null = null;
 
     try {
@@ -1919,9 +1919,20 @@ export const api = {
         txData = snap.data() as Transaction;
       } else {
         const wSnap = await getDoc(doc(db, 'withdrawals', txId));
-        if (wSnap.exists()) txData = wSnap.data() as Transaction;
+        if (wSnap.exists()) {
+          txData = wSnap.data() as Transaction;
+        } else {
+          const sSnap = await getDoc(doc(db, 'swaps', txId));
+          if (sSnap.exists()) txData = sSnap.data() as Transaction;
+        }
       }
     } catch {}
+
+    if (!txData && txMetadata) {
+      txData = { ...(txMetadata as Transaction), id: txId };
+    } else if (txData && txMetadata) {
+      txData = { ...txData, ...txMetadata };
+    }
 
     const isApprove = status === 'completed' || status === 'approved';
     const isDecline = status === 'failed' || status === 'cancelled' || status === 'declined';
@@ -2120,6 +2131,62 @@ export const api = {
       }
     }
 
+    // 2b. Direct Firestore Authoritative Balance Credit Engine for Swaps (if server did not execute it)
+    if (isApprove && txData?.type === 'swap' && !balanceReversalCommitted) {
+      const targetAsset = (txData.toAsset || 'USDT_TRC20') as SupportedAsset;
+      const creditAmt = parseFloat(String(txData.usdtEquivalent || txData.amount || 0)) || 0;
+
+      let userDocId = targetUid;
+      let userDocData: any = null;
+
+      if (userDocId) {
+        try {
+          const snap = await getDoc(doc(db, 'users', userDocId));
+          if (snap.exists()) {
+            userDocData = snap.data();
+          }
+        } catch {}
+      }
+
+      if (!userDocData && targetEmail) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', targetEmail));
+          const qSnap = await getDocs(q);
+          if (!qSnap.empty) {
+            userDocId = qSnap.docs[0].id;
+            userDocData = qSnap.docs[0].data();
+          }
+        } catch {}
+      }
+
+      if (userDocData && userDocId && creditAmt > 0) {
+        const currentBalances: Record<SupportedAsset, number> = {
+          BTC: userDocData.balances?.BTC || 0,
+          ETH: userDocData.balances?.ETH || 0,
+          BNB: userDocData.balances?.BNB || 0,
+          SOL: userDocData.balances?.SOL || 0,
+          TRX: userDocData.balances?.TRX || 0,
+          USDT_ERC20: userDocData.balances?.USDT_ERC20 || 0,
+          USDT_TRC20: userDocData.balances?.USDT_TRC20 || 0,
+        };
+
+        currentBalances[targetAsset] = Number(((currentBalances[targetAsset] || 0) + creditAmt).toFixed(8));
+
+        try {
+          await setDoc(doc(db, 'users', userDocId), {
+            balances: currentBalances,
+            updatedAt: nowISO,
+          }, { merge: true });
+
+          updatedUserBalances = currentBalances;
+          balanceReversalCommitted = true;
+        } catch (dbErr: any) {
+          console.error('CRITICAL: Failed to credit swap balance to Firestore:', dbErr);
+          throw new Error('Database Error: Failed to credit user balance. Approval aborted to preserve accounting integrity.');
+        }
+      }
+    }
+
     // 3. Sync local storage cache and dispatch global balance update event
     if (updatedUserBalances) {
       try {
@@ -2199,6 +2266,11 @@ export const api = {
         fsUpdate.completedAt = nowISO;
         fsUpdate.amountReserved = 0;
         fsUpdate.feeReserved = 0;
+        if (txData.type === 'swap') {
+          fsUpdate.toAsset = txData.toAsset;
+          fsUpdate.creditedAmount = Number(txData.usdtEquivalent || txData.amount);
+          fsUpdate.creditedAsset = txData.toAsset;
+        }
         if (txData.feeAmount && Number(txData.feeAmount) > 0) {
           fsUpdate.feeStatus = 'finalized';
           fsUpdate.isFeeFinalized = true;
@@ -2237,14 +2309,16 @@ export const api = {
       adminEmail: 'help.netbybit@hotmail.com',
       userEmail: txData.userEmail || targetEmail || targetUid,
       userId: txData.userId || targetUid,
-      asset: txData.asset,
-      amount: txData.amount,
-      newBalance: updatedUserBalances ? (updatedUserBalances[txData.asset as SupportedAsset] || 0) : 0,
+      asset: txData.type === 'swap'
+        ? (isApprove ? (txData.toAsset || 'USDT') : (txData.fromAsset || txData.asset || 'TRX'))
+        : txData.asset,
+      amount: txData.type === 'swap' && isApprove ? (txData.usdtEquivalent || txData.amount) : txData.amount,
+      newBalance: updatedUserBalances ? (updatedUserBalances[(txData.type === 'swap' && isApprove ? txData.toAsset : txData.asset) as SupportedAsset] || 0) : 0,
       date: nowISO,
       action: (txData.type === 'withdraw' || txData.type === 'send')
         ? `${txData.type === 'send' ? 'Send' : 'Withdrawal'} ${actionLabel}`
         : txData.type === 'swap'
-        ? `Swap ${actionLabel}`
+        ? (isApprove ? 'Crypto Swap Approval & Credit' : 'Crypto Swap Cancellation & Full Refund')
         : `Transaction ${actionLabel}`,
       status: statusLabel,
     };
@@ -2257,6 +2331,8 @@ export const api = {
       to: txData.userEmail || targetEmail || 'user@example.com',
       subject: (txData.type === 'withdraw' || txData.type === 'send')
         ? `NETBYBIT - ${txData.type === 'send' ? 'Send' : 'Withdrawal'} Request ${actionLabel} (${txData.amount} ${txData.asset})`
+        : txData.type === 'swap'
+        ? (isApprove ? 'Crypto Swap Approved & Settled' : 'Crypto Swap Cancelled - Funds Refunded')
         : `Transaction ${actionLabel}`,
       body: isDecline
         ? `Your transaction #${txId} was cancelled. Exact ${txData.amount} ${txData.asset} and network gas fee were returned to your balance.`

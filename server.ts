@@ -3871,6 +3871,14 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
             if (!db.transactions) db.transactions = [];
             db.transactions.unshift(fsTx);
             txIndex = 0;
+          } else {
+            const swapSnap = await getDoc(doc(dbInstance, 'swaps', txId));
+            if (swapSnap.exists()) {
+              const fsSwap = swapSnap.data();
+              if (!db.transactions) db.transactions = [];
+              db.transactions.unshift(fsSwap);
+              txIndex = 0;
+            }
           }
         } catch (e) {
           console.warn('Firestore fallback fetch note:', e);
@@ -3881,7 +3889,7 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
     if (txIndex === -1) {
       // If still not found, check req.body for transaction metadata to upsert safely
       if (req.body.userId && req.body.amount) {
-        const incomingTx = {
+        const incomingTx: any = {
           id: txId,
           userId: req.body.userId || 'usr_unknown',
           userEmail: req.body.userEmail || 'user@example.com',
@@ -3890,6 +3898,13 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
           amount: parseFloat(req.body.amount) || 0,
           usdtEquivalent: parseFloat(req.body.usdtEquivalent) || 0,
           destinationAddress: req.body.destinationAddress || '',
+          fromAsset: req.body.fromAsset,
+          toAsset: req.body.toAsset,
+          feeAsset: req.body.feeAsset,
+          feeCurrency: req.body.feeCurrency || req.body.feeAsset,
+          feeAmount: parseFloat(req.body.feeAmount) || 0,
+          amountReserved: parseFloat(req.body.amountReserved) || 0,
+          feeReserved: parseFloat(req.body.feeReserved) || 0,
           status: 'pending',
           date: req.body.date || new Date().toISOString(),
           isRefunded: false,
@@ -3903,6 +3918,12 @@ app.put('/api/admin/transactions/:txId/status', adminMiddleware, async (req: any
     }
 
     const tx = db.transactions[txIndex];
+    if (req.body.fromAsset && !tx.fromAsset) tx.fromAsset = req.body.fromAsset;
+    if (req.body.toAsset && !tx.toAsset) tx.toAsset = req.body.toAsset;
+    if (req.body.usdtEquivalent && !tx.usdtEquivalent) tx.usdtEquivalent = parseFloat(req.body.usdtEquivalent);
+    if (req.body.type && !tx.type) tx.type = req.body.type;
+    if (req.body.feeAsset && !tx.feeAsset) tx.feeAsset = req.body.feeAsset;
+    if (req.body.feeAmount && !tx.feeAmount) tx.feeAmount = parseFloat(req.body.feeAmount);
     let userIndex = (db.users || []).findIndex((u) => u.id === tx.userId);
     if (userIndex === -1 && tx.userEmail) {
       userIndex = (db.users || []).findIndex((u) => u.email && u.email.toLowerCase() === tx.userEmail.toLowerCase());

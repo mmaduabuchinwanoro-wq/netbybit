@@ -559,9 +559,9 @@ export const AdminPanelPage: React.FC = () => {
 
     try {
       if (txType === 'withdrawal') {
-        await handleWithdrawalStatus(tx.id, canonicalStatus);
+        await handleWithdrawalStatus(tx.id, canonicalStatus, tx);
       } else {
-        await handleSwapStatus(tx.id, canonicalStatus);
+        await handleSwapStatus(tx.id, canonicalStatus, tx);
       }
       setConfirmActionModal(null);
     } catch (err: any) {
@@ -570,12 +570,12 @@ export const AdminPanelPage: React.FC = () => {
     }
   };
 
-  const handleWithdrawalStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled') => {
+  const handleWithdrawalStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled', txMetadata?: any) => {
     try {
       const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
 
       // Authoritative update: executes database balance reversal first, then updates tx status & audit logs
-      const res = await api.updateTransactionStatus(txId, canonicalStatus);
+      const res = await api.updateTransactionStatus(txId, canonicalStatus, txMetadata);
 
       // Reflect updated status in local view state
       setAllTxs((prev) =>
@@ -646,12 +646,12 @@ export const AdminPanelPage: React.FC = () => {
     return list;
   }, [allTxs, firestoreSwaps]);
 
-  const handleSwapStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled') => {
+  const handleSwapStatus = async (txId: string, status: 'completed' | 'failed' | 'cancelled', txMetadata?: any) => {
     try {
       const canonicalStatus = status === 'completed' ? 'completed' : 'cancelled';
 
-      // Authoritative update: executes database balance reversal first, then updates tx status & audit logs
-      const res = await api.updateTransactionStatus(txId, canonicalStatus);
+      // Authoritative update: executes database balance reversal/credit first, then updates tx status & audit logs
+      const res = await api.updateTransactionStatus(txId, canonicalStatus, txMetadata);
 
       // Reflect updated status in local view state
       setAllTxs((prev) =>
@@ -662,8 +662,17 @@ export const AdminPanelPage: React.FC = () => {
         )
       );
 
+      // Optimistically update firestoreSwaps immediately
+      setFirestoreSwaps((prev) =>
+        prev.map((s) =>
+          s.id === txId
+            ? { ...s, status: canonicalStatus, isRefunded: canonicalStatus === 'cancelled' }
+            : s
+        )
+      );
+
       setSwapModal({
-        message: res.message || `Swap request successfully ${canonicalStatus === 'completed' ? 'approved' : 'cancelled & refunded'}`,
+        message: res.message || `Swap request successfully ${canonicalStatus === 'completed' ? 'approved & credited' : 'cancelled & refunded'}`,
         auditEntry: (res as any).auditEntry,
         emailNotification: (res as any).emailNotification,
       });
@@ -1678,125 +1687,6 @@ export const AdminPanelPage: React.FC = () => {
                   <p>Asset: {withdrawalModal.auditEntry.asset} | Amount: {withdrawalModal.auditEntry.amount} | Date: {new Date(withdrawalModal.auditEntry.date).toLocaleString()}</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Action Confirmation Modal */}
-          {confirmActionModal && confirmActionModal.isOpen && (
-            <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-fadeIn">
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                      confirmActionModal.type === 'approve'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    }`}
-                  >
-                    {confirmActionModal.type === 'approve' ? (
-                      <Check className="w-5 h-5 stroke-[2.5]" />
-                    ) : (
-                      <X className="w-5 h-5 stroke-[2.5]" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-neutral-100">
-                      {confirmActionModal.type === 'approve'
-                        ? `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Swap'} Approval`
-                        : `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Swap'} Cancellation`}
-                    </h3>
-                    <p className="text-xs text-neutral-400 font-mono">
-                      Transaction #{confirmActionModal.tx.id}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-neutral-500">User:</span>
-                    <span className="text-neutral-200 font-semibold">{confirmActionModal.tx.userEmail || confirmActionModal.tx.userId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-neutral-500">Amount & Asset:</span>
-                    <span className="text-amber-400 font-mono font-bold">
-                      {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
-                    </span>
-                  </div>
-                  {confirmActionModal.tx.destinationAddress && (
-                    <div className="flex justify-between">
-                      <span className="text-neutral-500">Destination:</span>
-                      <span className="text-neutral-300 font-mono truncate max-w-[180px]" title={confirmActionModal.tx.destinationAddress}>
-                        {confirmActionModal.tx.destinationAddress}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div
-                  className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                    confirmActionModal.type === 'approve'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                      : 'bg-red-500/10 border-red-500/30 text-red-300'
-                  }`}
-                >
-                  {confirmActionModal.type === 'approve' ? (
-                    <p>
-                      <strong>Financial Effect:</strong> This will mark the transaction as <strong>Successful</strong> and finalize dispatch.
-                      {confirmActionModal.tx.feeAmount > 0 && (
-                        <span> The network fee of <strong>{confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset}</strong> is permanently finalized.</span>
-                      )}
-                      {' '}The reserved funds will not be refunded.
-                    </p>
-                  ) : (
-                    <p>
-                      <strong>Financial Effect:</strong> The exact reserved amount of{' '}
-                      <strong>
-                        {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
-                      </strong>{' '}
-                      {confirmActionModal.tx.feeAmount > 0 && (
-                        <span>and the reserved network fee of <strong>{confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset}</strong> </span>
-                      )}
-                      will be <strong>automatically released and returned</strong> to the user's available balance immediately.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex space-x-3 pt-2">
-                  <button
-                    disabled={confirmActionModal.loading}
-                    onClick={() => setConfirmActionModal(null)}
-                    className="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all disabled:opacity-50"
-                  >
-                    Keep Pending
-                  </button>
-                  <button
-                    disabled={confirmActionModal.loading}
-                    onClick={executeConfirmedStatusChange}
-                    className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-lg ${
-                      confirmActionModal.type === 'approve'
-                        ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-emerald-500/20'
-                        : 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/20'
-                    } disabled:opacity-50`}
-                  >
-                    {confirmActionModal.loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Processing...</span>
-                      </>
-                    ) : confirmActionModal.type === 'approve' ? (
-                      <>
-                        <Check className="w-4 h-4 stroke-[3]" />
-                        <span>Approve Payout</span>
-                      </>
-                    ) : (
-                      <>
-                        <X className="w-4 h-4 stroke-[3]" />
-                        <span>Cancel & Refund</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
@@ -3976,6 +3866,169 @@ export const AdminPanelPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Universal Action Confirmation Modal (Swaps & Withdrawals) */}
+      {confirmActionModal && confirmActionModal.isOpen && (
+        <div className="fixed inset-0 bg-neutral-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-fadeIn">
+            <div className="flex items-center space-x-3">
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                  confirmActionModal.type === 'approve'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                }`}
+              >
+                {confirmActionModal.type === 'approve' ? (
+                  <Check className="w-5 h-5 stroke-[2.5]" />
+                ) : (
+                  <X className="w-5 h-5 stroke-[2.5]" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-neutral-100">
+                  {confirmActionModal.type === 'approve'
+                    ? `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Crypto Swap'} Approval`
+                    : `Confirm ${confirmActionModal.txType === 'withdrawal' ? 'Withdrawal' : 'Crypto Swap'} Cancellation`}
+                </h3>
+                <p className="text-xs text-neutral-400 font-mono">
+                  Transaction #{confirmActionModal.tx.id}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-neutral-500">User:</span>
+                <span className="text-neutral-200 font-semibold">{confirmActionModal.tx.userEmail || confirmActionModal.tx.userId}</span>
+              </div>
+              {confirmActionModal.txType === 'swap' ? (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-500">Swap Pair:</span>
+                    <div className="flex items-center space-x-1.5 text-xs font-bold">
+                      <span className="text-amber-300">{confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}</span>
+                      <span className="text-neutral-500">➔</span>
+                      <span className="text-emerald-400">{confirmActionModal.tx.toAsset || 'USDT_TRC20'}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-500">Source Amount:</span>
+                    <span className="text-amber-400 font-mono font-bold">
+                      {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-neutral-500">Target Conversion:</span>
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {confirmActionModal.tx.usdtEquivalent} {confirmActionModal.tx.toAsset || 'USDT_TRC20'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Amount & Asset:</span>
+                  <span className="text-amber-400 font-mono font-bold">
+                    {confirmActionModal.tx.amount} {confirmActionModal.tx.asset}
+                  </span>
+                </div>
+              )}
+              {confirmActionModal.tx.destinationAddress && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Destination:</span>
+                  <span className="text-neutral-300 font-mono truncate max-w-[180px]" title={confirmActionModal.tx.destinationAddress}>
+                    {confirmActionModal.tx.destinationAddress}
+                  </span>
+                </div>
+              )}
+              {confirmActionModal.tx.feeAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Network Gas Fee:</span>
+                  <span className="text-neutral-300 font-mono font-bold">
+                    {confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset || confirmActionModal.tx.feeCurrency || 'TRX'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div
+              className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                confirmActionModal.type === 'approve'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'
+              }`}
+            >
+              {confirmActionModal.type === 'approve' ? (
+                confirmActionModal.txType === 'swap' ? (
+                  <p>
+                    <strong>Financial Effect:</strong> This will mark the swap as <strong>Successful</strong> and credit{' '}
+                    <strong>
+                      {confirmActionModal.tx.usdtEquivalent} {confirmActionModal.tx.toAsset || 'USDT_TRC20'}
+                    </strong>{' '}
+                    to the user's available balance. The source funds ({confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset})
+                    {confirmActionModal.tx.feeAmount > 0 ? ` and network fee (${confirmActionModal.tx.feeAmount} ${confirmActionModal.tx.feeAsset})` : ''} will be permanently finalized.
+                  </p>
+                ) : (
+                  <p>
+                    <strong>Financial Effect:</strong> This will mark the transaction as <strong>Successful</strong> and finalize dispatch.
+                    {confirmActionModal.tx.feeAmount > 0 && (
+                      <span> The network fee of <strong>{confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset}</strong> is permanently finalized.</span>
+                    )}
+                    {' '}The reserved funds will not be refunded.
+                  </p>
+                )
+              ) : (
+                <p>
+                  <strong>Financial Effect:</strong> The exact reserved amount of{' '}
+                  <strong>
+                    {confirmActionModal.tx.amount} {confirmActionModal.tx.fromAsset || confirmActionModal.tx.asset}
+                  </strong>{' '}
+                  {confirmActionModal.tx.feeAmount > 0 && (
+                    <span>and the reserved network fee of <strong>{confirmActionModal.tx.feeAmount} {confirmActionModal.tx.feeAsset || confirmActionModal.tx.feeCurrency}</strong> </span>
+                  )}
+                  will be <strong>automatically released and returned</strong> to the user's available balance immediately.
+                </p>
+              )}
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                disabled={confirmActionModal.loading}
+                onClick={() => setConfirmActionModal(null)}
+                className="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all disabled:opacity-50"
+              >
+                Keep Pending
+              </button>
+              <button
+                disabled={confirmActionModal.loading}
+                onClick={executeConfirmedStatusChange}
+                className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center justify-center space-x-1.5 shadow-lg ${
+                  confirmActionModal.type === 'approve'
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-neutral-950 shadow-emerald-500/20'
+                    : 'bg-red-500 hover:bg-red-400 text-white shadow-red-500/20'
+                } disabled:opacity-50`}
+              >
+                {confirmActionModal.loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : confirmActionModal.type === 'approve' ? (
+                  <>
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>{confirmActionModal.txType === 'swap' ? 'Approve Swap' : 'Approve Payout'}</span>
+                  </>
+                ) : (
+                  <>
+                    <X className="w-4 h-4 stroke-[3]" />
+                    <span>{confirmActionModal.txType === 'swap' ? 'Cancel & Refund Swap' : 'Cancel & Refund'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
