@@ -48,8 +48,8 @@ export const ProfilePage: React.FC = () => {
         title="User Account Profile"
         subtitle="Manage personal credentials, account identity, and registered custody withdrawal addresses"
         icon={User}
-        badge={user.role === 'admin' ? 'Administrator' : 'Verified Custody Account'}
-        badgeType={user.role === 'admin' ? 'gold' : 'emerald'}
+        badge={user.role === 'admin' ? 'Verified Account' : 'Verified Custody Account'}
+        badgeType="emerald"
       />
 
       <form onSubmit={handleSaveProfile} className="space-y-6">

@@ -1677,7 +1677,7 @@ app.post('/api/auth/login', async (req, res) => {
         ip: req.ip,
       });
       await saveDB(db);
-      return res.status(403).json({ error: 'Account has been suspended by administration. Please contact customer support.' });
+      return res.status(403).json({ error: 'Account access is currently restricted. Please contact customer support.' });
     }
 
     let isMatch = false;
@@ -3393,7 +3393,7 @@ app.put('/api/admin/users/:userId/balance', adminMiddleware, async (req, res) =>
           status: 'completed',
           date: nowISO,
           createdAt: nowISO,
-          description: isDed ? 'Admin Balance Adjustment (Deduction)' : 'Admin Custody Deposit',
+          description: isDed ? 'Custody Balance Adjustment' : 'Custody Deposit',
         };
         db.transactions.unshift(autoTx);
       }
@@ -3424,7 +3424,7 @@ app.put('/api/admin/users/:userId/balance', adminMiddleware, async (req, res) =>
       status: 'completed',
       date: nowISO,
       createdAt: nowISO,
-      description: isDeduct ? 'Admin Balance Deduction' : 'Admin Custody Deposit',
+      description: isDeduct ? 'Custody Balance Adjustment' : 'Custody Deposit',
     };
     if (!db.transactions) db.transactions = [];
     db.transactions.unshift(adminTx);
@@ -3499,7 +3499,7 @@ app.post('/api/admin/adjust-user-balance', adminMiddleware, async (req: any, res
     status: 'completed',
     date: nowISO,
     createdAt: nowISO,
-    description: reason ? reason.trim() : (isDeduct ? 'Admin Balance Deduction' : 'Admin Custody Deposit'),
+    description: reason ? reason.trim() : (isDeduct ? 'Custody Balance Adjustment' : 'Custody Deposit'),
   };
   if (!db.transactions) db.transactions = [];
   db.transactions.unshift(adminTx);
@@ -3525,7 +3525,7 @@ app.post('/api/admin/adjust-user-balance', adminMiddleware, async (req: any, res
     amount: parsedAmount,
     newBalance: user.balances[asset],
     txHash,
-    reason: reason ? reason.trim() : 'Admin Balance Adjustment',
+    reason: reason ? reason.trim() : 'Custody Balance Adjustment',
     date: nowISO,
   };
 
@@ -3555,7 +3555,7 @@ NETBYBIT Support`;
   const emailNotificationRecord = sendEmailNotification(db, {
     to: user.email,
     subject,
-    category: 'Admin Balance Update',
+    category: 'Balance Update',
     body,
   });
 
@@ -4391,7 +4391,7 @@ NETBYBIT Support`,
     id: 'notif_' + Date.now(),
     userId: ticket.userId,
     title: `Support Ticket Reply: #${ticket.id}`,
-    message: `An admin has replied to your support ticket: "${ticket.subject}"`,
+    message: `Our support team has replied to your support ticket: "${ticket.subject}"`,
     isRead: false,
     createdAt: new Date().toISOString(),
   });

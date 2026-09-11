@@ -42,7 +42,7 @@ export const SettingsPage: React.FC = () => {
                 </span>
               </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
-                2FA verification codes are completely disabled across all user and admin workflows, allowing instant friction-free logins and access.
+                2FA verification codes are completely disabled across all account workflows, allowing instant, friction-free logins and access.
               </p>
             </div>
           </div>

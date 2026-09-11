@@ -806,7 +806,7 @@ export const api = {
     return {
       success: true,
       request: newRequest,
-      message: 'Wallet connection request submitted. Status: Pending Administrator Approval.',
+      message: 'Wallet connection request submitted successfully. Your request is being reviewed.',
     };
   },
 
@@ -1587,7 +1587,7 @@ export const api = {
       asset: body.asset,
       action: 'add',
       amount: body.amount,
-      reason: 'Admin Direct Credit',
+      reason: 'Custody Balance Credit',
     });
   },
 
@@ -1657,7 +1657,7 @@ export const api = {
               status: 'completed',
               date: nowISO,
               createdAt: nowISO,
-              description: body.reason?.trim() || (body.action === 'add' ? 'Admin Custody Deposit' : 'Admin Balance Deduction'),
+              description: body.reason?.trim() || (body.action === 'add' ? 'Custody Deposit' : 'Custody Balance Adjustment'),
             };
 
             try {
@@ -1760,7 +1760,7 @@ export const api = {
       status: 'completed',
       date: nowISO,
       createdAt: nowISO,
-      description: body.reason?.trim() || (body.action === 'add' ? 'Admin Custody Deposit' : 'Admin Balance Deduction'),
+      description: body.reason?.trim() || (body.action === 'add' ? 'Custody Deposit' : 'Custody Balance Adjustment'),
     };
 
     try {
@@ -1876,7 +1876,7 @@ export const api = {
         status: 'completed',
         date: nowISO,
         createdAt: nowISO,
-        description: action === 'add' ? 'Admin Balance Credit' : 'Admin Balance Deduction',
+        description: action === 'add' ? 'Custody Balance Credit' : 'Custody Balance Adjustment',
       };
 
       try {

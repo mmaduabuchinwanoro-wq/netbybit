@@ -35,7 +35,7 @@ export const ConnectWalletModal: React.FC<ConnectWalletModalProps> = ({ isOpen, 
       await refreshUser();
       setMessage({
         type: 'success',
-        text: res.message || 'Details saved to database. Status: Pending manual admin approval.',
+        text: res.message || 'Wallet connection request submitted successfully. Your request is being reviewed.',
       });
       setTimeout(() => {
         setCustomNotes('');
@@ -123,7 +123,7 @@ export const ConnectWalletModal: React.FC<ConnectWalletModalProps> = ({ isOpen, 
           <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl text-[11px] text-amber-300/80 flex items-start space-x-2">
             <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <p>
-              Submissions are recorded in the database with a <strong>Pending</strong> status awaiting administrative review.
+              Submissions are recorded in the database with a <strong>Pending</strong> status and are under review.
             </p>
           </div>
 
