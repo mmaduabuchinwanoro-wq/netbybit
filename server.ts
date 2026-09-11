@@ -2428,6 +2428,126 @@ NETBYBIT Automated Security System`,
   res.json({ success: true, wallet: db.users[userIndex].connectedWallet, walletUserEmail, walletAdminEmail });
 });
 
+// User: Get Current Wallet Connection Status
+app.get('/api/user/wallet-status', authMiddleware, async (req: any, res) => {
+  try {
+    await syncDBFromBlobs(true);
+    const db = loadDB();
+    let user = db.users.find((u) => u.id === req.user.id || u.email === req.user.email);
+    if (!user && req.user.id) {
+      user = {
+        id: req.user.id,
+        email: req.user.email || 'user@example.com',
+        name: req.user.name || req.user.email?.split('@')[0] || 'User',
+        username: req.user.email?.split('@')[0] || 'user',
+        role: 'user',
+        status: 'active',
+        balances: { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 },
+        createdAt: new Date().toISOString(),
+      };
+      db.users.push(user);
+      saveDB(db);
+    }
+    const connectedWallet = user?.connectedWallet || null;
+
+    if (!db.walletRequests) db.walletRequests = [];
+    const userRequests = db.walletRequests.filter((r) => r.userId === req.user.id || r.userEmail === req.user.email);
+    userRequests.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const latestRequest = userRequests[0] || null;
+
+    res.json({
+      success: true,
+      connectedWallet,
+      latestRequest,
+    });
+  } catch (err: any) {
+    console.error('Failed to get user wallet status:', err);
+    res.status(500).json({ error: 'Failed to get wallet status' });
+  }
+});
+
+// User: Submit New Wallet Connection Request
+app.post('/api/user/wallet-request', authMiddleware, async (req: any, res) => {
+  try {
+    const { provider, customNotes, address } = req.body;
+    await syncDBFromBlobs(true);
+    const db = loadDB();
+    if (!db.walletRequests) db.walletRequests = [];
+
+    const user = db.users.find((u) => u.id === req.user.id || u.email === req.user.email);
+    const userEmail = user?.email || req.user.email || 'user@example.com';
+    const userName = user?.name || req.user.name || 'User';
+    const userId = user?.id || req.user.id;
+
+    // Check if there is already an active pending request for this user
+    const existingPendingIndex = db.walletRequests.findIndex(
+      (r) => (r.userId === userId || r.userEmail === userEmail) && r.status === 'pending'
+    );
+
+    const reqId = 'wreq_' + Date.now();
+    const newRequest: any = {
+      id: reqId,
+      userId,
+      userEmail,
+      userName,
+      provider: provider || 'MetaMask',
+      customNotes: (customNotes || address || '').trim(),
+      status: 'pending',
+      date: new Date().toISOString(),
+    };
+
+    if (existingPendingIndex !== -1) {
+      db.walletRequests[existingPendingIndex] = {
+        ...db.walletRequests[existingPendingIndex],
+        ...newRequest,
+        id: db.walletRequests[existingPendingIndex].id,
+      };
+    } else {
+      db.walletRequests.unshift(newRequest);
+    }
+
+    saveDB(db);
+    res.json({
+      success: true,
+      request: existingPendingIndex !== -1 ? db.walletRequests[existingPendingIndex] : newRequest,
+      message: 'Your wallet connection request has been securely submitted. Please wait while your connection is being processed.',
+    });
+  } catch (err: any) {
+    console.error('Failed to submit wallet request:', err);
+    res.status(500).json({ error: 'Failed to submit wallet request' });
+  }
+});
+
+// User: Unlink Connected Wallet
+app.post('/api/user/unlink-wallet', authMiddleware, async (req: any, res) => {
+  try {
+    await syncDBFromBlobs(true);
+    const db = loadDB();
+    const userIndex = db.users.findIndex((u) => u.id === req.user.id || u.email === req.user.email);
+    if (userIndex !== -1) {
+      db.users[userIndex].connectedWallet = null;
+    }
+
+    if (db.walletRequests) {
+      db.walletRequests.forEach((r) => {
+        if ((r.userId === req.user.id || r.userEmail === req.user.email) && (r.status === 'completed' || r.status === 'pending')) {
+          r.status = 'unlinked';
+          r.updatedAt = new Date().toISOString();
+        }
+      });
+    }
+
+    saveDB(db);
+    res.json({
+      success: true,
+      message: 'Your wallet has been successfully unlinked.',
+    });
+  } catch (err: any) {
+    console.error('Failed to unlink wallet:', err);
+    res.status(500).json({ error: 'Failed to unlink wallet' });
+  }
+});
+
 // Transactions: Fetch History
 app.get('/api/user/transactions', authMiddleware, async (req: any, res) => {
   try {
@@ -4508,8 +4628,23 @@ app.put('/api/admin/wallet-requests/:reqId/status', adminMiddleware, async (req:
   const isApprove = status === 'completed';
   const actionLabel = isApprove ? 'Approved' : 'Declined';
 
-  // If approved, update user's connectedWallet
-  const userIndex = (db.users || []).findIndex((u) => u.id === targetReq.userId || u.email === targetReq.userEmail);
+  // If approved, update user's connectedWallet; if declined, clear it
+  let userIndex = (db.users || []).findIndex((u) => u.id === targetReq.userId || u.email === targetReq.userEmail);
+  if (userIndex === -1 && targetReq.userId) {
+    const newUser = {
+      id: targetReq.userId,
+      email: targetReq.userEmail || 'user@example.com',
+      name: targetReq.userName || targetReq.userEmail?.split('@')[0] || 'User',
+      username: targetReq.userEmail?.split('@')[0] || 'user',
+      role: 'user',
+      status: 'active',
+      balances: { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 },
+      createdAt: new Date().toISOString(),
+    };
+    db.users.push(newUser);
+    userIndex = db.users.length - 1;
+  }
+
   if (isApprove && userIndex !== -1) {
     db.users[userIndex].connectedWallet = {
       address: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
@@ -4517,6 +4652,8 @@ app.put('/api/admin/wallet-requests/:reqId/status', adminMiddleware, async (req:
       provider: targetReq.provider || 'MetaMask',
       connectedAt: new Date().toISOString(),
     };
+  } else if (!isApprove && userIndex !== -1) {
+    db.users[userIndex].connectedWallet = null;
   }
 
   saveDB(db);

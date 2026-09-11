@@ -13,6 +13,7 @@ import {
   EmailLogRecord,
   SmsLogRecord,
   WalletRequest,
+  ConnectedWallet,
 } from '../types';
 import {
   loginWithFirebase,
@@ -770,20 +771,138 @@ export const api = {
     return { success: true, message: 'Account deleted' };
   },
 
+  getUserWalletStatus: async (): Promise<{
+    connectedWallet: ConnectedWallet | null;
+    latestRequest: WalletRequest | null;
+  }> => {
+    let currentUser: User | null = null;
+    try {
+      currentUser = await getMeWithFirebase();
+    } catch {}
+
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        try {
+          currentUser = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
+    if (!currentUser) {
+      return { connectedWallet: null, latestRequest: null };
+    }
+
+    const userId = currentUser.id;
+    const userEmail = (currentUser.email || '').toLowerCase().trim();
+
+    // 1. Fetch latest request from Firestore
+    let latestRequest: WalletRequest | null = null;
+    try {
+      const q = query(collection(db, 'wallet_requests'), where('userId', '==', userId));
+      const snap = await getDocs(q);
+      const list: WalletRequest[] = [];
+      snap.forEach((d) => {
+        const item = d.data() as WalletRequest;
+        if (item) list.push({ ...item, id: d.id });
+      });
+
+      if (list.length === 0 && userEmail) {
+        const qEmail = query(collection(db, 'wallet_requests'), where('userEmail', '==', userEmail));
+        const snapEmail = await getDocs(qEmail);
+        snapEmail.forEach((d) => {
+          const item = d.data() as WalletRequest;
+          if (item) list.push({ ...item, id: d.id });
+        });
+      }
+
+      if (list.length > 0) {
+        list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        latestRequest = list[0];
+      }
+    } catch (e) {
+      console.warn('Error querying Firestore for wallet requests:', e);
+    }
+
+    // 2. Check local user-isolated cache if Firestore had network latency or no record
+    if (!latestRequest && userId) {
+      const userCacheKey = `netbybit_wallet_req_${userId}`;
+      const localStr = localStorage.getItem(userCacheKey);
+      if (localStr) {
+        try {
+          latestRequest = JSON.parse(localStr);
+        } catch {}
+      }
+    }
+
+    // 3. Query Express server endpoint if available
+    try {
+      const token = getAuthToken();
+      if (token) {
+        const res = await fetch('/api/user/wallet-status', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.connectedWallet !== undefined && data.connectedWallet) {
+            currentUser.connectedWallet = data.connectedWallet;
+          }
+          if (data.latestRequest) {
+            if (!latestRequest || new Date(data.latestRequest.date).getTime() >= new Date(latestRequest.date).getTime()) {
+              latestRequest = data.latestRequest;
+            }
+          }
+        }
+      }
+    } catch {}
+
+    // Check user's connectedWallet directly from Firestore users collection
+    let connectedWallet: ConnectedWallet | null = currentUser.connectedWallet || null;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const uData = userDoc.data() as User;
+        if (uData.connectedWallet !== undefined) {
+          connectedWallet = uData.connectedWallet;
+          currentUser.connectedWallet = connectedWallet;
+          localStorage.setItem('netbybit_cached_user', JSON.stringify(currentUser));
+        }
+      }
+    } catch {}
+
+    return {
+      connectedWallet,
+      latestRequest,
+    };
+  },
+
   connectWallet: async (body: { address?: string; network?: string; provider?: string; customNotes?: string }) => {
     let currentUser: User | null = null;
     try {
       currentUser = await getMeWithFirebase();
     } catch {}
 
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        try {
+          currentUser = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
+    const userId = currentUser?.id || 'usr_local';
+    const userEmail = currentUser?.email || 'user@example.com';
+    const userName = currentUser?.name || currentUser?.username || 'NETBYBIT User';
+
     const reqId = 'wreq_' + Date.now();
     const newRequest: WalletRequest = {
       id: reqId,
-      userId: currentUser?.id || 'usr_local',
-      userEmail: currentUser?.email || 'user@example.com',
-      userName: currentUser?.name || currentUser?.username || 'NETBYBIT User',
+      userId,
+      userEmail,
+      userName,
       provider: body.provider || 'MetaMask',
-      customNotes: body.customNotes || body.address || '',
+      customNotes: (body.customNotes || body.address || '').trim(),
       status: 'pending',
       date: new Date().toISOString(),
     };
@@ -795,18 +914,118 @@ export const api = {
       console.warn('Firestore wallet_requests save error:', e);
     }
 
-    // Save to local cache
+    // Save to user-isolated local cache
+    try {
+      localStorage.setItem(`netbybit_wallet_req_${userId}`, JSON.stringify(newRequest));
+    } catch {}
+
+    // Global list for admin view
     try {
       const localStr = localStorage.getItem('netbybit_wallet_requests');
       const list: WalletRequest[] = localStr ? JSON.parse(localStr) : [];
-      list.unshift(newRequest);
-      localStorage.setItem('netbybit_wallet_requests', JSON.stringify(list));
+      // Remove any older pending request for this user to avoid duplicates
+      const filtered = list.filter((r) => !(r.userId === userId && r.status === 'pending'));
+      filtered.unshift(newRequest);
+      localStorage.setItem('netbybit_wallet_requests', JSON.stringify(filtered));
+    } catch {}
+
+    // Synchronize to server API
+    try {
+      const token = getAuthToken();
+      if (token) {
+        await fetch('/api/user/wallet-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            provider: newRequest.provider,
+            customNotes: newRequest.customNotes,
+            address: body.address,
+          }),
+        });
+      }
     } catch {}
 
     return {
       success: true,
       request: newRequest,
-      message: 'Wallet connection request submitted successfully. Your request is being reviewed.',
+      message: 'Your wallet connection request has been securely submitted. Please wait while your connection is being processed.',
+    };
+  },
+
+  unlinkWallet: async () => {
+    let currentUser: User | null = null;
+    try {
+      currentUser = await getMeWithFirebase();
+    } catch {}
+
+    if (!currentUser) {
+      const cached = localStorage.getItem('netbybit_cached_user');
+      if (cached) {
+        try {
+          currentUser = JSON.parse(cached);
+        } catch {}
+      }
+    }
+
+    if (!currentUser) {
+      throw new Error('You must be logged in to unlink a wallet.');
+    }
+
+    const userId = currentUser.id;
+
+    // 1. Remove connectedWallet in Firestore
+    try {
+      await setDoc(doc(db, 'users', userId), { connectedWallet: null }, { merge: true });
+    } catch (e) {
+      console.warn('Failed to clear connectedWallet in Firestore:', e);
+    }
+
+    // 2. Mark any active requests as unlinked
+    try {
+      const q = query(collection(db, 'wallet_requests'), where('userId', '==', userId));
+      const snap = await getDocs(q);
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data();
+        if (data.status === 'completed' || data.status === 'pending') {
+          await updateDoc(docSnap.ref, { status: 'unlinked', updatedAt: new Date().toISOString() });
+        }
+      }
+    } catch {}
+
+    // 3. Clear user-isolated local cache
+    try {
+      localStorage.removeItem(`netbybit_wallet_req_${userId}`);
+    } catch {}
+
+    // 4. Update cached user in localStorage
+    currentUser.connectedWallet = null;
+    localStorage.setItem('netbybit_cached_user', JSON.stringify(currentUser));
+
+    // 5. Synchronize with server API
+    try {
+      const token = getAuthToken();
+      if (token) {
+        await fetch('/api/user/unlink-wallet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch {}
+
+    // 6. Notify application components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('netbybit:user_updated', { detail: currentUser }));
+    }
+
+    return {
+      success: true,
+      message: 'Your wallet has been successfully unlinked.',
     };
   },
 
@@ -891,22 +1110,66 @@ export const api = {
 
     // If approved, update user's connectedWallet
     if (isApprove && reqData.userId) {
+      const walletObj: ConnectedWallet = {
+        address: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+        network: 'Ethereum Mainnet',
+        provider: reqData.provider || 'MetaMask',
+        connectedAt: new Date().toISOString(),
+      };
       try {
         await setDoc(
           doc(db, 'users', reqData.userId),
           {
-            connectedWallet: {
-              address: '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-              network: 'Ethereum Mainnet',
-              provider: reqData.provider,
-            },
+            connectedWallet: walletObj,
           },
           { merge: true }
         );
       } catch (e) {
         console.warn('Error updating user connected wallet profile:', e);
       }
+      try {
+        localStorage.setItem(`netbybit_wallet_req_${reqData.userId}`, JSON.stringify(reqData));
+        const cached = localStorage.getItem('netbybit_cached_user');
+        if (cached) {
+          const u = JSON.parse(cached);
+          if (u.id === reqData.userId || u.email === reqData.userEmail) {
+            u.connectedWallet = walletObj;
+            localStorage.setItem('netbybit_cached_user', JSON.stringify(u));
+          }
+        }
+      } catch {}
+    } else if (!isApprove && reqData.userId) {
+      // If declined, ensure user has no connectedWallet
+      try {
+        await setDoc(doc(db, 'users', reqData.userId), { connectedWallet: null }, { merge: true });
+      } catch {}
+      try {
+        localStorage.setItem(`netbybit_wallet_req_${reqData.userId}`, JSON.stringify(reqData));
+        const cached = localStorage.getItem('netbybit_cached_user');
+        if (cached) {
+          const u = JSON.parse(cached);
+          if (u.id === reqData.userId || u.email === reqData.userEmail) {
+            u.connectedWallet = null;
+            localStorage.setItem('netbybit_cached_user', JSON.stringify(u));
+          }
+        }
+      } catch {}
     }
+
+    // Call server endpoint if available
+    try {
+      const token = getAuthToken();
+      if (token) {
+        await fetch(`/api/admin/wallet-requests/${reqId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        });
+      }
+    } catch {}
 
     return {
       success: true,

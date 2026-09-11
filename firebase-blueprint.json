@@ -69,12 +69,33 @@
         "type": { "type": "string" }
       },
       "required": ["id", "userId", "fromAsset", "toAsset", "amount", "status"]
+    },
+    "WalletRequest": {
+      "title": "WalletRequest",
+      "description": "User wallet connection requests and review status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "provider": { "type": "string" },
+        "customNotes": { "type": "string" },
+        "status": { "type": "string" },
+        "date": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "status"]
     }
   },
   "firestore": {
     "users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User documents keyed by user ID"
+    },
+    "wallet_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/WalletRequest" },
+      "description": "User wallet connection requests"
     },
     "swaps/{swapId}": {
       "schema": { "$ref": "#/entities/Swap" },
