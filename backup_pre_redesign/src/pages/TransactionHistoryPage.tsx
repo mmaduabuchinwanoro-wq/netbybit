@@ -1,0 +1,259 @@
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Transaction } from '../types';
+import { CryptoIcon } from '../components/CryptoIcon';
+import { PageHeader } from '../components/PageHeader';
+import { api } from '../lib/api';
+import { History, Search, ArrowDownLeft, ArrowUpRight, Send, QrCode, Repeat, Clock, CheckCircle2, XCircle } from 'lucide-react';
+
+export const TransactionHistoryPage: React.FC = () => {
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filterType, setFilterType] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      api.getTransactions()
+        .then((txs) => setTransactions(txs))
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
+  const filtered = transactions.filter((t) => {
+    if (!t) return false;
+    const tType = (t.type || '').toLowerCase();
+    const fType = filterType.toLowerCase();
+
+    let matchesType = fType === 'all';
+    if (!matchesType) {
+      if (fType === 'deposit') {
+        matchesType = tType === 'deposit' || tType === 'credit' || tType === 'add' || tType === 'receive';
+      } else if (fType === 'withdraw') {
+        matchesType = tType === 'withdraw' || tType === 'deduct' || tType === 'subtract';
+      } else if (fType === 'send') {
+        matchesType = tType === 'send' || tType === 'withdraw';
+      } else if (fType === 'swap') {
+        matchesType = tType === 'swap';
+      } else {
+        matchesType = tType === fType;
+      }
+    }
+
+    const s = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      !s ||
+      (t.asset && t.asset.toLowerCase().includes(s)) ||
+      (t.txHash && t.txHash.toLowerCase().includes(s)) ||
+      (t.destinationAddress && t.destinationAddress.toLowerCase().includes(s)) ||
+      (t.description && t.description.toLowerCase().includes(s)) ||
+      (t.type && t.type.toLowerCase().includes(s)) ||
+      (t.amount !== undefined && t.amount.toString().includes(s));
+
+    return matchesType && matchesSearch;
+  });
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'deposit':
+        return <ArrowDownLeft className="w-4 h-4 text-emerald-400" />;
+      case 'withdraw':
+        return <ArrowUpRight className="w-4 h-4 text-amber-400" />;
+      case 'send':
+        return <Send className="w-4 h-4 text-blue-400" />;
+      case 'swap':
+        return <Repeat className="w-4 h-4 text-purple-400" />;
+      default:
+        return <QrCode className="w-4 h-4 text-neutral-400" />;
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+      {/* Page Header with Back Button */}
+      <PageHeader
+        title="Transaction History"
+        subtitle="Complete institutional audit log of deposits, withdrawals, transfers, and swaps"
+        icon={History}
+        badge="Audited Custody Records"
+        badgeType="gold"
+      />
+
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by asset, TX hash, address..."
+            className="w-full bg-neutral-900/90 border border-neutral-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-500/50"
+          />
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex space-x-1.5 bg-neutral-900/90 p-1.5 border border-neutral-800 rounded-2xl overflow-x-auto w-full sm:w-auto">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'deposit', label: 'Deposits & Received' },
+            { id: 'withdraw', label: 'Withdrawals' },
+            { id: 'send', label: 'Sent' },
+            { id: 'swap', label: 'Swaps' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterType(tab.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                filterType === tab.id
+                  ? 'bg-amber-500 text-neutral-950 shadow-md'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-neutral-900/95 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-xl">
+        {loading ? (
+          <div className="text-center py-16 text-xs text-neutral-400 flex items-center justify-center space-x-2">
+            <Clock className="w-4 h-4 animate-spin text-amber-400" />
+            <span>Loading transaction ledger...</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-xs text-neutral-500">
+            No transactions match the selected filter criteria.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-neutral-800 bg-neutral-950/80 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider font-mono">
+                  <th className="py-3.5 px-4">Type</th>
+                  <th className="py-3.5 px-4">Asset / Pair</th>
+                  <th className="py-3.5 px-4">Amount</th>
+                  <th className="py-3.5 px-4">Destination / Hash</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Date & Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-800/60 text-xs text-neutral-200 font-mono">
+                {filtered.map((tx) => {
+                  const isPending = tx.status === 'pending' || (tx.status as string) === 'processing';
+                  const isCompleted =
+                    tx.status === 'completed' ||
+                    (tx.status as string) === 'Successful' ||
+                    (tx.status as string) === 'successful' ||
+                    (tx.status as string) === 'approved' ||
+                    (tx.status as string) === 'success';
+                  const isFailed =
+                    tx.status === 'failed' ||
+                    tx.status === 'declined' ||
+                    tx.status === 'cancelled' ||
+                    tx.status === 'rejected';
+
+                  const typeDisplayName =
+                    tx.type === 'deposit' || tx.type === 'receive' || tx.type === 'credit'
+                      ? 'Received'
+                      : tx.type === 'withdraw'
+                      ? 'Withdrawal'
+                      : tx.type === 'send'
+                      ? 'Sent'
+                      : tx.type === 'swap'
+                      ? 'Swap'
+                      : tx.type;
+
+                  return (
+                    <tr key={tx.id} className="hover:bg-neutral-950/50 transition-colors">
+                      <td className="py-4 px-4 font-sans flex items-center space-x-2.5">
+                        <div className="p-2 rounded-xl bg-neutral-950 border border-neutral-800 shrink-0">
+                          {getIcon(tx.type)}
+                        </div>
+                        <span className="font-bold text-neutral-100">{typeDisplayName}</span>
+                      </td>
+                      <td className="py-4 px-4 font-sans">
+                        {tx.type === 'swap' ? (
+                          <div className="flex items-center space-x-1.5 font-mono text-xs">
+                            <CryptoIcon asset={tx.fromAsset || tx.asset} size="xs" />
+                            <span className="font-bold text-amber-300">{tx.fromAsset || tx.asset}</span>
+                            <span className="text-neutral-500 font-bold">➔</span>
+                            <CryptoIcon asset={tx.toAsset || 'USDT'} size="xs" />
+                            <span className="font-bold text-emerald-400">{tx.toAsset || 'USDT'}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <CryptoIcon asset={tx.asset} size="xs" />
+                            <span className="font-mono font-semibold text-neutral-100">{tx.asset}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 font-bold font-mono">
+                        {tx.type === 'swap' ? (
+                          <span className="text-amber-300">{tx.amount} {tx.fromAsset || tx.asset}</span>
+                        ) : (
+                          <span className={tx.type === 'withdraw' || tx.type === 'send' ? 'text-neutral-200' : 'text-emerald-400'}>
+                            {tx.type === 'withdraw' || tx.type === 'send' ? '-' : '+'}
+                            {tx.amount} {tx.asset}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-[11px] text-neutral-400">
+                        {tx.destinationAddress ? (
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="text-[10px] text-amber-400/80 font-sans uppercase font-bold">Destination</span>
+                            <span className="truncate max-w-[160px] font-mono text-neutral-300 select-all" title={tx.destinationAddress}>
+                              {tx.destinationAddress}
+                            </span>
+                          </div>
+                        ) : tx.txHash ? (
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="text-[10px] text-neutral-500 font-sans uppercase">TxHash</span>
+                            <span className="truncate max-w-[140px] font-mono text-neutral-400 select-all" title={tx.txHash}>
+                              {tx.txHash}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-neutral-600">N/A</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 font-sans">
+                        {isPending ? (
+                          <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                            <span>Pending</span>
+                          </span>
+                        ) : isCompleted ? (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            <span>Successful</span>
+                          </span>
+                        ) : (
+                          <div className="flex flex-col space-y-1 items-start">
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-red-500/15 text-red-400 border border-red-500/30">
+                              <XCircle className="w-3 h-3 text-red-400" />
+                              <span>Cancelled</span>
+                            </span>
+                            <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                              <span>✓ Refunded</span>
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-neutral-400 text-[11px] font-mono">
+                        {new Date(tx.date).toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

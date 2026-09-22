@@ -22,5 +22,10 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "backup_pre_redesign",
+    "node_modules",
+    "dist"
+  ]
 }
