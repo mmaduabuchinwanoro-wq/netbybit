@@ -93,8 +93,10 @@ async function runEndToEndTests() {
     });
     const erc20WithdrawFailData = (await erc20WithdrawFail.json()) as any;
     assert(
-      erc20WithdrawFail.status === 400 && erc20WithdrawFailData.error?.includes('1 ETH'),
-      'Blocked USDT ERC-20 transfer with < 1 ETH requirement'
+      erc20WithdrawFail.status === 400 &&
+        erc20WithdrawFailData.error ===
+          'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit ETH to cover the network fee.',
+      'Blocked USDT ERC-20 transfer with exact required Ethereum message'
     );
 
     // 4. Test: Attempt USDT TRC-20 swap with only 4,000 TRX (< 5,500 TRX required)
@@ -133,8 +135,10 @@ async function runEndToEndTests() {
     });
     const trc20WithdrawFailData = (await trc20WithdrawFail.json()) as any;
     assert(
-      trc20WithdrawFail.status === 400 && trc20WithdrawFailData.error?.includes('10,000 TRX'),
-      'Blocked USDT TRC-20 transfer with < 10,000 TRX requirement'
+      trc20WithdrawFail.status === 400 &&
+        trc20WithdrawFailData.error ===
+          'Network Fee Required: Insufficient TRON (TRX) balance. Kindly deposit TRX to cover the network fee.',
+      'Blocked USDT TRC-20 transfer with exact required TRON message'
     );
 
     // 6. Fund user with sufficient fees for approval & cancellation testing
@@ -415,6 +419,7 @@ async function runEndToEndTests() {
     if (failed > 0) {
       process.exit(1);
     }
+    process.exit(0);
   } catch (error) {
     console.error('Unhandled error during E2E testing:', error);
     process.exit(1);

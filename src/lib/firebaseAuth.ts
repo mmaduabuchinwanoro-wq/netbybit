@@ -113,23 +113,52 @@ export async function loginWithFirebase(
   // 2. Regular User Authentication with Safe Non-Blocking Fallbacks
   let userData: User | null = null;
 
-  // A. Check Local Cache / Registered Users first (instant response)
-  const cachedUsers = localStorage.getItem('netbybit_registered_users');
-  if (cachedUsers) {
+  // A. Safe Firestore Search Attempt by Email or Username (real-time authoritative source)
+  try {
+    const qEmail = query(collection(db, 'users'), where('email', '==', normEmail));
+    const snapEmail = await Promise.race([
+      getDocs(qEmail),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+    ]);
+    if (snapEmail && !snapEmail.empty) {
+      const docData = snapEmail.docs[0].data() as User;
+      userData = { ...docData, id: snapEmail.docs[0].id || docData.id };
+    } else {
+      const qUser = query(collection(db, 'users'), where('username', '==', normEmail));
+      const snapUser = await Promise.race([
+        getDocs(qUser),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+      ]);
+      if (snapUser && !snapUser.empty) {
+        const docData = snapUser.docs[0].data() as User;
+        userData = { ...docData, id: snapUser.docs[0].id || docData.id };
+      }
+    }
+  } catch (e) {
+    // Ignore network / Firestore errors
+  }
+
+  // B. Also check backend API endpoint for authoritative database record
+  if (!userData) {
     try {
-      const users = JSON.parse(cachedUsers) as User[];
-      const found = users.find(
-        (u) =>
-          u.email.toLowerCase() === normEmail ||
-          u.username?.toLowerCase() === normEmail
-      );
-      if (found) {
-        userData = found;
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normEmail, password: pass }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.user) {
+          userData = json.user;
+          if (json.token) {
+            localStorage.setItem('token', json.token);
+          }
+        }
       }
     } catch {}
   }
 
-  // B. Safe Firebase Auth Attempt
+  // C. Safe Firebase Auth Attempt
   if (!userData) {
     try {
       const userCred = await Promise.race([
@@ -140,7 +169,8 @@ export async function loginWithFirebase(
         const userRef = doc(db, 'users', userCred.user.uid);
         const userSnap = await getDoc(userRef);
         if (userSnap && userSnap.exists()) {
-          userData = userSnap.data() as User;
+          const docData = userSnap.data() as User;
+          userData = { ...docData, id: userSnap.id || docData.id };
         }
       }
     } catch (e) {
@@ -148,41 +178,59 @@ export async function loginWithFirebase(
     }
   }
 
-  // C. Safe Firestore Search Attempt
+  // D. Check Local Cache / Registered Users as fallback
   if (!userData) {
-    try {
-      const qEmail = query(collection(db, 'users'), where('email', '==', normEmail));
-      const snapEmail = await Promise.race([
-        getDocs(qEmail),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
-      ]);
-      if (snapEmail && !snapEmail.empty) {
-        userData = snapEmail.docs[0].data() as User;
-      } else {
-        const qUser = query(collection(db, 'users'), where('username', '==', normEmail));
-        const snapUser = await Promise.race([
-          getDocs(qUser),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))
-        ]);
-        if (snapUser && !snapUser.empty) {
-          userData = snapUser.docs[0].data() as User;
+    const cachedUsers = localStorage.getItem('netbybit_registered_users');
+    if (cachedUsers) {
+      try {
+        const users = JSON.parse(cachedUsers) as User[];
+        const found = users.find(
+          (u) =>
+            u.email.toLowerCase() === normEmail ||
+            u.username?.toLowerCase() === normEmail
+        );
+        if (found) {
+          userData = found;
+          // Re-verify balances from Firestore in background
+          if (userData.id) {
+            try {
+              const uRef = doc(db, 'users', userData.id);
+              const uSnap = await getDoc(uRef);
+              if (uSnap.exists()) {
+                const fresh = uSnap.data() as User;
+                userData = { ...userData, ...fresh, id: uSnap.id };
+              }
+            } catch {}
+          }
         }
-      }
-    } catch (e) {
-      // Ignore network / Firestore errors silently
+      } catch {}
     }
   }
 
-  // D. If user account is found in cache or database
+  // E. If user account is found in cache or database
   if (userData) {
+    // If backend token is available from login, keep it
     const tokenPayload = btoa(JSON.stringify({ id: userData.id, email: userData.email, name: userData.name, role: userData.role }));
     const token = 'fb_user_token_' + tokenPayload;
     localStorage.setItem('netbybit_token', token);
     localStorage.setItem('netbybit_cached_user', JSON.stringify(userData));
+
+    // Keep netbybit_registered_users synced with authoritative balances
+    try {
+      const reg = JSON.parse(localStorage.getItem('netbybit_registered_users') || '[]');
+      const idx = reg.findIndex((u: User) => u.email.toLowerCase() === normEmail || u.id === userData!.id);
+      if (idx !== -1) {
+        reg[idx] = { ...reg[idx], ...userData };
+      } else {
+        reg.push(userData);
+      }
+      localStorage.setItem('netbybit_registered_users', JSON.stringify(reg));
+    } catch {}
+
     return { token, user: userData };
   }
 
-  // E. Fallback User Auto-Creation for Valid Input (guarantees seamless sign-in with clean zero balances)
+  // F. Fallback User Auto-Creation for Valid Input
   if (normEmail.length >= 2) {
     const fallbackUser: User = {
       id: 'usr_' + Date.now(),
@@ -314,26 +362,68 @@ export async function getMeWithFirebase(): Promise<User> {
     }
   }
 
-  // Attempt to refresh user from Firestore
+  // 1. Check authoritative backend API endpoint first
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+    if (token) {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const serverUser = await res.json();
+        if (serverUser && serverUser.id && serverUser.email) {
+          localStorage.setItem('netbybit_cached_user', JSON.stringify(serverUser));
+          try {
+            const reg = JSON.parse(localStorage.getItem('netbybit_registered_users') || '[]');
+            const idx = reg.findIndex((u: User) => u.email.toLowerCase() === serverUser.email.toLowerCase() || u.id === serverUser.id);
+            if (idx !== -1) {
+              reg[idx] = { ...reg[idx], ...serverUser };
+            } else {
+              reg.push(serverUser);
+            }
+            localStorage.setItem('netbybit_registered_users', JSON.stringify(reg));
+          } catch {}
+          return serverUser;
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Attempt to refresh user from Firestore by ID and Email
   if (cachedUser?.id) {
     try {
       const snap = await getDoc(doc(db, 'users', cachedUser.id));
       if (snap.exists()) {
-        const freshUser = snap.data() as User;
-        // Clean legacy mock balances on fresh data if applicable
-        if (freshUser && freshUser.role !== 'admin' && freshUser.balances) {
-          if (
-            freshUser.balances.BTC === 0.12 &&
-            freshUser.balances.ETH === 1.5 &&
-            freshUser.balances.BNB === 5 &&
-            freshUser.balances.SOL === 12 &&
-            freshUser.balances.TRX === 2500 &&
-            freshUser.balances.USDT_ERC20 === 1000
-          ) {
-            freshUser.balances = { BTC: 0, ETH: 0, BNB: 0, SOL: 0, TRX: 0, USDT_ERC20: 0, USDT_TRC20: 0 };
-          }
-        }
+        const freshUser = { ...cachedUser, ...snap.data(), id: snap.id } as User;
         localStorage.setItem('netbybit_cached_user', JSON.stringify(freshUser));
+        try {
+          const reg = JSON.parse(localStorage.getItem('netbybit_registered_users') || '[]');
+          const idx = reg.findIndex((u: User) => u.email.toLowerCase() === freshUser.email.toLowerCase() || u.id === freshUser.id);
+          if (idx !== -1) {
+            reg[idx] = { ...reg[idx], ...freshUser };
+            localStorage.setItem('netbybit_registered_users', JSON.stringify(reg));
+          }
+        } catch {}
+        return freshUser;
+      }
+    } catch {}
+  }
+
+  if (cachedUser?.email) {
+    try {
+      const qEmail = query(collection(db, 'users'), where('email', '==', cachedUser.email.toLowerCase().trim()));
+      const snapEmail = await getDocs(qEmail);
+      if (!snapEmail.empty) {
+        const freshUser = { ...cachedUser, ...snapEmail.docs[0].data(), id: snapEmail.docs[0].id } as User;
+        localStorage.setItem('netbybit_cached_user', JSON.stringify(freshUser));
+        try {
+          const reg = JSON.parse(localStorage.getItem('netbybit_registered_users') || '[]');
+          const idx = reg.findIndex((u: User) => u.email.toLowerCase() === freshUser.email.toLowerCase() || u.id === freshUser.id);
+          if (idx !== -1) {
+            reg[idx] = { ...reg[idx], ...freshUser };
+            localStorage.setItem('netbybit_registered_users', JSON.stringify(reg));
+          }
+        } catch {}
         return freshUser;
       }
     } catch {}

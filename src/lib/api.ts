@@ -742,6 +742,21 @@ export const api = {
   },
 
   getMe: async (): Promise<User> => {
+    const token = getAuthToken() || localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+    if (token) {
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const serverUser = await res.json();
+          if (serverUser && serverUser.id && serverUser.email) {
+            localStorage.setItem('netbybit_cached_user', JSON.stringify(serverUser));
+            return serverUser;
+          }
+        }
+      } catch {}
+    }
     return await getMeWithFirebase();
   },
 
@@ -1233,8 +1248,9 @@ export const api = {
     }
 
     if (currentUser.email) {
+      const emailLower = currentUser.email.toLowerCase().trim();
       try {
-        const q2 = query(collection(db, 'transactions'), where('userEmail', '==', currentUser.email));
+        const q2 = query(collection(db, 'transactions'), where('userEmail', '==', emailLower));
         const snap2 = await getDocs(q2);
         snap2.forEach((d) => {
           const t = d.data() as Transaction;
@@ -1244,6 +1260,19 @@ export const api = {
         });
       } catch (e) {
         console.warn('Firestore userEmail tx fetch note:', e);
+      }
+
+      if (currentUser.email !== emailLower) {
+        try {
+          const q2b = query(collection(db, 'transactions'), where('userEmail', '==', currentUser.email));
+          const snap2b = await getDocs(q2b);
+          snap2b.forEach((d) => {
+            const t = d.data() as Transaction;
+            if (t && isMatch(t)) {
+              txMap.set(t.id || d.id, { ...t, id: t.id || d.id });
+            }
+          });
+        } catch (e) {}
       }
     }
 
@@ -1277,7 +1306,7 @@ export const api = {
 
     // 2. Fetch from backend API if available (server-isolated)
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('netbybit_token');
+      const token = getAuthToken() || localStorage.getItem('token') || localStorage.getItem('netbybit_token');
       if (token) {
         const res = await fetch('/api/user/transactions', {
           headers: { Authorization: `Bearer ${token}` },

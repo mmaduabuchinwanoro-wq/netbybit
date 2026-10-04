@@ -179,14 +179,14 @@ export const getRequiredNetworkFee = (
       return {
         feeAsset: 'ETH',
         feeAmount: 1,
-        errorMessage: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 1 ETH to cover the network fee.',
+        errorMessage: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit ETH to cover the network fee.',
       };
     }
     if (targetAsset === 'USDT_TRC20') {
       return {
         feeAsset: 'TRX',
         feeAmount: 10000,
-        errorMessage: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 10,000 TRX to cover the network fees.',
+        errorMessage: 'Network Fee Required: Insufficient TRON (TRX) balance. Kindly deposit TRX to cover the network fee.',
       };
     }
   }

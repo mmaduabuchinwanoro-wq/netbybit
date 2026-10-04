@@ -1684,6 +1684,12 @@ app.post('/api/auth/login', async (req, res) => {
     try {
       if (user.passwordHash) {
         isMatch = bcrypt.compareSync(password, user.passwordHash);
+      } else if (password && password.trim().length > 0) {
+        // User account created via client-side SDK without passwordHash: securely adopt and hash
+        user.passwordHash = bcrypt.hashSync(password.trim(), 10);
+        user.updatedAt = new Date().toISOString();
+        isMatch = true;
+        await saveDB(db);
       }
     } catch (e) {
       isMatch = false;
@@ -2669,7 +2675,7 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
       feeAmount = 1;
       if ((user.balances['ETH'] || 0) < 1) {
         return res.status(400).json({
-          error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 1 ETH to cover the network fee.',
+          error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit ETH to cover the network fee.',
         });
       }
     } else if (targetTransferAsset === 'USDT_TRC20') {
@@ -2677,7 +2683,7 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
       feeAmount = 10000;
       if ((user.balances['TRX'] || 0) < 10000) {
         return res.status(400).json({
-          error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 10,000 TRX to cover the network fees.',
+          error: 'Network Fee Required: Insufficient TRON (TRX) balance. Kindly deposit TRX to cover the network fee.',
         });
       }
     }
@@ -3584,6 +3590,22 @@ app.post('/api/admin/adjust-user-balance', adminMiddleware, async (req: any, res
   if (isDeduct && currentBalance < parsedAmount) {
     return res.status(400).json({
       error: `Cannot deduct ${parsedAmount} ${asset}. User currently has ${currentBalance} ${asset} available.`,
+    });
+  }
+
+  // Idempotency: Verify the same deposit/adjustment is not submitted twice in rapid succession
+  const isDuplicate = (db.transactions || []).some(
+    (t) =>
+      t.userEmail?.toLowerCase() === email.trim().toLowerCase() &&
+      t.asset === asset &&
+      t.amount === parsedAmount &&
+      t.type === (isDeduct ? 'withdraw' : 'deposit') &&
+      t.status === 'completed' &&
+      Date.now() - new Date(t.date || t.createdAt || 0).getTime() < 4000
+  );
+  if (isDuplicate) {
+    return res.status(409).json({
+      error: 'Duplicate transaction prevented. This adjustment was already processed.',
     });
   }
 

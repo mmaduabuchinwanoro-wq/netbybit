@@ -415,11 +415,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Failed to bind real-time user listener:', e);
     }
 
+    try {
+      if (db && user.email) {
+        const normEmail = user.email.toLowerCase().trim();
+        const qEmail = query(collection(db, 'users'), where('email', '==', normEmail));
+        unsubEmail = onSnapshot(
+          qEmail,
+          (snap) => {
+            if (!snap.empty) {
+              const freshData = snap.docs[0].data() as User;
+              if (freshData) {
+                setUser((prev) => {
+                  if (!prev) return freshData;
+                  const updated = {
+                    ...prev,
+                    ...freshData,
+                    balances: freshData.balances || prev.balances,
+                    withdrawalAddresses: freshData.withdrawalAddresses || prev.withdrawalAddresses,
+                  };
+                  localStorage.setItem('netbybit_cached_user', JSON.stringify(updated));
+                  return updated;
+                });
+              }
+            }
+          },
+          (err) => {
+            console.warn('Real-time email user listener note:', err);
+          }
+        );
+      }
+    } catch (e) {
+      console.warn('Failed to bind real-time email listener:', e);
+    }
+
     // Instant local custom event listener
     const handleBalanceEvent = (e: any) => {
       const detail = e.detail;
       if (detail && detail.balances) {
-        if (!detail.userId || detail.userId === user.id) {
+        const matchesUser =
+          (detail.userId && detail.userId === user.id) ||
+          (detail.email && user.email && detail.email.toLowerCase() === user.email.toLowerCase());
+        if (matchesUser || (!detail.userId && !detail.email)) {
           setUser((prev) => {
             if (!prev) return prev;
             const updated = {
@@ -440,9 +476,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       if (unsubDoc) unsubDoc();
+      if (unsubEmail) unsubEmail();
       window.removeEventListener('netbybit_balance_updated', handleBalanceEvent);
     };
-  }, [user?.id]);
+  }, [user?.id, user?.email]);
 
   const setSelectedCurrency = async (curr: string) => {
     const cleanCurr = curr.toUpperCase();

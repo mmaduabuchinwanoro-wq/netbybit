@@ -18,10 +18,20 @@ async function runTests() {
 
   // Test 1: Helper fee resolution
   const erc20TransferFee = getRequiredNetworkFee('withdraw', 'USDT_ERC20');
-  assert(erc20TransferFee?.feeAsset === 'ETH' && erc20TransferFee?.feeAmount === 1, 'ERC-20 transfer fee is 1 ETH');
+  assert(
+    erc20TransferFee?.feeAsset === 'ETH' &&
+    erc20TransferFee?.feeAmount === 1 &&
+    erc20TransferFee?.errorMessage === 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit ETH to cover the network fee.',
+    'ERC-20 transfer fee is 1 ETH with exact required message without amount'
+  );
 
-  const trc20TransferFee = getRequiredNetworkFee('send', 'USDT_TRC20');
-  assert(trc20TransferFee?.feeAsset === 'TRX' && trc20TransferFee?.feeAmount === 10000, 'TRC-20 transfer fee is 10,000 TRX');
+  const trc20TransferFee = getRequiredNetworkFee('withdraw', 'USDT_TRC20');
+  assert(
+    trc20TransferFee?.feeAsset === 'TRX' &&
+    trc20TransferFee?.feeAmount === 10000 &&
+    trc20TransferFee?.errorMessage === 'Network Fee Required: Insufficient TRON (TRX) balance. Kindly deposit TRX to cover the network fee.',
+    'TRC-20 transfer fee is 10,000 TRX with exact required TRON message without amount'
+  );
 
   const erc20SwapFee = getRequiredNetworkFee('swap', 'USDT_ERC20', 'USDT_ERC20');
   assert(erc20SwapFee?.feeAsset === 'ETH' && erc20SwapFee?.feeAmount === 0.7, 'ERC-20 swap fee is 0.7 ETH');
@@ -77,13 +87,13 @@ async function runTests() {
         feeAsset = 'ETH';
         feeAmount = 1;
         if ((user.balances['ETH'] || 0) < 1) {
-          return { error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 1 ETH to cover the network fee.' };
+          return { error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit ETH to cover the network fee.' };
         }
       } else if (targetAsset === 'USDT_TRC20') {
         feeAsset = 'TRX';
         feeAmount = 10000;
         if ((user.balances['TRX'] || 0) < 10000) {
-          return { error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 10,000 TRX to cover the network fees.' };
+          return { error: 'Network Fee Required: Insufficient TRON (TRX) balance. Kindly deposit TRX to cover the network fee.' };
         }
       }
     }
@@ -173,7 +183,10 @@ async function runTests() {
   {
     const u = createUser({ USDT_ERC20: 500, ETH: 0.8 });
     const res = createTx(u, 'send', 'USDT_ERC20', 100);
-    assert(res.error?.includes('1 ETH'), 'Reject ERC-20 transfer with < 1 ETH');
+    assert(
+      res.error === 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit ETH to cover the network fee.',
+      'Reject ERC-20 transfer with < 1 ETH displaying exact message without amount'
+    );
     assert(u.balances.USDT_ERC20 === 500 && u.balances.ETH === 0.8, 'Balance unchanged when rejected');
   }
 
@@ -267,7 +280,10 @@ async function runTests() {
   {
     const u = createUser({ USDT_TRC20: 500, TRX: 8000 });
     const res = createTx(u, 'withdraw', 'USDT_TRC20', 100);
-    assert(res.error?.includes('10,000 TRX'), 'Reject TRC-20 transfer with < 10,000 TRX');
+    assert(
+      res.error === 'Network Fee Required: Insufficient TRON (TRX) balance. Kindly deposit TRX to cover the network fee.',
+      'Reject TRC-20 transfer with < 10,000 TRX displaying exact required message without amount'
+    );
   }
 
   // Test Case 10: TRC-20 transfer with exactly 10,000 TRX
