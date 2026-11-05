@@ -2657,7 +2657,7 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
       feeAmount = 0.7;
       if ((user.balances['ETH'] || 0) < 0.7) {
         return res.status(400).json({
-          error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.',
+          error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to complete this swap.',
         });
       }
     } else if (targetTransferAsset === 'USDT_TRC20') {
@@ -2665,7 +2665,7 @@ app.post('/api/user/transactions', authMiddleware, async (req: any, res) => {
       feeAmount = 5500;
       if ((user.balances['TRX'] || 0) < 5500) {
         return res.status(400).json({
-          error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+          error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.',
         });
       }
     }

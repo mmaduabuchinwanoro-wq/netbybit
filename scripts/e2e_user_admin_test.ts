@@ -117,8 +117,8 @@ async function runEndToEndTests() {
     assert(
       trc20SwapFail.status === 400 &&
         trc20SwapFailData.error ===
-          'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
-      'Blocked USDT TRC-20 swap with exact required 5,500 TRX error prompt'
+          'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.',
+      'Blocked USDT TRC-20 swap with exact required Tron error prompt'
     );
 
     // 5. Test: Attempt USDT TRC-20 transfer with only 4,000 TRX (< 10,000 TRX required)

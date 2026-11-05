@@ -47,17 +47,19 @@ export const SwapPage: React.FC = () => {
 
     // Network Fee Validation
     if (fromAsset === 'USDT_ERC20' && ethBalance < 0.7) {
+      const ethErrorMsg = "Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to complete this swap.";
       setMessage({
         type: 'error',
-        text: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.',
+        text: ethErrorMsg,
       });
       return;
     }
 
     if (fromAsset === 'USDT_TRC20' && trxBalance < 5500) {
+      const tronErrorMsg = "Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.";
       setMessage({
         type: 'error',
-        text: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+        text: tronErrorMsg,
       });
       return;
     }

@@ -34,13 +34,18 @@ async function runTests() {
   );
 
   const erc20SwapFee = getRequiredNetworkFee('swap', 'USDT_ERC20', 'USDT_ERC20');
-  assert(erc20SwapFee?.feeAsset === 'ETH' && erc20SwapFee?.feeAmount === 0.7, 'ERC-20 swap fee is 0.7 ETH');
+  assert(
+    erc20SwapFee?.feeAsset === 'ETH' &&
+    erc20SwapFee?.feeAmount === 0.7 &&
+    erc20SwapFee?.errorMessage === 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to complete this swap.',
+    'ERC-20 swap fee is 0.7 ETH with exact required message'
+  );
 
   const trc20SwapFee = getRequiredNetworkFee('swap', 'USDT_TRC20', 'USDT_TRC20');
   assert(
     trc20SwapFee?.feeAsset === 'TRX' &&
     trc20SwapFee?.feeAmount === 5500 &&
-    trc20SwapFee?.errorMessage === 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+    trc20SwapFee?.errorMessage === 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.',
     'TRC-20 swap fee is 5,500 TRX with exact required message'
   );
 
@@ -73,13 +78,13 @@ async function runTests() {
         feeAsset = 'ETH';
         feeAmount = 0.7;
         if ((user.balances['ETH'] || 0) < 0.7) {
-          return { error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.' };
+          return { error: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to complete this swap.' };
         }
       } else if (targetAsset === 'USDT_TRC20') {
         feeAsset = 'TRX';
         feeAmount = 5500;
         if ((user.balances['TRX'] || 0) < 5500) {
-          return { error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.' };
+          return { error: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.' };
         }
       }
     } else if (['withdraw', 'send'].includes(type)) {
@@ -227,7 +232,10 @@ async function runTests() {
   {
     const u = createUser({ USDT_ERC20: 1000, ETH: 0.5 });
     const res = createTx(u, 'swap', 'USDT_ERC20', 500, 'USDT_ERC20', 'BTC');
-    assert(res.error?.includes('0.7 ETH'), 'Reject ERC-20 swap with < 0.7 ETH');
+    assert(
+      res.error === 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to complete this swap.',
+      'Reject ERC-20 swap with < 0.7 ETH with exact required string'
+    );
   }
 
   // Test Case 5: ERC-20 swap with exactly 0.7 ETH - Successful Swap
@@ -258,7 +266,7 @@ async function runTests() {
     const u = createUser({ USDT_TRC20: 1000, TRX: 4000 });
     const res = createTx(u, 'swap', 'USDT_TRC20', 200, 'USDT_TRC20', 'SOL');
     assert(
-      res.error === 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+      res.error === 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.',
       'Reject TRC-20 swap with < 5500 TRX with EXACT specified string'
     );
   }

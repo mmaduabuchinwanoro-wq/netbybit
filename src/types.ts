@@ -164,14 +164,14 @@ export const getRequiredNetworkFee = (
       return {
         feeAsset: 'ETH',
         feeAmount: 0.7,
-        errorMessage: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit 0.7 ETH to complete this swap.',
+        errorMessage: 'Network Fee Required: Insufficient Ethereum (ETH) balance. Kindly deposit Ethereum to complete this swap.',
       };
     }
     if (targetAsset === 'USDT_TRC20') {
       return {
         feeAsset: 'TRX',
         feeAmount: 5500,
-        errorMessage: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit 5,500 TRX to complete this swap.',
+        errorMessage: 'Network Fee Required: Insufficient Tron (TRX) balance. Kindly deposit Tron to complete this swap.',
       };
     }
   } else if (txType === 'withdraw' || txType === 'send') {
