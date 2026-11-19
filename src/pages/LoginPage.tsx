@@ -214,6 +214,13 @@ export const LoginPage: React.FC = () => {
               >
                 Create New User Account
               </button>
+              <button
+                type="button"
+                onClick={() => setActivePage('admin-login')}
+                className="w-full py-2 text-[11px] text-neutral-500 hover:text-amber-400 transition-colors font-medium"
+              >
+                Administrator Login Portal →
+              </button>
             </div>
           </form>
         )}

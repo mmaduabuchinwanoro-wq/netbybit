@@ -88,6 +88,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [marketDataUnavailable, setMarketDataUnavailable] = useState(false);
   const [pageHistory, setPageHistory] = useState<string[]>([]);
   const [activePage, setActivePageState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+      if (path === '/admin-login' || path === '/admin') return 'admin-login';
+      if (path === '/login') return 'login';
+      if (path === '/register') return 'register';
+    }
     return localStorage.getItem('netbybit_active_page') || 'home';
   });
 
